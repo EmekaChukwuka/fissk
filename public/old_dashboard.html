@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - FISSK Online Academy</title>
+    <link rel="stylesheet" href="styles.css">
+
+   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Online Academy</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="classes.html" class="nav-link">Classes</a></li>
+                <li><a href="about.html" class="nav-link">About</a></li>
+                <li><a href="contact.html" class="nav-link">Contact</a></li>
+                <li><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
+                <li class="nav-user">
+                    <div class="user-dropdown">
+                        <img src="https://ui-avatars.com/api/?name=John+Doe&background=8B5FBF&color=fff" alt="User" class="user-avatar">
+                        <span id="nameB"></span>
+                        <div class="dropdown-content">
+                            <a href="profile.html">Profile</a>
+                            <a href="settings.html">Settings</a>
+                            <a href="login.html" class="logout">Logout</a>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dashboard Header -->
+    <section class="dashboard-header">
+        <div class="container">
+            <div class="welcome-section">
+                <h1>Welcome back, <span id="name"></span> 👋</h1>
+                <p>Continue your learning journey</p>
+                <div class="date-display">
+                    <span id="currentDate"></span>
+                </div>
+            </div>
+            <div class="quick-stats">
+                <div class="stat-card">
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-info">
+                        <h3>5</h3>
+                        <p>Enrolled Classes</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-info">
+                        <h3>12h 30m</h3>
+                        <p>Learning Time</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-info">
+                        <h3>68%</h3>
+                        <p>Average Progress</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📅</div>
+                    <div class="stat-info">
+                        <h3>2</h3>
+                        <p>Upcoming Live</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Main Content -->
+    <section class="dashboard-main">
+        <div class="container">
+            <div class="dashboard-layout">
+                <!-- Sidebar -->
+                <div class="dashboard-sidebar">
+                    <div class="sidebar-section">
+                        <h4>Navigation</h4>
+                        <ul class="sidebar-menu">
+                            <li><a href="#overview" class="sidebar-link active" data-section="overview">📊 Overview</a></li>
+                            <li><a href="#classes" class="sidebar-link" data-section="classes">🎓 My Classes</a></li>
+                            <li><a href="#progress" class="sidebar-link" data-section="progress">📈 Progress</a></li>
+                            <li><a href="#live" class="sidebar-link" data-section="live">🔴 Live Sessions</a></li>
+                            <li><a href="#resources" class="sidebar-link" data-section="resources">📚 Resources</a></li>
+                            <li><a href="#certificates" class="sidebar-link" data-section="certificates">🏆 Certificates</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="sidebar-section">
+                        <h4>Quick Actions</h4>
+                        <div class="quick-actions">
+                            <a href="classes.html" class="action-btn">
+                                <span>➕</span>
+                                <span>Enroll in New Class</span>
+                            </a>
+                            <a href="#" class="action-btn">
+                                <span>📅</span>
+                                <span>View Schedule</span>
+                            </a>
+                            <a href="#" class="action-btn">
+                                <span>💬</span>
+                                <span>Community</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <h4>Daily Goal</h4>
+                        <div class="goal-tracker">
+                            <div class="goal-progress">
+                                <div class="progress-circle">
+                                    <svg width="80" height="80" viewBox="0 0 80 80">
+                                        <circle cx="40" cy="40" r="35" stroke="#E2E8F0" stroke-width="6" fill="none"></circle>
+                                        <circle cx="40" cy="40" r="35" stroke="#8B5FBF" stroke-width="6" fill="none" 
+                                                stroke-dasharray="220" stroke-dashoffset="66" transform="rotate(-90 40 40)"></circle>
+                                    </svg>
+                                    <span class="progress-text">70%</span>
+                                </div>
+                            </div>
+                            <p>45/60 minutes completed</p>
+                            <button class="btn btn-outline btn-small">Continue Learning</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="dashboard-content">
+                    <!-- Overview Section -->
+                    <div id="overview" class="content-section active">
+                        <div class="section-header">
+                            <h2>Learning Overview</h2>
+                            <div class="time-filter">
+                                <select id="timeRange">
+                                    <option value="week">This Week</option>
+                                    <option value="month" selected>This Month</option>
+                                    <option value="quarter">This Quarter</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="overview-grid">
+                            <!-- Recent Activity -->
+                            <div class="overview-card full-width">
+                                <h3>Recent Activity</h3>
+                                <div class="activity-list">
+                                    <div class="activity-item">
+                                        <div class="activity-icon completed">✓</div>
+                                        <div class="activity-details">
+                                            <p>Completed <strong>French Pronunciation Basics</strong></p>
+                                            <span class="activity-time">2 hours ago</span>
+                                        </div>
+                                    </div>
+                                    <div class="activity-item">
+                                        <div class="activity-icon enrolled">➕</div>
+                                        <div class="activity-details">
+                                            <p>Enrolled in <strong>Business English Advanced</strong></p>
+                                            <span class="activity-time">Yesterday</span>
+                                        </div>
+                                    </div>
+                                    <div class="activity-item">
+                                        <div class="activity-icon watched">👁️</div>
+                                        <div class="activity-details">
+                                            <p>Watched <strong>IELTS Writing Workshop</strong></p>
+                                            <span class="activity-time">2 days ago</span>
+                                        </div>
+                                    </div>
+                                    <div class="activity-item">
+                                        <div class="activity-icon quiz">📝</div>
+                                        <div class="activity-details">
+                                            <p>Scored 85% on <strong>French Vocabulary Quiz</strong></p>
+                                            <span class="activity-time">3 days ago</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Continue Learning -->
+                            <div class="overview-card">
+                                <h3>Continue Learning</h3>
+                                <div class="continue-class">
+                                    <div class="class-info">
+                                        <h4>French for Canada Express Entry</h4>
+                                        <p>Last watched: TEF Exam Strategies</p>
+                                        <div class="progress-container">
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 75%"></div>
+                                            </div>
+                                            <span>75% complete</span>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary">Continue</button>
+                                </div>
+                            </div>
+
+                            <!-- Upcoming Live Sessions -->
+                            <div class="overview-card">
+                                <h3>Upcoming Live Sessions</h3>
+                                <div class="live-sessions">
+                                    <div class="session-item">
+                                        <div class="session-time">
+                                            <span class="date">Jan 28</span>
+                                            <span class="time">14:00 WAT</span>
+                                        </div>
+                                        <div class="session-details">
+                                            <h5>French Conversation Practice</h5>
+                                            <p>Intermediate Level</p>
+                                        </div>
+                                        <button class="btn btn-outline btn-small">Join</button>
+                                    </div>
+                                    <div class="session-item">
+                                        <div class="session-time">
+                                            <span class="date">Jan 30</span>
+                                            <span class="time">16:00 WAT</span>
+                                        </div>
+                                        <div class="session-details">
+                                            <h5>IELTS Speaking Test</h5>
+                                            <p>Mock Exam Session</p>
+                                        </div>
+                                        <button class="btn btn-outline btn-small">Join</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- My Classes Section -->
+                    <div id="classes" class="content-section">
+                        <div class="section-header">
+                            <h2>My Classes</h2>
+                            <a href="classes.html" class="btn btn-primary">Browse All Classes</a>
+                        </div>
+
+                        <div class="classes-filter">
+                            <button class="filter-btn active" data-filter="all">All</button>
+                            <button class="filter-btn" data-filter="in-progress">In Progress</button>
+                            <button class="filter-btn" data-filter="completed">Completed</button>
+                            <button class="filter-btn" data-filter="french">French</button>
+                            <button class="filter-btn" data-filter="english">English</button>
+                        </div>
+
+                        <div id="enrolledClasses" class="enrolled-classes-grid">
+                            <!-- Classes will be loaded dynamically -->
+                        </div>
+
+                        <div id="noEnrolledClasses" class="no-content" style="display: none;">
+                            <div class="empty-state">
+                                <div class="empty-icon">🎓</div>
+                                <h3>No Classes Yet</h3>
+                                <p>You haven't enrolled in any classes. Start your learning journey today!</p>
+                                <a href="classes.html" class="btn btn-primary">Browse Classes</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Section -->
+                    <div id="progress" class="content-section">
+                        <div class="section-header">
+                            <h2>Learning Progress</h2>
+                            <div class="export-options">
+                                <button class="btn btn-outline">Export Report</button>
+                            </div>
+                        </div>
+
+                        <div class="progress-grid">
+                            <div class="progress-card full-width">
+                                <h3>Overall Progress</h3>
+                                <div class="progress-chart">
+                                    <div class="chart-placeholder">
+                                        <p>Progress visualization chart would be displayed here</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="progress-card">
+                                <h3>Language Skills</h3>
+                                <div class="skills-list">
+                                    <div class="skill-item">
+                                        <span class="skill-name">Speaking</span>
+                                        <div class="skill-progress">
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 70%"></div>
+                                            </div>
+                                            <span>70%</span>
+                                        </div>
+                                    </div>
+                                    <div class="skill-item">
+                                        <span class="skill-name">Listening</span>
+                                        <div class="skill-progress">
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 85%"></div>
+                                            </div>
+                                            <span>85%</span>
+                                        </div>
+                                    </div>
+                                    <div class="skill-item">
+                                        <span class="skill-name">Reading</span>
+                                        <div class="skill-progress">
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 90%"></div>
+                                            </div>
+                                            <span>90%</span>
+                                        </div>
+                                    </div>
+                                    <div class="skill-item">
+                                        <span class="skill-name">Writing</span>
+                                        <div class="skill-progress">
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 65%"></div>
+                                            </div>
+                                            <span>65%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="progress-card">
+                                <h3>Achievements</h3>
+                                <div class="achievements-list">
+                                    <div class="achievement-item unlocked">
+                                        <div class="achievement-icon">🏆</div>
+                                        <div class="achievement-details">
+                                            <h5>Fast Learner</h5>
+                                            <p>Complete 5 lessons in one week</p>
+                                        </div>
+                                    </div>
+                                    <div class="achievement-item unlocked">
+                                        <div class="achievement-icon">⭐</div>
+                                        <div class="achievement-details">
+                                            <h5>Consistent Student</h5>
+                                            <p>Learn for 10 consecutive days</p>
+                                        </div>
+                                    </div>
+                                    <div class="achievement-item locked">
+                                        <div class="achievement-icon">🎯</div>
+                                        <div class="achievement-details">
+                                            <h5>Quiz Master</h5>
+                                            <p>Score 100% on 3 quizzes</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Sessions Section -->
+                    <div id="live" class="content-section">
+                        <div class="section-header">
+                            <h2>Live Sessions</h2>
+                            <div class="session-filter">
+                                <button class="filter-btn active" data-type="upcoming">Upcoming</button>
+                                <button class="filter-btn" data-type="recorded">Recorded</button>
+                            </div>
+                        </div>
+
+                        <div class="live-sessions-grid">
+                            <!-- Sessions will be loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Add similar sections for Resources and Certificates -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <h3>FISSK</h3>
+                        <span>Online Academy</span>
+                    </div>
+                    <p>Empowering Nigerians with language skills for global success.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="classes.html">Classes</a></li>
+                        <li><a href="about.html">About</a></li>
+                        <li><a href="contact.html">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Support</h4>
+                    <ul>
+                        <li><a href="#">Help Center</a></li>
+                        <li><a href="#">FAQ</a></li>
+                        <li><a href="#">Contact Support</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact</h4>
+                    <ul>
+                        <li>📧 hello@fissk.com</li>
+                        <li>📱 +234 812 345 6789</li>
+                        <li>📍 Lagos, Nigeria</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 FISSK Online Academy. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+    <script src="dashboard.js"></script>
+</body>
+</html>

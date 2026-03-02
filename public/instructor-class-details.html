@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Instructor Class Details - FISSK</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="instructor-dashboard.css">
+</head>
+
+<body>
+
+<nav class="navbar">
+  <div class="nav-container">
+    <div class="nav-logo">
+      <h2>FISSK</h2>
+      <span>Instructor Portal</span>
+    </div>
+    <ul class="nav-menu">
+      <li><a href="instructor-dashboard.html">Dashboard</a></li>
+      <li><a href="instructor-classes.html">My Classes</a></li>
+    </ul>
+  </div>
+</nav>
+
+<section class="class-hero">
+<div class="container">
+<div class="class-header">
+
+<div class="class-info">
+<span id="classCategory" class="class-category"></span>
+<h1 id="className"></h1>
+<p id="classDescription" class="class-description" style="color:white;"></p>
+ <div class="class-meta" style="color:white;">
+                        <span id="classLevel"></span>
+                        <span id="classDuration"></span>
+                        <span id="classStudents"></span>
+                    </div>
+<div class="class-actions">
+<button class="btn btn-primary" id="editClassBtn">Edit Class</button>
+<button class="btn btn-outline" id="deleteClassBtn" style="color:white;">Delete</button>
+</div>
+</div>
+
+</div>
+</div>
+</section>
+
+<section class="class-content">
+<div class="container">
+
+<div class="content-tabs">
+<button class="tab-btn active" data-tab="videos">Videos</button>
+<button class="tab-btn" data-tab="students">Students</button>
+<button class="tab-btn" data-tab="streams">Live Streams</button>
+<button class="tab-btn" data-tab="materials">Materials</button>
+</div>
+
+<!-- VIDEOS -->
+<div id="videosTab" class="tab-content active">
+<button class="btn btn-primary" id="uploadVideoBtn">Upload Video</button><br><br>
+<div id="videosContainer" class="videos-grid"></div>
+</div>
+
+<!-- STUDENTS -->
+<div id="studentsTab" class="tab-content">
+<div id="studentsContainer"></div>
+</div>
+
+<!-- STREAMS -->
+<div id="streamsTab" class="tab-content">
+<button class="btn btn-primary" id="scheduleStreamBtn">Schedule Stream</button>
+<div id="streamsContainer"></div>
+</div>
+
+<!-- MATERIALS -->
+<div id="materialsTab" class="tab-content">
+<button class="btn btn-primary" id="uploadMaterialBtn">Upload Material</button>
+<div id="materialsContainer"></div>
+</div>
+
+</div>
+</section>
+
+
+    <!-- Video Modal -->
+    <div id="videoModal" class="modal">
+        <div class="modal-content video-modal">
+         
+
+            <span class="close-modal">&times;</span><br>
+            <video id="videoPlayer" controls>
+                Your browser does not support the video tag.
+            </video>
+            <div class="video-info">
+                <h3 id="videoTitle"></h3>
+                <p id="videoDescription"></p>
+            </div>
+        </div>
+    </div>
+
+<script src="instructor-class-details.js"></script>
+</body>
+</html>

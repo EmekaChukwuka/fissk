@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - FISSK Online Academy</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="instructor-dashboard.css">
+    <link rel="icon" href="fissklogo.jpg">
+
+   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Online Academy</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="classes.html" class="nav-link">Classes</a></li>
+                <li><a href="about.html" class="nav-link">About</a></li>
+                <li><a href="contact.html" class="nav-link">Contact</a></li>
+                <li><a href="dashboard.html" class="nav-link active">Dashboard</a></li>
+                <li class="nav-user">
+                    <div class="user-dropdown" id="user-dropdown">
+                    </div>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dashboard Header -->
+    <section class="dashboard-header">
+        <div class="container">
+            <div class="welcome-section">
+                <h1>Welcome back, <span id="name"></span> 👋</h1>
+                <p>Continue your learning journey</p>
+                <div class="date-display">
+                    <span id="currentDate"></span>
+                </div>
+            </div><br>
+            <div class="instructor-stats">
+                <div class="stat-card">
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-info">
+                        <h3 id="stat-enrolled">0</h3>
+                        <p>Enrolled Classes</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏱️</div>
+                    <div class="stat-info">
+                        <h3 id="stat-learning-time">0h 0m</h3>
+                        <p>Learning Time</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎯</div>
+                    <div class="stat-info">
+                        <h3 id="stat-avg-progress">0%</h3>
+                        <p>Average Progress</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📅</div>
+                    <div class="stat-info">
+                        <h3 id="stat-upcoming">0</h3>
+                        <p>Upcoming Live</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Main Content -->
+    <section class="dashboard-main">
+        <div class="container">
+            <div class="dashboard-layout">
+                <!-- Sidebar -->
+                <div class="dashboard-sidebar">
+                    <div class="sidebar-section">
+                        <h4>Navigation</h4>
+                        <ul class="sidebar-menu">
+                            <li><a href="#overview" class="sidebar-link active" data-section="overview">📊 Overview</a></li>
+                            <li><a href="#classes" class="sidebar-link" data-section="classes">🎓 My Classes</a></li>
+                            <li><a href="#progress" class="sidebar-link" data-section="progress">📈 Progress</a></li>
+                            <li><a href="#live" class="sidebar-link" data-section="live">🔴 Live Sessions</a></li>
+                            <li><a href="#resources" class="sidebar-link" data-section="resources">📚 Resources</a></li>
+                            <li><a href="#certificates" class="sidebar-link" data-section="certificates">🏆 Certificates</a></li>
+                        </ul>
+                    </div>
+                    
+                    <div class="sidebar-section">
+                        <h4>Quick Actions</h4>
+                        <div class="quick-actions">
+                            <a href="classes.html" class="action-btn">
+                                <span>➕</span>
+                                <span>Enroll in New Class</span>
+                            </a>
+                            <a href="#" class="action-btn">
+                                <span>📅</span>
+                                <span>View Schedule</span>
+                            </a>
+                            <a href="forum.html" class="action-btn">
+                                <span>💬</span>
+                                <span>Community</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <h4>Daily Goal</h4>
+                        <div class="goal-tracker">
+                            <div class="goal-progress">
+                                <div class="progress-circle">
+                                    <svg width="80" height="80" viewBox="0 0 80 80">
+                                        <circle cx="40" cy="40" r="35" stroke="#E2E8F0" stroke-width="6" fill="none"></circle>
+                                        <circle cx="40" cy="40" r="35" stroke="#8B5FBF" stroke-width="6" fill="none" 
+                                                stroke-dasharray="220" stroke-dashoffset="66" transform="rotate(-90 40 40)"></circle>
+                                    </svg>
+                                    <span class="progress-text">70%</span>
+                                </div>
+                            </div>
+                            <p>45/60 minutes completed</p>
+                            <button class="btn btn-outline btn-small">Continue Learning</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="dashboard-content">
+                    <!-- Overview Section -->
+                    <div id="overview" class="content-section active">
+                        <div class="section-header">
+                            <h2>Learning Overview</h2>
+                            <div class="time-filter">
+                                <select id="timeRange">
+                                    <option value="week">This Week</option>
+                                    <option value="month" selected>This Month</option>
+                                    <option value="quarter">This Quarter</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="overview-grid">
+                            <!-- Recent Activity -->
+                            <div class="overview-card full-width">
+                                <h3>Recent Activity</h3>
+                                <div class="activity-list" id="recentActivity">
+                                    <!-- populated dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- Continue Learning -->
+                            <div class="overview-card">
+                                <h3>Continue Learning</h3>
+                                <div class="continue-class" id="continueClass">
+                                    <!-- populated dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- Upcoming Live Sessions -->
+                            <div class="overview-card">
+                                <h3>Upcoming Live Sessions</h3>
+                                <div class="live-sessions" id="overviewLiveSessions">
+                                    <!-- populated dynamically -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- My Classes Section -->
+                    <div id="classes" class="content-section">
+                        <div class="section-header">
+                            <h2>My Classes</h2>
+                            <a href="classes.html" class="btn btn-primary">Browse All Classes</a>
+                        </div>
+
+                        <div class="classes-filter">
+                            <button class="filter-btn active" data-filter="all">All</button>
+                            <button class="filter-btn" data-filter="in-progress">In Progress</button>
+                            <button class="filter-btn" data-filter="completed">Completed</button>
+                            <button class="filter-btn" data-filter="french">French</button>
+                            <button class="filter-btn" data-filter="english">English</button>
+                        </div>
+
+                        <div id="enrolledClasses" class="enrolled-classes-grid">
+                            <!-- Classes will be loaded dynamically -->
+                        </div>
+
+                        <div id="noEnrolledClasses" class="no-content" style="display: none;">
+                            <div class="empty-state">
+                                <div class="empty-icon">🎓</div>
+                                <h3>No Classes Yet</h3>
+                                <p>You haven't enrolled in any classes. Start your learning journey today!</p>
+                                <a href="classes.html" class="btn btn-primary">Browse Classes</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Section -->
+                    <div id="progress" class="content-section">
+                        <div class="section-header">
+                            <h2>Learning Progress</h2>
+                            <div class="export-options">
+                                <button class="btn btn-outline">Export Report</button>
+                            </div>
+                        </div>
+
+                        <div class="progress-grid">
+                            <div class="progress-card full-width">
+                                <h3>Overall Progress</h3>
+                                <div class="progress-chart">
+                                    <canvas id="chart" class="chart-placeholder"></canvas>
+                                    <div class="chart-placeholder">
+                                        <p>Progress visualization chart would be displayed here</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="progress-card">
+                                <h3> Skills</h3>
+                                <div class="skills-list">
+                                    <div class="skill-item">
+                                        <span class="skill-name">Speaking</span>
+                                        <div class="skill-progress">
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 70%"></div>
+                                            </div>
+                                            <span>70%</span>
+                                        </div>
+                                    </div>
+                                    <div class="skill-item">
+                                        <span class="skill-name">Listening</span>
+                                        <div class="skill-progress">
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 85%"></div>
+                                            </div>
+                                            <span>85%</span>
+                                        </div>
+                                    </div>
+                                    <div class="skill-item">
+                                        <span class="skill-name">Reading</span>
+                                        <div class="skill-progress">
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 90%"></div>
+                                            </div>
+                                            <span>90%</span>
+                                        </div>
+                                    </div>
+                                    <div class="skill-item">
+                                        <span class="skill-name">Writing</span>
+                                        <div class="skill-progress">
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: 65%"></div>
+                                            </div>
+                                            <span>65%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="progress-card">
+                                <h3>Achievements</h3>
+                                <div class="achievements-list">
+                                    <div class="achievement-item unlocked">
+                                        <div class="achievement-icon">🏆</div>
+                                        <div class="achievement-details">
+                                            <h5>Fast Learner</h5>
+                                            <p>Complete 5 lessons in one week</p>
+                                        </div>
+                                    </div>
+                                    <div class="achievement-item unlocked">
+                                        <div class="achievement-icon">⭐</div>
+                                        <div class="achievement-details">
+                                            <h5>Consistent Student</h5>
+                                            <p>Learn for 10 consecutive days</p>
+                                        </div>
+                                    </div>
+                                    <div class="achievement-item locked">
+                                        <div class="achievement-icon">🎯</div>
+                                        <div class="achievement-details">
+                                            <h5>Quiz Master</h5>
+                                            <p>Score 100% on 3 quizzes</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Sessions Section -->
+                    <div id="live" class="content-section">
+                        <div class="section-header">
+                            <h2>Live Sessions</h2>
+                            <div class="session-filter">
+                                <button class="filter-btn active" data-type="upcoming">Upcoming</button>
+                                <button class="filter-btn" data-type="recorded">Recorded</button>
+                            </div>
+                        </div>
+
+                        <div class="live-sessions-grid" id="liveSessionsGrid">
+                            <!-- Sessions will be loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Add similar sections for Resources and Certificates -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <h3>FISSK</h3>
+                        <span>Online Academy</span>
+                    </div>
+                    <p>Empowering Nigerians with  skills for global success.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="classes.html">Classes</a></li>
+                        <li><a href="about.html">About</a></li>
+                        <li><a href="contact.html">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Support</h4>
+                    <ul>
+                        <li><a href="#">Help Center</a></li>
+                        <li><a href="#">FAQ</a></li>
+                        <li><a href="#">Contact Support</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact</h4>
+                    <ul>
+                        <li>📧 hello@fissk.com</li>
+                        <li>📱 +234 812 345 6789</li>
+                        <li>📍 Lagos, Nigeria</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 FISSK Online Academy. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Inline rewritten dashboard script (replaces dashboard.js) -->
+    <script>
+    // Rewritten Dashboard Logic - uses backend routes:
+    // POST /register/get-user-classes  -> { classes: [...] }
+    // POST /dashboard/learning-time   -> { total_seconds, readable }
+    // GET  /dashboard/live-sessions  -> { upcoming: [], recorded: [] }
+
+    class DashboardManager {
+        constructor() {
+            this.currentSection = 'overview';
+            this.user = this.getLocalUser();
+            this.init();
+        }
+
+        getLocalUser() {
+            try {
+                const u = JSON.parse(localStorage.getItem('user')) || {};
+                // normalize: support { email, name } or {email:..., first_name...}
+                if (!u.email && u.first_name) {
+                    u.email = u.first_name.toLowerCase() + '@fissk.com';
+                }
+                return u;
+            } catch (e) {
+                return {};
+            }
+        }
+
+        init() {
+            this.setupEventListeners();
+            this.updateDate();
+            this.setupSectionNavigation();
+            this.loadDashboardData();
+        }
+
+        setupEventListeners() {
+            
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const section = e.target.dataset.section;
+                    this.switchSection(section);
+                });
+            });
+
+            document.querySelectorAll('.classes-filter .filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    this.filterClasses(e.target.dataset.filter);
+                });
+            });
+
+            document.querySelectorAll('.session-filter .filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    this.filterSessions(e.target.dataset.type);
+                });
+            });
+
+            const timeRange = document.getElementById('timeRange');
+            if (timeRange) timeRange.addEventListener('change', (e) => this.updateProgressData(e.target.value));
+        }
+
+        switchSection(sectionName) {
+            document.querySelectorAll('.sidebar-link').forEach(link => link.classList.toggle('active', link.dataset.section === sectionName));
+            document.querySelectorAll('.content-section').forEach(section => section.classList.toggle('active', section.id === sectionName));
+            this.currentSection = sectionName;
+            this.loadSectionData(sectionName);
+        }
+
+        setupSectionNavigation() {
+            window.addEventListener('hashchange', () => {
+                const section = window.location.hash.substring(1);
+                if (section) this.switchSection(section);
+            });
+            const initialSection = window.location.hash.substring(1) || 'overview';
+            this.switchSection(initialSection);
+        }
+
+        updateDate() {
+            const dateElement = document.getElementById('currentDate');
+            if (!dateElement) return;
+            const now = new Date();
+            const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateElement.textContent = now.toLocaleDateString('en-US', opts);
+        }
+
+        async loadDashboardData() {
+            try {
+                this.updateUserName();
+                await Promise.all([
+                    this.loadEnrolledClasses(),
+                    this.loadLearningTime(),
+                    this.loadLiveSessions(),
+                    this.loadStats()
+                ]);
+            } catch (err) {
+                console.error('Dashboard load error', err);
+            }
+        }
+
+        updateUserName() {
+        document.getElementById('user-dropdown').innerHTML = `
+                        <img src="https://ui-avatars.com/api/?name=${this.user.firstname}+${this.user.lastname}&background=8B5FBF&color=fff" alt="User" class="user-avatar" id="user-avatar">
+                        <span id="nameB"></span>
+                        <div class="dropdown-content">
+                            <a href="profile.html">Profile</a>
+                            <a href="settings.html">Settings</a>
+                            <a href="#" class="logout" onclick="logout()">Logout</a>
+                        </div>`;
+            const nameEl = document.getElementById('name');
+            const nameB = document.getElementById('nameB');
+            const name = this.user.name || this.user.firstname || this.user.email || 'Student';
+            if (nameEl) nameEl.textContent = name;
+            if (nameB) nameB.textContent = name;
+        }
+
+        // ----------- Enrolled Classes -----------
+        async loadEnrolledClasses() {
+            try {
+                const email = this.user.email;
+                const res = await fetch('/register/get-user-classes', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email })
+                });
+                const json = await res.json();
+                const classes = Array.isArray(json?.classes) ? json.classes : [];
+
+                const resB = await fetch('/register/dashboard/learning-time', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email })
+                });
+                const jsonB = await resB.json();
+                // compute stats
+                const enrolledCount = classes.length;
+                const avgProgress = classes.length ? Math.round(classes.reduce((s, c) => s + (Number(c.progress) || 0), 0) / classes.length) : 0;
+
+                // update UI
+                document.getElementById('stat-enrolled').textContent = enrolledCount;
+                document.getElementById('stat-learning-time').textContent = jsonB.readable;
+                document.getElementById('stat-avg-progress').textContent = avgProgress + '%';
+
+                this.renderEnrolledClasses(classes);
+                this.renderOverviewContinue(classes);
+            } catch (err) {
+                console.error('loadEnrolledClasses error', err);
+                const mock = this.getMockEnrolledClasses();
+                document.getElementById('stat-enrolled').textContent = mock.length;
+                document.getElementById('stat-avg-progress').textContent = '0%';
+                this.renderEnrolledClasses(mock);
+            }
+        }
+
+        renderOverviewContinue(classes) {
+            const container = document.getElementById('continueClass');
+            if (!container) return;
+            if (!classes || classes.length === 0) {
+                container.innerHTML = '<p>No classes to continue. Browse classes to get started.</p>';
+                return;
+            }
+            const top = classes[0];
+            container.innerHTML = `
+                <div class="class-info">
+                    <h4>${top.title}</h4>
+                    <p>Last watched: ${top.last_accessed ? new Date(top.last_accessed).toLocaleString() : '—'}</p>
+                    <div class="progress-container">
+                        <div class="progress-bar"><div class="progress-fill" style="width: ${top.progress || 0}%"></div></div>
+                        <span>${top.progress || 0}% complete</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="window.location.href='class.html?id=${top.class_id}'">Continue</button>
+            `;
+        }
+
+        renderEnrolledClasses(classes) {
+            const container = document.getElementById('enrolledClasses');
+            const noClasses = document.getElementById('noEnrolledClasses');
+
+            if (!classes || classes.length === 0) {
+                if (container) container.style.display = 'none';
+                if (noClasses) noClasses.style.display = 'block';
+                return;
+            }
+
+            if (noClasses) noClasses.style.display = 'none';
+            if (container) {
+                container.style.display = 'grid';
+                container.innerHTML = classes.map(classItem => `
+                    <div class="enrolled-class-card" data-class-id="${classItem.class_id}" data-category="${classItem.category}">
+                        <img src="${classItem.thumbnail_url || '/assets/default-class-thumbnail.jpg'}" alt="${this.escapeHtml(classItem.title)}" class="class-thumb" />
+                        <div class="card-body">
+                            <span class="class-category ${classItem.category}">${(classItem.category || '').toUpperCase()}</span>
+                            <h4>${this.escapeHtml(classItem.title)}</h4>
+                            <div class="class-meta">
+                                <span>🟢 ${classItem.level || '—'}</span>
+                            </div>
+
+                            <div class="class-progress">
+                                <div class="progress-bar"><div class="progress-fill" style="width: ${classItem.progress || 0}%"></div></div>
+                                <span>${classItem.progress || 0}% complete</span>
+                            </div>
+
+                            <div class="class-info">
+                                <p><strong>Last accessed:</strong> ${classItem.last_accessed ? new Date(classItem.last_accessed).toLocaleDateString() : '—'}</p>
+                            </div>
+
+                            <div class="class-actions">
+                                <a href="class.html?id=${classItem.class_id}" class="btn btn-primary">Continue</a>
+                                <button class="btn btn-outline view-materials">Materials</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                // actions
+                container.querySelectorAll('.view-materials').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const classCard = e.target.closest('.enrolled-class-card');
+                        const classId = classCard.dataset.classId;
+                        this.viewClassMaterials(classId);
+                    });
+                });
+
+                // animate progress bars
+                container.querySelectorAll('.progress-fill').forEach(bar => {
+                    const width = bar.style.width;
+                    bar.style.width = '0%';
+                    setTimeout(() => bar.style.width = width, 150);
+                });
+            }
+        }
+
+        escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/[&<>"]/g, function (s) {
+                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[s];
+            });
+        }
+
+        filterClasses(filter) {
+            const classes = document.querySelectorAll('.enrolled-class-card');
+            const filterButtons = document.querySelectorAll('.classes-filter .filter-btn');
+            filterButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.filter === filter));
+            classes.forEach(classCard => {
+                const pct = parseInt(classCard.querySelector('.progress-fill').style.width) || 0;
+                if (filter === 'all' || classCard.dataset.category === filter || (filter === 'in-progress' && pct < 100) || (filter === 'completed' && pct === 100)) {
+                    classCard.style.display = 'block';
+                } else {
+                    classCard.style.display = 'none';
+                }
+            });
+        }
+
+        // ----------- Learning Time (backend optimized) -----------
+        async loadLearningTime() {
+            try {
+                const email = this.user.email || 'chiamaka@fissk.com';
+                const res = await fetch('/register/dashboard/learning-time', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: 'chiamaka@fissk.com' })
+                });
+                const json = await res.json();
+                const readable = json?.readable || '0h 0m';
+                document.getElementById('stat-learning-time').textContent = readable;
+            } catch (err) {
+                console.error('loadLearningTime error', err);
+                document.getElementById('stat-learning-time').textContent = '0h 0m';
+            }
+        }
+
+        // ----------- Live Sessions -----------
+        async loadLiveSessions() {
+            try {
+                const res = await fetch('/register/dashboard/live-sessions', {
+                    method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id : this.user.id })
+                });
+                const json = await res.json();
+                const upcoming = Array.isArray(json.upcoming) ? json.upcoming : [];
+                const recorded = Array.isArray(json.recorded) ? json.recorded : [];
+                document.getElementById('stat-upcoming').textContent = upcoming.length;
+                this.renderLiveSessions({ upcoming, recorded });
+            } catch (err) {
+                console.error('loadLiveSessions error', err);
+                document.getElementById('stat-upcoming').textContent = '0';
+                this.renderLiveSessions({ upcoming: [], recorded: [] });
+            }
+        }
+
+        renderLiveSessions(sessions) {
+            const container = document.getElementById('liveSessionsGrid');
+            const overview = document.getElementById('overviewLiveSessions');
+            if (!container) return;
+
+            container.innerHTML = `
+                <div class="upcoming-sessions">
+                    <h3>Upcoming Sessions</h3><br>
+                    <div class="sessions-list">
+                        ${sessions.upcoming.map(s => `
+                            <div class="enrolled-class-card upcoming">
+                                <div class="session-header"><h4>${this.escapeHtml(s.class_title)}</h4><span class="session-badge">Live</span></div>
+                                <p>${this.escapeHtml(s.description || '')}</p>
+                                <div class="session-details">
+                                    <div class="session-info">
+                                        <span>📅 ${new Date(s.date).toLocaleDateString()} at ${s.time || ''}</span>
+                                        <span>⏱️ ${s.duration || ''}</span>
+                                        <span>👤 ${this.escapeHtml(s.instructor)}</span>
+                                        <span>👥 ${s.participants || 0} enrolled</span>
+                                    </div><br>
+                                    <div class="session-actions">
+                                        <button class="btn btn-primary join-session" data-session-id="${s.id}">Join Session</button>
+                                    </div>
+                                </div>
+                            </div><br>
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="recorded-sessions">
+                    <h3>Recorded Sessions</h3><br>
+                    <div class="sessions-list">
+                        ${sessions.recorded.map(s => `
+                            <div class="enrolled-class-card recorded">
+                                <div class="session-header"><h4>${this.escapeHtml(s.class_title)}</h4><span class="session-badge recorded">Recorded</span></div>
+                                <p>${this.escapeHtml(s.description || '')}</p>
+                                <div class="session-details">
+                                    <div class="session-info">
+                                        <span>📅 ${new Date(s.date).toLocaleDateString()}</span>
+                                        <span>⏱️ ${s.duration || ''}</span>
+                                        <span>👤 ${this.escapeHtml(s.instructor)}</span>
+                                        <span>👁️ ${s.participants || 0} views</span>
+                                    </div><br>
+                                    <div class="session-actions">
+                                        <button class="btn btn-primary watch-session" data-session-id="${s.class_id}">Watch Now</button>
+                                    </div>
+                                </div>
+                            </div><br>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            // event listeners
+            container.querySelectorAll('.join-session').forEach(btn => btn.addEventListener('click', (e) => this.joinLiveSession(e.target.dataset.sessionId)));
+            container.querySelectorAll('.watch-session').forEach(btn => btn.addEventListener('click', (e) => this.watchRecordedSession(e.target.dataset.sessionId)));
+
+            // overview snippet
+            if (overview) {
+                overview.innerHTML = sessions.upcoming.slice(0,2).map(s => `
+                    <div class="session-item">
+                        <div class="session-time"><span class="date">${new Date(s.date).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</span><span class="time">${s.time || ''} WAT</span></div>
+                        <div class="session-details"><h5>${this.escapeHtml(s.title)}</h5><p>${this.escapeHtml(s.description || '')}</p></div>
+                        <button class="btn btn-outline btn-small" onclick="location.href='#live'">Join</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        
+        // ----------- Recent Activity -----------
+        async loadStats() {
+            try {
+                const res = await fetch('/register/dashboard/load-stats', {
+                    method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id : this.user.id })
+                });
+                const json = await res.json();
+                console.log(json) 
+                this.renderStats( json );
+            } catch (err) {
+                console.error('loadStats error', err);
+            }
+        }
+
+        renderStats(stats) {
+            const container = document.getElementById('recentActivity');
+            if (!container) return;
+
+            container.innerHTML = `
+                <div class="upcoming-sessions">
+                    <div>
+                </div>
+            `;
+
+        }
+
+        filterSessions(type) {
+            document.querySelectorAll('.session-filter .filter-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.type === type));
+            const upcomingSection = document.querySelector('.upcoming-sessions');
+            const recordedSection = document.querySelector('.recorded-sessions');
+            if (type === 'upcoming') { if (upcomingSection) upcomingSection.style.display = 'block'; if (recordedSection) recordedSection.style.display = 'none'; }
+            else { if (upcomingSection) upcomingSection.style.display = 'none'; if (recordedSection) recordedSection.style.display = 'block'; }
+        }
+
+        loadSectionData(sectionName) {
+            switch (sectionName) {
+                case 'classes': this.loadEnrolledClasses(); break;
+                case 'live': this.loadLiveSessions(); break;
+                case 'progress': this.loadProgressData(); break;
+            }
+        }
+
+        loadProgressData() { console.log('loadProgressData'); }
+
+        updateProgressData(range) { console.log('updateProgressData', range); }
+
+        viewClassMaterials(classId) { window.location.href = `class.html?id=${classId}#materials`; }
+        joinLiveSession(sessionId) { alert(`Joining live session ${sessionId}`); }
+        watchRecordedSession(sessionId) {  window.location.href = `class.html?id=${sessionId}`  }
+
+        getMockEnrolledClasses() {
+            return [
+                { class_id:1, title: 'French for Canada Express Entry', category:'french', level:'beginner', progress:75, last_accessed:'2026-01-25' },
+                { class_id:2, title: 'Business English Advanced', category:'english', level:'advanced', progress:30, last_accessed:'2026-01-24' }
+            ];
+        }
+
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => new DashboardManager());
+    
+        async function logout() {
+            console.log('hey')
+            localStorage.removeItem('user');
+            window.location.href = "/";
+        }
+
+
+// Mobile Navigation
+const hamburger = document.querySelector('.hamburger');
+const navMenu = document.querySelector('.nav-menu');
+
+
+if (hamburger) {
+    hamburger.addEventListener('click', () => {
+        hamburger.classList.toggle('active');
+        navMenu.classList.toggle('active');
+        
+        // Add mobile menu styles
+        if (navMenu.classList.contains('active')) {
+            navMenu.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        } else {
+            navMenu.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+    });
+}
+
+// Close mobile menu when clicking on links
+document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+        hamburger.classList.remove('active');
+        navMenu.classList.remove('active');
+        navMenu.style.display = 'none';
+        document.body.style.overflow = 'auto';
+    });
+});
+
+
+
+// Smooth scrolling for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
+    });
+});
+    </script>
+</body>
+</html>

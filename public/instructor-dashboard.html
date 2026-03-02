@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instructor Dashboard - FISSK Online Academy</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="instructor-dashboard.css">
+    <link rel="icon" href="fissklogo.jpg">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Instructor Portal</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="instructor-dashboard.html" class="nav-link active">Dashboard</a></li>
+                <li><a href="instructor-classes.html" class="nav-link">My Classes</a></li>
+                <li><a href="instructor-livestream.html" class="nav-link">Live Streams</a></li>
+                <li><a href="dashboard.html" class="nav-link">Student View</a></li>
+                <li class="nav-user">
+                    <div class="user-dropdown" id="user-dropdown">
+                    </div>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+            <div class="dashboard-header">
+                <div class="container">
+                <h1>Instructor Dashboard</h1>
+                <p>Manage your classes and live streams</p><br><br>
+                        <div class="instructor-stats">
+                            <div class="stat-card">
+                                <div class="stat-icon">📚</div>
+                                <div class="stat-info">
+                                    <h3 id="totalClasses">0</h3>
+                                    <p>Total Classes</p>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">👥</div>
+                                <div class="stat-info">
+                                    <h3 id="totalStudents">0</h3>
+                                    <p>Total Students</p>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">🎥</div>
+                                <div class="stat-info">
+                                    <h3 id="totalVideos">0</h3>
+                                    <p>Recorded Videos</p>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">⭐</div>
+                                <div class="stat-info">
+                                    <h3 id="avgRating">0.0</h3>
+                                    <p>Average Rating</p>
+                                </div>
+                            </div>
+                        
+                        </div>
+                 </div>
+            </div>
+    <!-- Instructor Dashboard -->
+    <section class="dashboard">
+        
+
+<div class="container">
+            <div class="dashboard-grid">
+                <!-- Sidebar -->
+                <div class="dashboard-sidebar">
+                    <div class="sidebar-header">
+                        <h3>Instructor Tools</h3>
+                    </div>
+                    <ul class="sidebar-menu">
+                        <li><a href="#overview" class="sidebar-link active" data-section="overview">📊 Overview</a></li>
+                        <li><a href="#classes" class="sidebar-link" data-section="classes">📚 My Classes</a></li>
+                        <li><a href="#livestreams" class="sidebar-link" data-section="livestreams">🎥 Live Streams</a></li>
+                        <li><a href="#students" class="sidebar-link" data-section="students">👥 Students</a></li>
+                        <li><a href="#analytics" class="sidebar-link" data-section="analytics">📈 Analytics</a></li>
+                    </ul>
+                    
+                    <div class="sidebar-card">
+                        <h4>Quick Actions</h4>
+                        <button class="btn btn-primary btn-full" id="createClassBtn2">
+                            + New Class
+                        </button>
+                        <button class="btn btn-outline btn-full" id="scheduleLiveBtn2">
+                            📅 Schedule Live
+                        </button>
+                    </div>
+                </div>
+
+               
+
+                        
+                <!-- Main Content -->
+                <div class="dashboard-main">   
+                    
+                      <!-- Overview Section -->
+
+                                    <div id="overview" class="dashboard-section active">
+                        <div class="recent-activities">
+                            <h3>Recent Activity</h3>
+                            <div id="recentActivities" class="activities-list">
+                                <!-- Activities will be loaded here -->
+                            </div>
+                        </div>
+                        </div>
+                        
+                     <!-- My Classes Section -->
+                    <div id="classes" class="dashboard-section">
+                        <div class="section-header">
+                            <h2>My Classes</h2>
+                            <button class="btn btn-primary" id="createClassBtn">
+                                + Create New Class
+                            </button>
+                        </div>
+                        <div id="classesList" class="classes-grid">
+                            <!-- Classes will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Live Streams Section -->
+                    <div id="livestreams" class="dashboard-section">
+                        <div class="section-header">
+                            <h2>Live Stream Management</h2>
+                            <div class="section-actions">
+                                <button class="btn btn-primary" id="startLiveBtn">
+                                    🎥 Start Live Stream
+                                </button>
+                                <button class="btn btn-outline" id="scheduleLiveBtn">
+                                    📅 Schedule Live
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="livestream-sections">
+                            <div class="scheduled-streams">
+                                <h4>Scheduled Live Streams</h4>
+                                <div id="scheduledStreams" >
+                                    <div class="instructor-stats">
+                                        
+                                    </div>
+                                    <!-- Scheduled streams will be loaded here -->
+                                </div>
+                            </div>
+
+                            <div class="past-streams">
+                                <h4>Past Live Streams</h4>
+                                <div id="pastStreams">
+                                    <!-- Past streams will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Students Section -->
+                    <div id="students" class="dashboard-section">
+                        <div class="section-header">
+                            <h2>Student Management</h2>
+                            <select id="classFilter" onchange="instructorDashboard.loadEnrollments()">
+                                <option value="">All Classes</option>
+                            </select>
+                        </div>
+                        <div id="enrollmentsList" class="enrollments-table">
+                            <!-- Enrollments will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </section>
+
+
+    <!-- Modals -->
+    <div id="createClassModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Create New Class</h2>
+            <form id="createClassForm">
+                <div class="form-group">
+                    <label for="className">Class Title</label>
+                    <input type="text" id="className" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="classDescription">Description</label>
+                    <textarea id="classDescription" name="description" rows="4" required></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="classCategory">Subject</label>
+                        <select id="classCategory" name="category" required>
+                            <option value="french">French</option>
+                            <option value="english">English</option>
+                            <option value="biology">Biology</option>
+                            <option value="chemistry">Chemistry</option>
+                            <option value="physics">Physics</option>
+                            <option value="mathematics">Mathematics</option>
+                            <option value="economics">Economics</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="classLevel">Level</label>
+                        <select id="classLevel" name="level" required>
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="classDuration">Duration</label>
+                    <input type="text" id="classDuration" name="duration" placeholder="e.g., 8 weeks" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="createClassBtn" >Create Class</button>
+                    <button type="button" class="btn btn-outline">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="scheduleStreamModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Schedule Live Stream</h2>
+            <form id="scheduleStreamForm">
+                <div class="form-group">
+                    <label for="streamClass">Select Class</label>
+                    <select id="streamClass" name="classId" required>
+                        <option value="">Choose a class...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="streamTitle">Stream Title</label>
+                    <input type="text" id="streamTitle" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="streamDescription">Description</label>
+                    <textarea id="streamDescription" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="streamDateTime">Date & Time</label>
+                    <input type="datetime-local" id="streamDateTime" name="scheduledTime" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Schedule Stream</button>
+                    <button type="button" class="btn btn-outline">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <h3>FISSK</h3>
+                        <span>Online Academy</span>
+                    </div>
+                    <p>Empowering Nigerians with  skills for global success.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="classes.html">Classes</a></li>
+                        <li><a href="forum.html">Forum</a></li>
+                        <li><a href="dashboard.html">Dashboard</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Courses</h4>
+                    <ul>
+                        <li><a href="#">French Courses</a></li>
+                        <li><a href="#">English Courses</a></li>
+                        <li><a href="#">Exam Preparation</a></li>
+                        <li><a href="#">Business </a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact</h4>
+                    <ul>
+                        <li>📧 hello@fissk.com</li>
+                        <li>📱 +234 812 345 6789</li>
+                        <li>📍 Lagos, Nigeria</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 FISSK Online Academy. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+    <script src="instructor-dashboard.js"></script>
+</body>
+</html>

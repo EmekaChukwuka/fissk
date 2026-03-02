@@ -1,0 +1,1233 @@
+I'll create a complete system for handling live stream videos, class management, and instructor dashboard. Here's the implementation:
+
+## 1. Backend Updates for Video Management
+
+### Updated server.js with Video Routes
+
+```javascript
+// Add these routes to your existing server.js
+
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+
+// Configure multer for video uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = 'uploads/';
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        // Format: classname_timestamp_random.webm
+        const classId = req.body.classId || 'general';
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '');
+        const random = Math.random().toString(36).substring(2, 8);
+        const filename = `${classId}_${timestamp}_${random}.webm`;
+        cb(null, filename);
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 100 * 1024 * 1024 // 100MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'video/webm') {
+            cb(null, true);
+        } else {
+            cb(new Error('Only .webm files are allowed'), false);
+        }
+    }
+});
+
+// Video Upload Route
+app.post('/api/upload-livestream', upload.single('video'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No video file uploaded' });
+        }
+
+        const { classId, title, description } = req.body;
+        
+        // Save video info to database
+        const [result] = await pool.execute(
+            `INSERT INTO class_videos (class_id, title, description, video_url, duration, upload_date) 
+             VALUES (?, ?, ?, ?, ?, NOW())`,
+            [classId, title, description, req.file.filename, '00:00'] // Duration can be calculated later
+        );
+
+        res.json({
+            message: 'Video uploaded successfully',
+            video: {
+                id: result.insertId,
+                title,
+                description,
+                filename: req.file.filename,
+                url: `/uploads/${req.file.filename}`
+            }
+        });
+    } catch (error) {
+        console.error('Video upload error:', error);
+        res.status(500).json({ message: 'Video upload failed' });
+    }
+});
+
+// Get Videos by Class ID
+app.get('/api/classes/:id/videos', async (req, res) => {
+    try {
+        const classId = req.params.id;
+        
+        const [videos] = await pool.execute(`
+            SELECT cv.*, c.title as class_title, c.category
+            FROM class_videos cv
+            JOIN classes c ON cv.class_id = c.id
+            WHERE cv.class_id = ? AND cv.is_active = TRUE
+            ORDER BY cv.upload_date DESC
+        `, [classId]);
+
+        // Add full URL to video files
+        const videosWithUrls = videos.map(video => ({
+            ...video,
+            video_url: `/uploads/${video.video_url}`,
+            thumbnail_url: video.thumbnail_url || '/assets/default-thumbnail.jpg'
+        }));
+
+        res.json(videosWithUrls);
+    } catch (error) {
+        console.error('Get class videos error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Serve uploaded videos statically
+app.use('/uploads', express.static('uploads'));
+
+// Get Videos by Filename Pattern
+app.get('/api/videos/by-class/:classId', async (req, res) => {
+    try {
+        const classId = req.params.classId;
+        
+        // Get class info to determine naming pattern
+        const [classes] = await pool.execute(
+            'SELECT title, category FROM classes WHERE id = ?',
+            [classId]
+        );
+
+        if (classes.length === 0) {
+            return res.status(404).json({ message: 'Class not found' });
+        }
+
+        const classInfo = classes[0];
+        const classPattern = classInfo.category; // Use category for filename pattern
+        
+        // Read uploads directory
+        const uploadsDir = 'uploads/';
+        const files = fs.readdirSync(uploadsDir);
+        
+        // Filter files that match the class pattern
+        const classVideos = files.filter(file => {
+            return file.startsWith(`${classPattern}_`) && file.endsWith('.webm');
+        }).map(file => {
+            const filePath = path.join(uploadsDir, file);
+            const stats = fs.statSync(filePath);
+            
+            return {
+                filename: file,
+                url: `/uploads/${file}`,
+                uploadDate: stats.mtime,
+                size: stats.size,
+                classTitle: classInfo.title,
+                category: classInfo.category
+            };
+        }).sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+
+        res.json(classVideos);
+    } catch (error) {
+        console.error('Get videos by class error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Instructor Routes
+app.get('/api/instructor/classes', authenticateToken, async (req, res) => {
+    try {
+        const instructorId = req.user.id;
+
+        const [classes] = await pool.execute(`
+            SELECT c.*, 
+                   COUNT(e.id) as enrolled_students,
+                   COUNT(cv.id) as video_count
+            FROM classes c
+            LEFT JOIN enrollments e ON c.id = e.class_id
+            LEFT JOIN class_videos cv ON c.id = cv.class_id
+            WHERE c.instructor_id = ?
+            GROUP BY c.id
+            ORDER BY c.created_at DESC
+        `, [instructorId]);
+
+        res.json(classes);
+    } catch (error) {
+        console.error('Get instructor classes error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+app.get('/api/instructor/classes/:classId/enrollments', authenticateToken, async (req, res) => {
+    try {
+        const classId = req.params.classId;
+        const instructorId = req.user.id;
+
+        // Verify the class belongs to the instructor
+        const [classes] = await pool.execute(
+            'SELECT id FROM classes WHERE id = ? AND instructor_id = ?',
+            [classId, instructorId]
+        );
+
+        if (classes.length === 0) {
+            return res.status(404).json({ message: 'Class not found or access denied' });
+        }
+
+        const [enrollments] = await pool.execute(`
+            SELECT e.*, u.first_name, u.last_name, u.email, u.phone,
+                   e.enrolled_at, e.progress, e.last_accessed
+            FROM enrollments e
+            JOIN users u ON e.user_id = u.id
+            WHERE e.class_id = ?
+            ORDER BY e.enrolled_at DESC
+        `, [classId]);
+
+        res.json(enrollments);
+    } catch (error) {
+        console.error('Get class enrollments error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+app.post('/api/instructor/classes', authenticateToken, async (req, res) => {
+    try {
+        const { title, description, category, level, duration } = req.body;
+        const instructorId = req.user.id;
+
+        const [result] = await pool.execute(
+            `INSERT INTO classes (title, description, category, level, duration, instructor_id) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [title, description, category, level, duration, instructorId]
+        );
+
+        const [newClass] = await pool.execute(`
+            SELECT c.*, u.first_name, u.last_name
+            FROM classes c
+            JOIN users u ON c.instructor_id = u.id
+            WHERE c.id = ?
+        `, [result.insertId]);
+
+        res.status(201).json({
+            message: 'Class created successfully',
+            class: newClass[0]
+        });
+    } catch (error) {
+        console.error('Create class error:', error);
+        res.status(500).json({ message: 'Failed to create class' });
+    }
+});
+
+app.post('/api/instructor/livestreams/schedule', authenticateToken, async (req, res) => {
+    try {
+        const { classId, scheduledTime, title, description } = req.body;
+        const instructorId = req.user.id;
+
+        // Verify the class belongs to the instructor
+        const [classes] = await pool.execute(
+            'SELECT id FROM classes WHERE id = ? AND instructor_id = ?',
+            [classId, instructorId]
+        );
+
+        if (classes.length === 0) {
+            return res.status(404).json({ message: 'Class not found or access denied' });
+        }
+
+        const [result] = await pool.execute(
+            `INSERT INTO scheduled_livestreams (class_id, scheduled_time, title, description, instructor_id) 
+             VALUES (?, ?, ?, ?, ?)`,
+            [classId, scheduledTime, title, description, instructorId]
+        );
+
+        res.status(201).json({
+            message: 'Live stream scheduled successfully',
+            schedule: {
+                id: result.insertId,
+                classId,
+                scheduledTime,
+                title,
+                description
+            }
+        });
+    } catch (error) {
+        console.error('Schedule livestream error:', error);
+        res.status(500).json({ message: 'Failed to schedule livestream' });
+    }
+});
+```
+
+## 2. Updated Database Schema
+
+Add these tables to your database initialization:
+
+```javascript
+// Add to initializeDatabase function in server.js
+
+// Create scheduled_livestreams table
+await connection.execute(`
+    CREATE TABLE IF NOT EXISTS scheduled_livestreams (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        class_id INT NOT NULL,
+        instructor_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        scheduled_time DATETIME NOT NULL,
+        status ENUM('scheduled', 'live', 'completed', 'cancelled') DEFAULT 'scheduled',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (class_id) REFERENCES classes(id),
+        FOREIGN KEY (instructor_id) REFERENCES users(id)
+    )
+`);
+
+// Update class_videos table to include livestream info
+await connection.execute(`
+    ALTER TABLE class_videos 
+    ADD COLUMN IF NOT EXISTS is_livestream BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS scheduled_id INT,
+    ADD COLUMN IF NOT EXISTS original_filename VARCHAR(255)
+`);
+```
+
+## 3. Frontend JavaScript for Video Handling
+
+### videoManager.js
+
+```javascript
+// Video Manager for handling past live classes
+class VideoManager {
+    constructor() {
+        this.currentClassId = null;
+    }
+
+    async loadClassVideos(classId) {
+        try {
+            this.currentClassId = classId;
+            
+            // Show loading state
+            this.showLoadingState();
+
+            const response = await fetch(`/api/classes/${classId}/videos`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to load videos');
+            }
+
+            const videos = await response.json();
+            this.displayVideos(videos);
+            
+        } catch (error) {
+            console.error('Error loading videos:', error);
+            this.showError('Failed to load videos. Please try again.');
+        }
+    }
+
+    displayVideos(videos) {
+        const videosContainer = document.getElementById('videosContainer');
+        const noVideos = document.getElementById('noVideos');
+
+        if (!videos || videos.length === 0) {
+            if (videosContainer) videosContainer.style.display = 'none';
+            if (noVideos) noVideos.style.display = 'block';
+            return;
+        }
+
+        if (noVideos) noVideos.style.display = 'none';
+        if (videosContainer) {
+            videosContainer.innerHTML = videos.map(video => `
+                <div class="video-card" data-video-id="${video.id}">
+                    <div class="video-thumbnail" onclick="videoManager.playVideo(${video.id})">
+                        <div class="play-overlay">▶</div>
+                        <img src="${video.thumbnail_url}" alt="${video.title}" onerror="this.src='/assets/default-thumbnail.jpg'">
+                        <div class="video-duration">${video.duration || 'Live'}</div>
+                    </div>
+                    <div class="video-info">
+                        <h4>${video.title}</h4>
+                        <p>${video.description || 'Recorded live session'}</p>
+                        <div class="video-meta">
+                            <span>📅 ${new Date(video.upload_date).toLocaleDateString()}</span>
+                            <span>👁️ ${this.formatViews(video.views || 0)}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            videosContainer.style.display = 'grid';
+        }
+    }
+
+    async playVideo(videoId) {
+        try {
+            const response = await fetch(`/api/videos/${videoId}`);
+            if (!response.ok) throw new Error('Video not found');
+            
+            const video = await response.json();
+            this.showVideoModal(video);
+            
+        } catch (error) {
+            console.error('Error playing video:', error);
+            this.showError('Failed to load video.');
+        }
+    }
+
+    showVideoModal(video) {
+        const modal = document.getElementById('videoModal');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const videoTitle = document.getElementById('videoTitle');
+        const videoDescription = document.getElementById('videoDescription');
+
+        videoPlayer.src = video.video_url;
+        videoTitle.textContent = video.title;
+        videoDescription.textContent = video.description || 'Recorded live session';
+
+        modal.style.display = 'flex';
+        videoPlayer.play();
+
+        // Track video view
+        this.trackVideoView(video.id);
+    }
+
+    async trackVideoView(videoId) {
+        try {
+            await fetch(`/api/videos/${videoId}/view`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+        } catch (error) {
+            console.error('Error tracking view:', error);
+        }
+    }
+
+    formatViews(views) {
+        if (views >= 1000000) {
+            return (views / 1000000).toFixed(1) + 'M views';
+        } else if (views >= 1000) {
+            return (views / 1000).toFixed(1) + 'K views';
+        }
+        return views + ' views';
+    }
+
+    showLoadingState() {
+        const videosContainer = document.getElementById('videosContainer');
+        if (videosContainer) {
+            videosContainer.innerHTML = `
+                <div class="loading-videos">
+                    <div class="loader"></div>
+                    <p>Loading videos...</p>
+                </div>
+            `;
+        }
+    }
+
+    showError(message) {
+        const videosContainer = document.getElementById('videosContainer');
+        if (videosContainer) {
+            videosContainer.innerHTML = `
+                <div class="error-message">
+                    <p>${message}</p>
+                    <button onclick="videoManager.loadClassVideos(${this.currentClassId})" class="btn btn-primary">
+                        Try Again
+                    </button>
+                </div>
+            `;
+        }
+    }
+}
+
+// Live Stream Upload Handler
+class LiveStreamUploader {
+    constructor() {
+        this.uploading = false;
+    }
+
+    async uploadLiveStreamVideo(file, classId, title, description) {
+        if (this.uploading) {
+            throw new Error('Upload already in progress');
+        }
+
+        this.uploading = true;
+        
+        try {
+            const formData = new FormData();
+            formData.append('video', file);
+            formData.append('classId', classId);
+            formData.append('title', title);
+            formData.append('description', description);
+
+            const token = localStorage.getItem('token');
+            
+            const response = await fetch('/api/upload-livestream', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || 'Upload failed');
+            }
+
+            const result = await response.json();
+            return result;
+            
+        } catch (error) {
+            console.error('Upload error:', error);
+            throw error;
+        } finally {
+            this.uploading = false;
+        }
+    }
+
+    showUploadProgress(progress) {
+        // Implement progress bar UI
+        const progressBar = document.getElementById('uploadProgress');
+        const progressText = document.getElementById('uploadProgressText');
+        
+        if (progressBar && progressText) {
+            progressBar.style.width = `${progress}%`;
+            progressText.textContent = `Uploading... ${progress}%`;
+        }
+    }
+}
+
+// Initialize video manager
+const videoManager = new VideoManager();
+const liveStreamUploader = new LiveStreamUploader();
+```
+
+## 4. Instructor Dashboard
+
+### instructor-dashboard.html
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instructor Dashboard - FISSK Online Academy</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Instructor Portal</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="instructor-dashboard.html" class="nav-link active">Dashboard</a></li>
+                <li><a href="instructor-classes.html" class="nav-link">My Classes</a></li>
+                <li><a href="instructor-livestream.html" class="nav-link">Live Streams</a></li>
+                <li><a href="dashboard.html" class="nav-link">Student View</a></li>
+                <li class="nav-user">
+                    <div class="user-menu">
+                        <img src="https://ui-avatars.com/api/?name=Instructor&background=8B5FBF&color=fff" alt="Instructor" class="user-avatar">
+                        <span>Instructor</span>
+                        <div class="user-dropdown">
+                            <a href="instructor-profile.html" class="dropdown-item">Profile</a>
+                            <a href="login.html" class="dropdown-item logout">Logout</a>
+                        </div>
+                    </div>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Instructor Dashboard -->
+    <section class="dashboard">
+        <div class="container">
+            <div class="dashboard-header">
+                <h1>Instructor Dashboard</h1>
+                <p>Manage your classes and live streams</p>
+            </div>
+
+            <div class="dashboard-grid">
+                <!-- Sidebar -->
+                <div class="dashboard-sidebar">
+                    <div class="sidebar-header">
+                        <h3>Instructor Tools</h3>
+                    </div>
+                    <ul class="sidebar-menu">
+                        <li><a href="#overview" class="sidebar-link active" data-section="overview">📊 Overview</a></li>
+                        <li><a href="#classes" class="sidebar-link" data-section="classes">📚 My Classes</a></li>
+                        <li><a href="#livestreams" class="sidebar-link" data-section="livestreams">🎥 Live Streams</a></li>
+                        <li><a href="#students" class="sidebar-link" data-section="students">👥 Students</a></li>
+                        <li><a href="#analytics" class="sidebar-link" data-section="analytics">📈 Analytics</a></li>
+                    </ul>
+                    
+                    <div class="sidebar-card">
+                        <h4>Quick Actions</h4>
+                        <button class="btn btn-primary btn-full" onclick="instructorDashboard.createNewClass()">
+                            + New Class
+                        </button>
+                        <button class="btn btn-outline btn-full" onclick="instructorDashboard.scheduleLivestream()">
+                            📅 Schedule Live
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="dashboard-main">
+                    <!-- Overview Section -->
+                    <div id="overview" class="dashboard-section active">
+                        <div class="instructor-stats">
+                            <div class="stat-card">
+                                <div class="stat-icon">📚</div>
+                                <div class="stat-info">
+                                    <h3 id="totalClasses">0</h3>
+                                    <p>Total Classes</p>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">👥</div>
+                                <div class="stat-info">
+                                    <h3 id="totalStudents">0</h3>
+                                    <p>Total Students</p>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">🎥</div>
+                                <div class="stat-info">
+                                    <h3 id="totalVideos">0</h3>
+                                    <p>Recorded Videos</p>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">⭐</div>
+                                <div class="stat-info">
+                                    <h3 id="avgRating">0.0</h3>
+                                    <p>Average Rating</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="recent-activities">
+                            <h3>Recent Activity</h3>
+                            <div id="recentActivities" class="activities-list">
+                                <!-- Activities will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- My Classes Section -->
+                    <div id="classes" class="dashboard-section">
+                        <div class="section-header">
+                            <h2>My Classes</h2>
+                            <button class="btn btn-primary" onclick="instructorDashboard.createNewClass()">
+                                + Create New Class
+                            </button>
+                        </div>
+                        <div id="classesList" class="classes-grid">
+                            <!-- Classes will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Live Streams Section -->
+                    <div id="livestreams" class="dashboard-section">
+                        <div class="section-header">
+                            <h2>Live Stream Management</h2>
+                            <div class="section-actions">
+                                <button class="btn btn-primary" onclick="instructorDashboard.startLivestream()">
+                                    🎥 Start Live Stream
+                                </button>
+                                <button class="btn btn-outline" onclick="instructorDashboard.scheduleLivestream()">
+                                    📅 Schedule Live
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="livestream-sections">
+                            <div class="scheduled-streams">
+                                <h4>Scheduled Live Streams</h4>
+                                <div id="scheduledStreams" class="streams-list">
+                                    <!-- Scheduled streams will be loaded here -->
+                                </div>
+                            </div>
+
+                            <div class="past-streams">
+                                <h4>Past Live Streams</h4>
+                                <div id="pastStreams" class="streams-list">
+                                    <!-- Past streams will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Students Section -->
+                    <div id="students" class="dashboard-section">
+                        <div class="section-header">
+                            <h2>Student Management</h2>
+                            <select id="classFilter" onchange="instructorDashboard.loadEnrollments()">
+                                <option value="">All Classes</option>
+                            </select>
+                        </div>
+                        <div id="enrollmentsList" class="enrollments-table">
+                            <!-- Enrollments will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Modals -->
+    <div id="createClassModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Create New Class</h2>
+            <form id="createClassForm">
+                <div class="form-group">
+                    <label for="className">Class Title</label>
+                    <input type="text" id="className" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="classDescription">Description</label>
+                    <textarea id="classDescription" name="description" rows="4" required></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="classCategory">Category</label>
+                        <select id="classCategory" name="category" required>
+                            <option value="french">French</option>
+                            <option value="english">English</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="classLevel">Level</label>
+                        <select id="classLevel" name="level" required>
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="classDuration">Duration</label>
+                    <input type="text" id="classDuration" name="duration" placeholder="e.g., 8 weeks" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Create Class</button>
+                    <button type="button" class="btn btn-outline" onclick="instructorDashboard.closeModal('createClassModal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="scheduleStreamModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Schedule Live Stream</h2>
+            <form id="scheduleStreamForm">
+                <div class="form-group">
+                    <label for="streamClass">Select Class</label>
+                    <select id="streamClass" name="classId" required>
+                        <option value="">Choose a class...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="streamTitle">Stream Title</label>
+                    <input type="text" id="streamTitle" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="streamDescription">Description</label>
+                    <textarea id="streamDescription" name="description" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="streamDateTime">Date & Time</label>
+                    <input type="datetime-local" id="streamDateTime" name="scheduledTime" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Schedule Stream</button>
+                    <button type="button" class="btn btn-outline" onclick="instructorDashboard.closeModal('scheduleStreamModal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="instructor-dashboard.js"></script>
+</body>
+</html>
+```
+
+## 5. Instructor Dashboard JavaScript
+
+### instructor-dashboard.js
+
+```javascript
+class InstructorDashboard {
+    constructor() {
+        this.currentClassId = null;
+        this.init();
+    }
+
+    async init() {
+        await this.loadDashboardData();
+        this.setupEventListeners();
+        this.loadClassesForSelect();
+    }
+
+    async loadDashboardData() {
+        try {
+            // Load instructor stats
+            const statsResponse = await fetch('/api/instructor/stats', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            
+            if (statsResponse.ok) {
+                const stats = await statsResponse.json();
+                this.updateStats(stats);
+            }
+
+            // Load classes
+            await this.loadInstructorClasses();
+            
+            // Load scheduled streams
+            await this.loadScheduledStreams();
+            
+            // Load enrollments
+            await this.loadEnrollments();
+
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+        }
+    }
+
+    updateStats(stats) {
+        document.getElementById('totalClasses').textContent = stats.totalClasses || 0;
+        document.getElementById('totalStudents').textContent = stats.totalStudents || 0;
+        document.getElementById('totalVideos').textContent = stats.totalVideos || 0;
+        document.getElementById('avgRating').textContent = stats.avgRating || '0.0';
+    }
+
+    async loadInstructorClasses() {
+        try {
+            const response = await fetch('/api/instructor/classes', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.ok) {
+                const classes = await response.json();
+                this.displayClasses(classes);
+                
+                // Update class filter
+                this.updateClassFilter(classes);
+            }
+        } catch (error) {
+            console.error('Error loading classes:', error);
+        }
+    }
+
+    displayClasses(classes) {
+        const container = document.getElementById('classesList');
+        if (!container) return;
+
+        if (classes.length === 0) {
+            container.innerHTML = `
+                <div class="no-content">
+                    <p>You haven't created any classes yet.</p>
+                    <button class="btn btn-primary" onclick="instructorDashboard.createNewClass()">
+                        Create Your First Class
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = classes.map(classItem => `
+            <div class="class-card instructor-class">
+                <div class="class-header">
+                    <span class="class-category ${classItem.category}">${classItem.category.toUpperCase()}</span>
+                    <span class="class-level ${classItem.level}">${classItem.level}</span>
+                </div>
+                <h3>${classItem.title}</h3>
+                <p>${classItem.description}</p>
+                <div class="class-stats">
+                    <span>👥 ${classItem.enrolled_students} students</span>
+                    <span>🎥 ${classItem.video_count} videos</span>
+                    <span>🕒 ${classItem.duration}</span>
+                </div>
+                <div class="class-actions">
+                    <button class="btn btn-primary" onclick="instructorDashboard.viewClassDetails(${classItem.id})">
+                        Manage
+                    </button>
+                    <button class="btn btn-outline" onclick="instructorDashboard.viewEnrollments(${classItem.id})">
+                        Students
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async loadEnrollments(classId = '') {
+        try {
+            let url = '/api/instructor/enrollments';
+            if (classId) {
+                url = `/api/instructor/classes/${classId}/enrollments`;
+            }
+
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.ok) {
+                const enrollments = await response.json();
+                this.displayEnrollments(enrollments);
+            }
+        } catch (error) {
+            console.error('Error loading enrollments:', error);
+        }
+    }
+
+    displayEnrollments(enrollments) {
+        const container = document.getElementById('enrollmentsList');
+        if (!container) return;
+
+        if (enrollments.length === 0) {
+            container.innerHTML = '<div class="no-content"><p>No students enrolled yet.</p></div>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table class="enrollments-table">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Enrolled</th>
+                        <th>Progress</th>
+                        <th>Last Accessed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${enrollments.map(enrollment => `
+                        <tr>
+                            <td>${enrollment.first_name} ${enrollment.last_name}</td>
+                            <td>${enrollment.email}</td>
+                            <td>${enrollment.phone || 'N/A'}</td>
+                            <td>${new Date(enrollment.enrolled_at).toLocaleDateString()}</td>
+                            <td>
+                                <div class="progress-bar small">
+                                    <div class="progress-fill" style="width: ${enrollment.progress}%"></div>
+                                </div>
+                                <span>${enrollment.progress}%</span>
+                            </td>
+                            <td>${new Date(enrollment.last_accessed).toLocaleDateString()}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    async loadScheduledStreams() {
+        try {
+            const response = await fetch('/api/instructor/scheduled-streams', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.ok) {
+                const streams = await response.json();
+                this.displayScheduledStreams(streams);
+            }
+        } catch (error) {
+            console.error('Error loading scheduled streams:', error);
+        }
+    }
+
+    displayScheduledStreams(streams) {
+        const container = document.getElementById('scheduledStreams');
+        if (!container) return;
+
+        if (streams.length === 0) {
+            container.innerHTML = '<div class="no-content"><p>No scheduled streams.</p></div>';
+            return;
+        }
+
+        container.innerHTML = streams.map(stream => `
+            <div class="stream-card scheduled">
+                <div class="stream-info">
+                    <h4>${stream.title}</h4>
+                    <p>${stream.description || 'No description'}</p>
+                    <div class="stream-meta">
+                        <span>📚 ${stream.class_title}</span>
+                        <span>📅 ${new Date(stream.scheduled_time).toLocaleString()}</span>
+                    </div>
+                </div>
+                <div class="stream-actions">
+                    <button class="btn btn-primary" onclick="instructorDashboard.startScheduledStream(${stream.id})">
+                        Start Now
+                    </button>
+                    <button class="btn btn-outline" onclick="instructorDashboard.cancelStream(${stream.id})">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async createNewClass() {
+        this.showModal('createClassModal');
+    }
+
+    async scheduleLivestream() {
+        await this.loadClassesForSelect();
+        this.showModal('scheduleStreamModal');
+    }
+
+    async loadClassesForSelect() {
+        try {
+            const response = await fetch('/api/instructor/classes', {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.ok) {
+                const classes = await response.json();
+                this.updateClassSelects(classes);
+            }
+        } catch (error) {
+            console.error('Error loading classes for select:', error);
+        }
+    }
+
+    updateClassSelects(classes) {
+        const streamClassSelect = document.getElementById('streamClass');
+        const classFilterSelect = document.getElementById('classFilter');
+
+        if (streamClassSelect) {
+            streamClassSelect.innerHTML = '<option value="">Choose a class...</option>' +
+                classes.map(classItem => `
+                    <option value="${classItem.id}">${classItem.title}</option>
+                `).join('');
+        }
+
+        if (classFilterSelect) {
+            classFilterSelect.innerHTML = '<option value="">All Classes</option>' +
+                classes.map(classItem => `
+                    <option value="${classItem.id}">${classItem.title}</option>
+                `).join('');
+        }
+    }
+
+    setupEventListeners() {
+        // Create class form
+        const createClassForm = document.getElementById('createClassForm');
+        if (createClassForm) {
+            createClassForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleCreateClass();
+            });
+        }
+
+        // Schedule stream form
+        const scheduleStreamForm = document.getElementById('scheduleStreamForm');
+        if (scheduleStreamForm) {
+            scheduleStreamForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleScheduleStream();
+            });
+        }
+
+        // Modal close events
+        document.querySelectorAll('.close-modal').forEach(closeBtn => {
+            closeBtn.addEventListener('click', (e) => {
+                const modal = e.target.closest('.modal');
+                this.closeModal(modal.id);
+            });
+        });
+    }
+
+    async handleCreateClass() {
+        const form = document.getElementById('createClassForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+
+        try {
+            const response = await fetch('/api/instructor/classes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                this.closeModal('createClassModal');
+                form.reset();
+                await this.loadDashboardData();
+                this.showMessage('Class created successfully!', 'success');
+            } else {
+                throw new Error('Failed to create class');
+            }
+        } catch (error) {
+            this.showMessage('Failed to create class. Please try again.', 'error');
+        }
+    }
+
+    async handleScheduleStream() {
+        const form = document.getElementById('scheduleStreamForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+
+        try {
+            const response = await fetch('/api/instructor/livestreams/schedule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                this.closeModal('scheduleStreamModal');
+                form.reset();
+                await this.loadScheduledStreams();
+                this.showMessage('Live stream scheduled successfully!', 'success');
+            } else {
+                throw new Error('Failed to schedule stream');
+            }
+        } catch (error) {
+            this.showMessage('Failed to schedule stream. Please try again.', 'error');
+        }
+    }
+
+    showModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+    }
+
+    closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    showMessage(message, type) {
+        // Implement message display
+        const messageEl = document.createElement('div');
+        messageEl.className = `message message-${type}`;
+        messageEl.textContent = message;
+        messageEl.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            background: ${type === 'success' ? '#48BB78' : '#F56565'};
+            z-index: 10000;
+        `;
+
+        document.body.appendChild(messageEl);
+
+        setTimeout(() => {
+            messageEl.remove();
+        }, 5000);
+    }
+
+    startLivestream() {
+        // Redirect to livestream page or open livestream interface
+        window.location.href = 'instructor-livestream.html';
+    }
+
+    viewClassDetails(classId) {
+        window.location.href = `instructor-class-details.html?id=${classId}`;
+    }
+
+    viewEnrollments(classId) {
+        document.getElementById('classFilter').value = classId;
+        this.loadEnrollments(classId);
+        this.switchSection('students');
+    }
+
+    switchSection(sectionId) {
+        // Hide all sections
+        document.querySelectorAll('.dashboard-section').forEach(section => {
+            section.classList.remove('active');
+        });
+
+        // Show target section
+        const targetSection = document.getElementById(sectionId);
+        if (targetSection) {
+            targetSection.classList.add('active');
+        }
+
+        // Update sidebar active state
+        document.querySelectorAll('.sidebar-link').forEach(link => {
+            link.classList.remove('active');
+        });
+
+        const activeLink = document.querySelector(`[data-section="${sectionId}"]`);
+        if (activeLink) {
+            activeLink.classList.add('active');
+        }
+    }
+}
+
+// Initialize instructor dashboard
+const instructorDashboard = new InstructorDashboard();
+
+// Add sidebar navigation
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.sidebar-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const section = link.dataset.section;
+            instructorDashboard.switchSection(section);
+        });
+    });
+});
+```
+
+This complete system provides:
+
+1. **Video Management**: Automatic organization of live stream videos by class
+2. **Instructor Dashboard**: Full class management, live stream scheduling, and student tracking
+3. **File Organization**: Videos are automatically named and sorted by class
+4. **Live Stream Integration**: Seamless upload and management of recorded live streams
+5. **Student Enrollment Tracking**: View and manage students enrolled in each class
+
+The system will automatically organize videos based on filename patterns like `french_20252310_064237.webm` and associate them with the correct classes.

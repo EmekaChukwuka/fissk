@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Forum Topic | FISSK</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="forum-style.css">
+  <link rel="stylesheet" href="forum.css">
+    <link rel="icon" href="fissklogo.jpg">
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Community Forum</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="classes.html" class="nav-link">Classes</a></li>
+                <li><a href="forum.html" class="nav-link active">Forum</a></li>
+                <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                <li class="nav-user">
+                    <div class="user-dropdown" id="user-dropdown">
+                        </div>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+<section class="forum">
+  <div class="container">
+
+    <!-- Topic -->
+    <div id="topicCard" class="forum-topic forum-topic-single"></div>
+
+    <!-- Replies -->
+    <div class="forum-section">
+      <h3>Replies</h3>
+      <div id="repliesList"></div>
+    </div>
+
+    <!-- Reply Form -->
+    <div class="forum-card">
+      <h4>Add Reply</h4>
+      <form id="replyForm">
+        <textarea name="content" required></textarea>
+        <button class="btn btn-primary">Post Reply</button>
+      </form>
+    </div>
+
+  </div>
+</section>
+
+<script src="forum-post.js"></script>
+</body>
+</html>

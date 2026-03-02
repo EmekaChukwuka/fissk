@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Community Forum - FISSK Online Academy</title>
+    <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="forum-style.css">
+    <link rel="icon" href="fissklogo.jpg">
+     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Community Forum</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="classes.html" class="nav-link">Classes</a></li>
+                <li><a href="forum.html" class="nav-link active">Forum</a></li>
+                <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                <li class="nav-user">
+                    <div class="user-dropdown" id="user-dropdown">
+                        </div>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+        <!-- Forum Header -->
+        <header class="forum-header">
+            <div class="container">
+                <h1>FISSK Community Forum</h1>
+                <p>Connect, learn, and grow with fellow learners</p>
+                <div class="forum-actions">
+                    <button class="btn btn-primary" id="newTopicBtn" onclick="forumUI.openNewTopicModal()">
+                        <span>+</span> New Topic
+                    </button>
+                    <div class="search-box">
+                        <input type="text" id="forumSearch" placeholder="Search forum...">
+                        <button class="search-btn">🔍</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+    <!-- Forum Main Content -->
+    <div class="forum-container">
+
+        <div class="container">
+            <div class="forum-layout">
+                <!-- Main Content -->
+                <main class="forum-main">
+                    <!-- Categories Section -->
+                    <section class="forum-categories">
+                        <h2>Forum Categories</h2>
+                        <div id="categoriesList" class="categories-grid">
+                            <!-- Categories will be loaded here -->
+                        </div>
+                    </section>
+
+                    <!-- Recent Topics Section -->
+                    <section class="recent-topics">
+                        <div class="section-header">
+                            <h2>Recent Discussions</h2>
+                            <div class="sort-options">
+                                <select id="sortTopics">
+                                    <option value="latest">Latest</option>
+                                    <option value="popular">Most Popular</option>
+                                    <option value="unanswered">Unanswered</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="topicsList" class="topics-list">
+                            <!-- Topics will be loaded here -->
+                        </div>
+                        <div class="pagination" id="pagination">
+                            <!-- Pagination will be loaded here -->
+                        </div>
+                    </section>
+
+                    <!-- Statistics Section -->
+                    <section class="forum-stats">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-icon">💬</div>
+                                <div class="stat-info">
+                                    <h3 id="totalTopics">0</h3>
+                                    <p>Topics</p>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">👥</div>
+                                <div class="stat-info">
+                                    <h3 id="totalUsers">0</h3>
+                                    <p>Active Users</p>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">📝</div>
+                                <div class="stat-info">
+                                    <h3 id="totalReplies">0</h3>
+                                    <p>Replies</p>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">✅</div>
+                                <div class="stat-info">
+                                    <h3 id="solvedTopics">0</h3>
+                                    <p>Solved Topics</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+
+                <!-- Sidebar -->
+                <aside class="forum-sidebar">
+                    <!-- Quick Links -->
+                    <div class="sidebar-widget">
+                        <h3>Quick Links</h3>
+                        <ul class="quick-links">
+                            <li><a href="#" class="sidebar-link">📌 Pinned Topics</a></li>
+                            <li><a href="#" class="sidebar-link">🔥 Trending</a></li>
+                            <li><a href="#" class="sidebar-link">❓ Need Help?</a></li>
+                            <li><a href="#" class="sidebar-link">🏆 Top Contributors</a></li>
+                        </ul>
+                    </div>
+
+                    <!-- Online Users -->
+                    <div class="sidebar-widget">
+                        <h3>Online Now</h3>
+                        <div id="onlineUsers" class="online-users">
+                            <!-- Online users will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Community Guidelines -->
+                    <div class="sidebar-widget guidelines">
+                        <h3>Community Guidelines</h3>
+                        <ul>
+                            <li>✅ Be respectful and kind</li>
+                            <li>✅ Stay on topic</li>
+                            <li>✅ No spam or self-promotion</li>
+                            <li>✅ Help others learn</li>
+                            <li>✅ Use appropriate language</li>
+                        </ul>
+                    </div>
+
+                    <!-- Recent Activity -->
+                    <div class="sidebar-widget">
+                        <h3>Recent Activity</h3>
+                        <div id="recentActivity" class="activity-feed">
+                            <!-- Activity will be loaded here -->
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="newTopicModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Create New Topic</h2>
+            <form id="newTopicForm">
+                <div class="form-group">
+                    <label for="topicTitle">Title</label>
+                    <input type="text" id="topicTitle" placeholder="What would you like to discuss?" required>
+                </div>
+                <div class="form-group">
+                    <label for="topicCategory">Category</label>
+                    <select id="topicCategory" required>
+                        <!-- Categories will be loaded here -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="topicContent">Content</label>
+                    <textarea id="topicContent" rows="8" placeholder="Write your question or discussion topic here..." required></textarea>
+                    <div class="editor-tools">
+                        <button type="button" class="editor-btn" data-format="bold"><strong>B</strong></button>
+                        <button type="button" class="editor-btn" data-format="italic"><em>I</em></button>
+                        <button type="button" class="editor-btn" data-format="code"><code>{}</code></button>
+                        <button type="button" class="editor-btn" data-format="link">🔗</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="topicTags">Tags (optional)</label>
+                    <input type="text" id="topicTags" placeholder="french, grammar, help">
+                    <small>Separate tags with commas</small>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Post Topic</button>
+                    <button type="button" class="btn btn-outline" onclick="forumManager.closeModal('newTopicModal')">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <h3>FISSK</h3>
+                        <span>Online Academy</span>
+                    </div>
+                    <p>Empowering Nigerians with  skills for global success.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="classes.html">Classes</a></li>
+                        <li><a href="forum.html">Forum</a></li>
+                        <li><a href="dashboard.html">Dashboard</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Courses</h4>
+                    <ul>
+                        <li><a href="#">French Courses</a></li>
+                        <li><a href="#">English Courses</a></li>
+                        <li><a href="#">Exam Preparation</a></li>
+                        <li><a href="#">Business </a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact</h4>
+                    <ul>
+                        <li>📧 hello@fissk.com</li>
+                        <li>📱 +234 812 345 6789</li>
+                        <li>📍 Lagos, Nigeria</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 FISSK Online Academy. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="forum.js"></script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classes - FISSK Online Academy</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="fissklogo.jpg">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Online Academy</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="classes.html" class="nav-link active">Classes</a></li>
+                <li><a href="about.html" class="nav-link">About</a></li>
+                <li><a href="contact.html" class="nav-link">Contact</a></li>
+                <li><a href="dashboard.html" class="nav-link dashboard-btn" id="dashboard-btn">Dashboard</a></li>
+         <li><a href="login.html" class="nav-link login-btn" id="login-btn">Login</a></li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Classes Hero -->
+    <section class="page-hero">
+        <div class="container">
+            <h1>Available Classes</h1>
+            <p>Browse and enroll in our comprehensive French and English courses</p>
+        </div>
+    </section>
+
+    <!-- Classes Filter -->
+    <section class="classes-filter">
+        <div class="container">
+            <div class="filter-options">
+                <button class="filter-btn active" data-filter="all">All Classes</button>
+               <!-- <button class="filter-btn" data-filter="french">French</button>
+                <button class="filter-btn" data-filter="english">English</button>
+                <button class="filter-btn" data-filter="beginner">Beginner</button>
+                <button class="filter-btn" data-filter="intermediate">Intermediate</button>
+                <button class="filter-btn" data-filter="advanced">Advanced</button>-->
+            </div>
+            <div class="search-box">
+                <input type="text" id="classSearch" placeholder="Search classes...">
+                <span>🔍</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Classes Grid -->
+    <section class="classes-grid-section">
+        <div class="container">
+            <div id="classesContainer" class="classes-container">
+                <!-- Classes will be loaded dynamically -->
+            </div>
+            <div id="loadingIndicator" class="loading-indicator">
+                <div class="loader"></div>
+                <p>Loading classes...</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Enrollment Modal -->
+    <div id="enrollmentModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Enroll in Class</h2>
+            <div id="modalClassDetails"></div>
+            <div class="modal-actions">
+                <button id="confirmEnroll" class="btn btn-primary">Confirm Enrollment</button>
+                <button id="cancelEnroll" class="btn btn-outline">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <h3>FISSK</h3>
+                        <span>Online Academy</span>
+                    </div>
+                    <p>Empowering Nigerians with  skills for global success.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="classes.html">Classes</a></li>
+                        <li><a href="about.html">About</a></li>
+                        <li><a href="contact.html">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Courses</h4>
+                    <ul>
+                        <li><a href="#">French Courses</a></li>
+                        <li><a href="#">English Courses</a></li>
+                        <li><a href="#">Exam Preparation</a></li>
+                        <li><a href="#">Business </a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact</h4>
+                    <ul>
+                        <li>📧 hello@fissk.com</li>
+                        <li>📱 +234 812 345 6789</li>
+                        <li>📍 Lagos, Nigeria</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 FISSK Online Academy. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+   <!-- <script src="script.js"></script>-->
+    <script src="classes.js"></script>
+</body>
+</html>

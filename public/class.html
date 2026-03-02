@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Class Details - FISSK Online Academy</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="fissklogo.jpg">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Online Academy</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="classes.html" class="nav-link">Classes</a></li>
+                <li><a href="about.html" class="nav-link">About</a></li>
+                <li><a href="contact.html" class="nav-link">Contact</a></li>
+                <li><a href="dashboard.html" class="nav-link dashboard-btn" id="dashboard-btn">Dashboard</a></li>
+                <li><a href="login.html" class="nav-link login-btn" id="login-btn">Login</a></li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Class Hero -->
+    <section class="class-hero">
+        <div class="container">
+            <div class="class-header">
+                <div class="class-info">
+                    <span id="classCategory" class="class-category">French</span>
+                    <h1 id="className">French for Canada Express Entry</h1>
+                    <p id="classDescription" class="class-description" style="color:white;">Master TEF/TCF exam requirements and boost your CRS score for Canadian immigration.</p>
+                    <div class="class-meta" style="color:white;">
+                        <span id="classLevel">🟢 Beginner</span>
+                        <span id="classDuration">🕒 8 Weeks</span>
+                        <span id="classStudents">👥 245 Students</span>
+                    </div>
+                    <div class="class-actions">
+                        <button id="enrollBtn" class="btn btn-primary">Enroll Now</button>
+                        <button id="backToClasses" class="btn btn-outline" style="color:white;">Back to Classes</button>
+                    </div>
+                </div>
+                <div class="class-image">
+                    <img id="classThumbnail" src="" alt="Class Thumbnail">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Class Content -->
+    <section class="class-content">
+        <div class="container">
+            <div class="class-layout">
+                <!-- Main Content -->
+                <div class="class-main">
+                    <div class="content-tabs">
+                        <button class="tab-btn active" data-tab="videos">Recorded Classes</button>
+                        <button class="tab-btn" data-tab="materials">Learning Materials</button>
+                        <button class="tab-btn" data-tab="details">Class Details</button>
+                    </div>
+
+                    <!-- Videos Tab -->
+                    <div id="videosTab" class="tab-content active">
+                        <h3>Past Live Classes</h3>
+                        <div id="videosContainer" class="videos-grid">
+                            <!-- Videos will be loaded dynamically -->
+                        </div>
+                        <div id="noVideos" class="no-content">
+                            <p>No recorded classes available yet.</p>
+                        </div>
+                    </div>
+
+                    <!-- Materials Tab -->
+                    <div id="materialsTab" class="tab-content">
+                        <h3>Learning Materials</h3>
+                        <div id="materialsContainer" class="materials-list">
+                            <!-- Materials will be loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Details Tab -->
+                    <div id="detailsTab" class="tab-content">
+                        <h3>About This Class</h3>
+                        <div id="classDetailsContent">
+                            <!-- Class details will be loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="class-sidebar">
+                    <div class="sidebar-card">
+                        <h4>Class Progress</h4>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div id="classProgress" class="progress-fill" style="width: 0%"></div>
+                            </div>
+                            <span id="progressText">0% Complete</span>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-card">
+                        <h4>Instructor</h4>
+                        <div class="instructor-info">
+                            <img id="instructorAvatar" src="" alt="Instructor">
+                            <div>
+                                <h5 id="instructorName">Mr. Adebayo</h5>
+                                <p id="instructorBio">Certified French Tutor</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-card">
+                        <h4>Upcoming Live Sessions</h4>
+                        <div id="upcomingSessions">
+                            <!-- Sessions will be loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Video Modal -->
+    <div id="videoModal" class="modal">
+        <div class="modal-content video-modal">
+          <!--  <button id="markCompleteBtn" class="btn btn-outline">
+  ✅ Mark as Complete
+</button>-->
+
+            <span class="close-modal">&times;</span><br>
+            <video id="videoPlayer" controls>
+                Your browser does not support the video tag.
+            </video>
+            <div class="video-info">
+                <h3 id="videoTitle"></h3>
+                <p id="videoDescription"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <!-- Same footer as classes.html -->
+                <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <h3>FISSK</h3>
+                        <span>Online Academy</span>
+                    </div>
+                    <p>Empowering Nigerians with skills for global success.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="classes.html">Classes</a></li>
+                        <li><a href="about.html">About</a></li>
+                        <li><a href="contact.html">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Courses</h4>
+                    <ul>
+                        <li><a href="#">French Courses</a></li>
+                        <li><a href="#">English Courses</a></li>
+                        <li><a href="#">Exam Preparation</a></li>
+                        <li><a href="#">Business </a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contact</h4>
+                    <ul>
+                        <li>📧 hello@fissk.com</li>
+                        <li>📱 +234 812 345 6789</li>
+                        <li>📍 Lagos, Nigeria</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 FISSK Online Academy. All rights reserved.</p>
+            </div>
+        </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="class.js"></script>
+</body>
+</html>
