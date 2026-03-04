@@ -10,7 +10,6 @@ import User from "../models/User.js";
 import Class from "../models/Class.js";
 import Enrollment from "../models/Enrollment.js";
 import LiveSession from "../models/LiveSession.js";
-import Video from "../models/Video.js";
 import Assignment from "../models/Assignment.js";
 
 // Configuration
