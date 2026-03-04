@@ -1,315 +1,456 @@
 import express from 'express';
 const forumRouter = express.Router();
-import mysql from "mysql2/promise";
-// MySQL connection pool
-const pool = mysql.createPool({
-    host: '127.0.0.1',
-    user: 'root', // replace with your MySQL username
-    password: '', // replace with your MySQL password
-    database: 'fissk_online_academy',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
 
-// Create users table if not exists
-async function initializeDatabase() {
-    try {
-        const connection = await pool.getConnection();
-        connection.release();
-      //  console.log('Database initialized');
-    } catch (error) {
-        console.error('Database initialization failed:', error);
-    }
-}
+// Import Mongoose models
+import User from '../models/User.js';
+import ForumCategory from '../models/ForumCategory.js';
+import ForumPost from '../models/ForumPost.js';
 
-initializeDatabase();
-
+// Get single topic with details
 forumRouter.get('/topics/:id', async (req, res) => {
   const postId = req.params.id;
+  
   try {
-       // Increment view count
-        await pool.execute(
-            'UPDATE forum_posts SET views = views + 1 WHERE id = ?',
-            [postId]
-        );
-    const [[post]] = await pool.query(`
-      SELECT fp.*, CONCAT(u.first_name, ' ', u.last_name) AS author_name
-      FROM forum_posts fp
-      JOIN users u ON u.id = fp.user_id
-      WHERE fp.id = ?
-    `, [postId]);
+    // Increment view count
+    await ForumPost.findByIdAndUpdate(postId, { $inc: { views: 1 } });
     
-    res.json(post);
+    const post = await ForumPost.findById(postId)
+      .populate('userId', 'firstName lastName')
+      .lean();
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    const formattedPost = {
+      ...post,
+      author_name: post.userId ? `${post.userId.firstName} ${post.userId.lastName}` : 'Unknown'
+    };
+    
+    res.json(formattedPost);
   } catch (err) {
+    console.error('Get topic error:', err);
     res.status(500).json({ message: "Failed to load post" });
   }
 });
 
+// Create new topic
 forumRouter.post('/topics', async (req, res) => {
-  const { title, content, categoryId, userId } = req.body; 
+  const { title, content, categoryId, userId } = req.body;
+  
   try {
-    const [category1] = await pool.execute(`
-      SELECT name FROM forum_categories WHERE id = ?
-      `, [categoryId]);
-      const category = category1[0].name;
-    await pool.query("INSERT INTO forum_posts (user_id, title, content, category) VALUES (?, ?, ?, ?)", [userId, title, content, category]);
-    res.json({ message: "Post created" });
+    const category = await ForumCategory.findById(categoryId);
+    
+    if (!category) {
+      return res.status(400).json({ message: "Invalid category" });
+    }
+    
+    const post = new ForumPost({
+      userId,
+      title,
+      content,
+      categoryId,
+      replies: []
+    });
+    
+    await post.save();
+    
+    res.json({ message: "Post created", postId: post._id });
   } catch (err) {
-    console.error(err);
+    console.error('Create post error:', err);
     res.status(500).json({ message: "Failed to create post" });
   }
 });
 
+// Get replies for a topic
 forumRouter.get('/topics/:id/replies', async (req, res) => {
   const postId = req.params.id;
+  
   try {
-    const [rows] = await pool.query(`
-      SELECT fr.*, CONCAT(u.first_name, ' ', u.last_name) AS author_name
-      FROM forum_replies fr
-      JOIN users u ON u.id = fr.user_id
-      WHERE fr.post_id = ?
-      ORDER BY fr.created_at ASC
-    `, [postId]);
-    res.json(rows);
+    const post = await ForumPost.findById(postId)
+      .populate('replies.userId', 'firstName lastName')
+      .lean();
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    const replies = post.replies.map(reply => ({
+      ...reply,
+      author_name: reply.userId ? `${reply.userId.firstName} ${reply.userId.lastName}` : 'Unknown'
+    }));
+    
+    res.json(replies);
   } catch (err) {
+    console.error('Get replies error:', err);
     res.status(500).json({ message: "Failed to load replies" });
   }
 });
 
-forumRouter.get('/delete-post', async (req, res) => {
+// Delete post
+forumRouter.delete('/delete-post/:id', async (req, res) => {
   const postId = req.params.id;
+  
   try {
-    await pool.query("DELETE FROM forum_posts WHERE id = ?", [postId]);
+    await ForumPost.findByIdAndDelete(postId);
     res.json({ message: "Post deleted" });
   } catch (err) {
+    console.error('Delete post error:', err);
     res.status(500).json({ message: "Failed to delete post" });
   }
 });
 
-forumRouter.get('/delete-reply', async (req, res) => {
-  const replyId = req.params.id;
+// Delete reply
+forumRouter.delete('/delete-reply/:postId/:replyIndex', async (req, res) => {
+  const { postId, replyIndex } = req.params;
+  
   try {
-    await pool.query("DELETE FROM forum_replies WHERE id = ?", [replyId]);
+    const post = await ForumPost.findById(postId);
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    // Remove reply by index
+    post.replies.splice(parseInt(replyIndex), 1);
+    await post.save();
+    
     res.json({ message: "Reply deleted" });
   } catch (err) {
+    console.error('Delete reply error:', err);
     res.status(500).json({ message: "Failed to delete reply" });
   }
 });
 
-forumRouter.post('/replies/:id/best', async (req, res) => {
-  const replyId = req.params.id;
-
-  await pool.query(
-    "UPDATE forum_replies SET is_best_answer = FALSE WHERE post_id = (SELECT post_id FROM forum_replies WHERE id = ?)",
-    [replyId]
-  );
-
-  await pool.query(
-    "UPDATE forum_replies SET is_best_answer = TRUE WHERE id = ?",
-    [replyId]
-  );
-
-  res.json({ message: "Best answer marked" });
+// Mark reply as best answer
+forumRouter.post('/replies/:postId/:replyIndex/best', async (req, res) => {
+  const { postId, replyIndex } = req.params;
+  
+  try {
+    const post = await ForumPost.findById(postId);
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    // Reset all replies isBestAnswer to false
+    post.replies.forEach(reply => {
+      reply.isBestAnswer = false;
+    });
+    
+    // Set the selected reply as best answer
+    if (post.replies[parseInt(replyIndex)]) {
+      post.replies[parseInt(replyIndex)].isBestAnswer = true;
+    }
+    
+    post.solved = true;
+    await post.save();
+    
+    res.json({ message: "Best answer marked" });
+  } catch (err) {
+    console.error('Mark best answer error:', err);
+    res.status(500).json({ message: "Failed to mark best answer" });
+  }
 });
 
-forumRouter.post('/replies/:id/like', async (req, res) => {
-  const replyId = req.params.id;
-  await pool.query(
-    "UPDATE forum_replies SET likes = likes + 1 WHERE id = ?",
-    [replyId]
-  );
-  res.json({ message: "Liked" });
+// Like a reply
+forumRouter.post('/replies/:postId/:replyIndex/like', async (req, res) => {
+  const { postId, replyIndex } = req.params;
+  
+  try {
+    const post = await ForumPost.findById(postId);
+    
+    if (!post || !post.replies[parseInt(replyIndex)]) {
+      return res.status(404).json({ message: "Reply not found" });
+    }
+    
+    post.replies[parseInt(replyIndex)].likes += 1;
+    await post.save();
+    
+    res.json({ message: "Liked" });
+  } catch (err) {
+    console.error('Like reply error:', err);
+    res.status(500).json({ message: "Failed to like reply" });
+  }
 });
 
+// Add reply to topic
 forumRouter.post('/topics/:id/replies', async (req, res) => {
   const postId = req.params.id;
   const { content, userId } = req.body;
-try{
-  await pool.query(
-    "INSERT INTO forum_replies (post_id, user_id, content) VALUES (?, ?, ?)",
-    [postId, userId, content]
-  );
-
-  const [[post]] = await pool.query(
-    "SELECT user_id FROM forum_posts WHERE id = ?",
-    [postId]
-  );
-
-  if (post.user_id !== userId) {
-    await pool.query(
-      "INSERT INTO notifications (user_id, message, link) VALUES (?, ?, ?)",
-      [
-        post.user_id,
-        "Someone replied to your forum post",
-        `/forum-post.html?id=${postId}`,
-      ]
-    );
+  
+  try {
+    const post = await ForumPost.findById(postId);
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    // Add reply
+    post.replies.push({
+      userId,
+      content,
+      createdAt: new Date(),
+      likes: 0,
+      isBestAnswer: false
+    });
+    
+    await post.save();
+    
+    // Create notification for post author (if different from replier)
+    if (post.userId.toString() !== userId) {
+      // You'll need to create a Notification model
+      // This is a placeholder
+      console.log(`Notification: User ${userId} replied to your post`);
+    }
+    
+    res.json({ message: "Reply added" });
+  } catch (error) {
+    console.error('Add reply error:', error);
+    res.status(500).json({ message: "Could not post reply, please try again" });
   }
-
-  res.json({ message: "Reply added" });
-}catch(error){
-  console.log(error);
-  res.json("Could not post reply, please try again")
-}
 });
 
+// Get notifications (placeholder)
 forumRouter.post('/notifications', async (req, res) => {
-  const { userId }  = req.body;
-  const [rows] = await pool.query(
-    "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC",
-    [userId]
-  );
+  const { userId } = req.body;
+  
+  // Implement Notification model as needed
+  const rows = []; // await Notification.find({ userId }).sort({ createdAt: -1 });
+  
   res.json(rows);
 });
 
+// Get topics with filtering
 forumRouter.get('/topics', async (req, res) => {
   const { search, sort, category } = req.query;
-
-  let sql = `
-    SELECT fp.*, fc.name category_name, fc.icon,
-    COUNT(fr.id) reply_count
-    FROM forum_posts fp
-    JOIN forum_categories fc ON fc.id = fp.category
-    LEFT JOIN forum_replies fr ON fr.post_id = fp.id
-  `;
-  const params = [];
-
-  if (category || search) {
-    sql += " WHERE ";
-    if (category) {
-      sql += "fc.slug = ?";
-      params.push(category);
-    }
-    if (search) {
-      if (params.length) sql += " AND ";
-      sql += "fp.title LIKE ?";
-      params.push(`%${search}%`);
-    }
-  }
-
-  sql += `
-    GROUP BY fp.id
-    ORDER BY
-      ${sort === "popular" ? "reply_count DESC" :
-        sort === "unanswered" ? "reply_count ASC" :
-        "fp.created_at DESC"}
-  `;
-
-  const [topics] = await pool.query(sql, params);
-  res.json(topics);
-});
-
-forumRouter.get('/categories', async (req, res) => {
-    try {
-        const [categories] = await pool.execute(`
-            SELECT fc.*, 
-                   COUNT(ft.id) as topic_count
-            FROM forum_categories fc
-            LEFT JOIN forum_posts ft ON fc.name = ft.category AND fc.is_active = TRUE
-            WHERE fc.is_active = TRUE
-            GROUP BY fc.id
-            ORDER BY fc.sort_order, fc.name
-        `);
-
-        res.json(categories);
-    } catch (error) {
-        console.error('Get forum categories error:', error);
-        res.status(500).json({ message: 'Failed to load forum categories' });
-    }
-});
-
-forumRouter.get('/stats', async (req, res) => {
-  const [[topics]] = await pool.query("SELECT COUNT(*) total FROM forum_posts");
-  const [[users]] = await pool.query("SELECT COUNT(DISTINCT user_id) total FROM forum_posts");
-  const [[replies]] = await pool.query("SELECT COUNT(*) total FROM forum_replies");
-  const [[solved]] = await pool.query("SELECT COUNT(*) total FROM forum_posts WHERE solved = TRUE");
-
-  res.json({
-    totalTopics: topics.total,
-    totalUsers: users.total,
-    totalReplies: replies.total,
-    solvedTopics: solved.total
-  });
-});
-
-forumRouter.get('/topics/:topicId', async (req, res) => {
-    try {
-        const topicId = req.params.topicId;
-
-        // Increment view count
-        await pool.execute(
-            'UPDATE forum_topics SET views_count = views_count + 1 WHERE id = ?',
-            [topicId]
-        );
-
-        // Get topic details
-        const [topics] = await pool.execute(`
-            SELECT ft.*,
-                   u.first_name, u.last_name, u.profile_picture, u.bio,
-                   fc.name as category_name, fc.slug as category_slug,
-                   (SELECT COUNT(*) FROM forum_subscriptions WHERE topic_id = ft.id) as subscribers_count
-            FROM forum_topics ft
-            JOIN users u ON ft.user_id = u.id
-            JOIN forum_categories fc ON ft.category_id = fc.id
-            WHERE ft.id = ?
-        `, [topicId]);
-
-        if (topics.length === 0) {
-            return res.status(404).json({ message: 'Topic not found' });
-        }
-
-        // Get replies
-        const [replies] = await pool.execute(`
-             SELECT fr.*,
-                   u.first_name, u.last_name, u.profile_picture
-            FROM forum_replies fr
-            JOIN users u ON fr.user_id = u.id
-            WHERE fr.post_id = ?
-            ORDER BY fr.is_best_answer DESC, fr.created_at ASC
-     `, [topicId]);
-
+  
+  try {
+    let query = {};
+    let sortOption = {};
     
-        res.json({
-            topic: topics[0],
-            replies: replies.map(reply => ({
-                ...reply
-            }))
-        });
-
-    } catch (error) {
-        console.error('Get topic error:', error);
-        res.status(500).json({ message: 'Failed to load topic' });
+    // Filter by category
+    if (category) {
+      const categoryDoc = await ForumCategory.findOne({ slug: category });
+      if (categoryDoc) {
+        query.categoryId = categoryDoc._id;
+      }
     }
+    
+    // Search by title
+    if (search) {
+      query.title = { $regex: search, $options: 'i' };
+    }
+    
+    // Sort options
+    if (sort === "popular") {
+      // Popular by reply count (need to compute in aggregation)
+      sortOption = { "replyCount": -1 };
+    } else if (sort === "unanswered") {
+      // Unanswered = 0 replies
+      query.$expr = { $eq: [{ $size: "$replies" }, 0] };
+      sortOption = { createdAt: -1 };
+    } else {
+      // Default: newest first
+      sortOption = { createdAt: -1 };
+    }
+    
+    const topics = await ForumPost.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: "forumcategories",
+          localField: "categoryId",
+          foreignField: "_id",
+          as: "category"
+        }
+      },
+      { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          replyCount: { $size: "$replies" },
+          category_name: "$category.name",
+          icon: "$category.icon"
+        }
+      },
+      { $sort: sortOption }
+    ]);
+    
+    res.json(topics);
+  } catch (err) {
+    console.error('Get topics error:', err);
+    res.status(500).json({ message: "Failed to load topics" });
+  }
 });
+
+// Get forum categories
+forumRouter.get('/categories', async (req, res) => {
+  try {
+    const categories = await ForumCategory.aggregate([
+      { $match: { isActive: true } },
+      {
+        $lookup: {
+          from: "forumposts",
+          localField: "_id",
+          foreignField: "categoryId",
+          as: "posts"
+        }
+      },
+      {
+        $addFields: {
+          topic_count: { $size: "$posts" }
+        }
+      },
+      { $project: { posts: 0 } },
+      { $sort: { sortOrder: 1, name: 1 } }
+    ]);
+    
+    res.json(categories);
+  } catch (error) {
+    console.error('Get forum categories error:', error);
+    res.status(500).json({ message: 'Failed to load forum categories' });
+  }
+});
+
+// Get forum stats
+forumRouter.get('/stats', async (req, res) => {
+  try {
+    const totalTopics = await ForumPost.countDocuments();
+    const totalUsers = await User.countDocuments();
+    
+    const repliesResult = await ForumPost.aggregate([
+      { $project: { replyCount: { $size: "$replies" } } },
+      { $group: { _id: null, total: { $sum: "$replyCount" } } }
+    ]);
+    
+    const totalReplies = repliesResult.length > 0 ? repliesResult[0].total : 0;
+    
+    const solvedTopics = await ForumPost.countDocuments({ solved: true });
+    
+    res.json({
+      totalTopics,
+      totalUsers,
+      totalReplies,
+      solvedTopics
+    });
+  } catch (err) {
+    console.error('Get stats error:', err);
+    res.status(500).json({ message: "Failed to load stats" });
+  }
+});
+
+// Get topic with details (alternative endpoint)
+forumRouter.get('/topics/:topicId', async (req, res) => {
+  try {
+    const topicId = req.params.topicId;
+    
+    // Increment view count
+    await ForumPost.findByIdAndUpdate(topicId, { $inc: { views: 1 } });
+    
+    // Get topic details with populated fields
+    const topic = await ForumPost.findById(topicId)
+      .populate('userId', 'firstName lastName profilePicture bio')
+      .populate('categoryId', 'name slug')
+      .populate('replies.userId', 'firstName lastName profilePicture')
+      .lean();
+    
+    if (!topic) {
+      return res.status(404).json({ message: 'Topic not found' });
+    }
+    
+    // Format replies
+    const formattedReplies = topic.replies.map(reply => ({
+      ...reply,
+      author: reply.userId ? {
+        first_name: reply.userId.firstName,
+        last_name: reply.userId.lastName,
+        profile_picture: reply.userId.profilePicture
+      } : null
+    }));
+    
+    // Format response
+    const formattedTopic = {
+      ...topic,
+      author: topic.userId ? {
+        first_name: topic.userId.firstName,
+        last_name: topic.userId.lastName,
+        profile_picture: topic.userId.profilePicture,
+        bio: topic.userId.bio
+      } : null,
+      category_name: topic.categoryId?.name,
+      category_slug: topic.categoryId?.slug,
+      replies: formattedReplies,
+      subscribers_count: 0 // Implement if needed
+    };
+    
+    res.json({
+      topic: formattedTopic,
+      replies: formattedReplies
+    });
+    
+  } catch (error) {
+    console.error('Get topic error:', error);
+    res.status(500).json({ message: 'Failed to load topic' });
+  }
+});
+
 // Get user's forum activity
 forumRouter.get('/activity/:userId', async (req, res) => {
-    try {
-        const userId = req.params.userId;
-        const [topics] = await pool.execute(`
-         SELECT ft.*, u.first_name, u.last_name, u.profile_picture,
-                   fc.name as category_name, fc.slug as category_slug
-            FROM forum_posts ft
-            JOIN users u ON ft.user_id = u.id
-            JOIN forum_categories fc ON ft.category = fc.name
-            WHERE u.id = ?
-        ORDER BY ft.created_at DESC
-            LIMIT 10
-                `, [userId]);
-
-        const [replies] = await pool.execute(`
-                SELECT fr.*, ft.title as topic_title
-            FROM forum_replies fr
-            JOIN forum_posts ft ON fr.post_id = ft.id
-            WHERE fr.user_id = ?
-            ORDER BY fr.created_at DESC
-            LIMIT 10
-    `, [userId]);
-
-        res.json({ topics, replies });
-    } catch (error) {
-        console.error('Get user activity error:', error);
-        res.status(500).json({ message: 'Failed to get user activity' });
-    }
+  try {
+    const userId = req.params.userId;
+    
+    // Get user's topics
+    const topics = await ForumPost.find({ userId })
+      .populate('userId', 'firstName lastName profilePicture')
+      .populate('categoryId', 'name slug')
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+    
+    // Get user's replies
+    const postsWithUserReplies = await ForumPost.find({
+      'replies.userId': userId
+    })
+      .select('title replies')
+      .sort({ 'replies.createdAt': -1 })
+      .limit(10)
+      .lean();
+    
+    // Extract user's replies
+    const replies = [];
+    postsWithUserReplies.forEach(post => {
+      const userReplies = post.replies.filter(r => 
+        r.userId && r.userId.toString() === userId
+      );
+      
+      userReplies.forEach(reply => {
+        replies.push({
+          ...reply,
+          topic_title: post.title
+        });
+      });
+    });
+    
+    // Sort replies by date
+    replies.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    // Format topics
+    const formattedTopics = topics.map(topic => ({
+      ...topic,
+      author: topic.userId ? {
+        first_name: topic.userId.firstName,
+        last_name: topic.userId.lastName,
+        profile_picture: topic.userId.profilePicture
+      } : null,
+      category_name: topic.categoryId?.name,
+      category_slug: topic.categoryId?.slug
+    }));
+    
+    res.json({ topics: formattedTopics, replies });
+  } catch (error) {
+    console.error('Get user activity error:', error);
+    res.status(500).json({ message: 'Failed to get user activity' });
+  }
 });
+
 export default forumRouter;

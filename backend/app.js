@@ -6,6 +6,7 @@ import router from "./routes/api.js";
 import forumRouter from "./routes/forum.js";
 import Regisrouter from "./registration/server.js";
 import Dashboardrouter from "./routes/dashboard.js";
+import connectDB from "./config/db.js";
 const app = express();
 const server = http.createServer(app);
 import path from 'path';
@@ -312,6 +313,8 @@ app.get('/api/stream-status', (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
+// Connect to MongoDB
+connectDB();
+
 server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
+    console

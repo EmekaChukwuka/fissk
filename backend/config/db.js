@@ -1,14 +1,13 @@
-import mysql from "mysql2/promise";
+ import mongoose from "mongoose";
 
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("MongoDB Connected");
+  } catch (err) {
+    console.error(err);
+    process.exit(1);
+  }
+};
 
-const pool = mysql.createPool({
-  host: '127.0.0.1',
-  user: 'root',
-  password: '',
-  database: 'fissk_online_academy',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
-
-export default pool;
+export default connectDB;
