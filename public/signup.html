@@ -457,7 +457,7 @@ if (password !== confirmPassword) {
             submitBtn.textContent = 'Creating account...';
             submitBtn.disabled = true;
 
-            const response = await fetch('http://localhost:3000/register/student-register', {
+            const response = await fetch('https://fissk-backend.onrender.com/register/student-register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -523,7 +523,7 @@ if (password !== confirmPassword) {
             submitBtn.textContent = 'Creating account...';
             submitBtn.disabled = true;
 
-            const response = await fetch('http://localhost:3000/register/instructor-register', {
+            const response = await fetch('https://fissk-backend.onrender.com/register/instructor-register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

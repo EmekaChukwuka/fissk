@@ -18,7 +18,7 @@ class ClassesManager {
         try {
             
 
-             const response = await fetch('http://localhost:3000/register/classes');
+             const response = await fetch('https://fissk-backend.onrender.com/register/classes');
     
     const data =await response.json();
     console.log(data);
@@ -223,7 +223,7 @@ this.classes = coursesArray;
         const modalContent = document.getElementById('modalClassDetails');
         try{
 
-           const response = await fetch('http://localhost:3000/register/classes/instructor',{
+           const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor',{
             method: 'POST',
       headers:{
         'Content-Type':'application/json'

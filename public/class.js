@@ -35,7 +35,7 @@ class ClassManager {
     async loadClassData() {
         try {
             // Simulate API call - replace with your actual endpoint
-            const response = await fetch(`http://localhost:3000/register/class/${this.classId}`);
+            const response = await fetch(`https://fissk-backend.onrender.com/register/class/${this.classId}`);
         
             this.classData = await response.json();
             console.log(this.classData)
@@ -72,10 +72,10 @@ class ClassManager {
     async loadClassVideos() {
         try {
             // Simulate API call - replace with your actual endpoint
-            const response = await fetch(`http://localhost:3000/api/by-class/${this.classId}`);
+            const response = await fetch(`https://fissk-backend.onrender.com/api/by-class/${this.classId}`);
             this.videos = await response.json();
             console.log(this.videos) 
-               const responseB = await fetch(`http://localhost:3000/register/user-progress`,{
+               const responseB = await fetch(`https://fissk-backend.onrender.com/register/user-progress`,{
             method: 'POST',
       headers:{
         'Content-Type':'application/json'
@@ -85,7 +85,7 @@ class ClassManager {
         const progress = await responseB.json();
 
 
-               const res = await fetch(`http://localhost:3000/register/class/upcoming`,{
+               const res = await fetch(`https://fissk-backend.onrender.com/register/class/upcoming`,{
             method: 'POST',
       headers:{
         'Content-Type':'application/json'
@@ -211,7 +211,7 @@ class ClassManager {
    async renderClassData() {
         if (!this.classData) return;
 try{
- const response = await fetch('http://localhost:3000/register/classes/instructor',{
+ const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor',{
             method: 'POST',
       headers:{
         'Content-Type':'application/json'

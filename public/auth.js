@@ -110,7 +110,7 @@ class AuthManager {
             submitBtn.textContent = 'Signing in...';
             submitBtn.disabled = true;
 
-            const response = await fetch('http://localhost:3000/register/login', {
+            const response = await fetch('https://fissk-backend.onrender.com/register/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -178,7 +178,7 @@ class AuthManager {
             submitBtn.textContent = 'Creating account...';
             submitBtn.disabled = true;
 
-            const response = await fetch('http://localhost:3000/register/register', {
+            const response = await fetch('https://fissk-backend.onrender.com/register/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
