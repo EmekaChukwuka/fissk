@@ -382,7 +382,7 @@ let totalUniqueViewers = new Set();
     
     // Initialize WebSocket connection
     function initWebSocket() {
-        socket = new WebSocket('ws://localhost:3000');
+        socket = new WebSocket('wss://fissk-backend.onrender.com');
         
         socket.onopen = () => {
             console.log('WebSocket connected');
