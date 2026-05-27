@@ -564,3 +564,201 @@
         align-items: flex-start;
     }
 }
+/* Topic post styles */
+.topic-header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border);
+}
+
+.topic-header h2 {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+    color: var(--text-dark);
+}
+
+.topic-meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.topic-category {
+    background: var(--gray-light);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+}
+
+.badge-solved, .badge-pinned {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+}
+
+.badge-solved {
+    background: #48BB78;
+    color: white;
+}
+
+.badge-pinned {
+    background: var(--primary);
+    color: white;
+}
+
+.topic-content {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.topic-author, .reply-author {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border);
+}
+
+.author-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.author-info strong {
+    display: block;
+    color: var(--text-dark);
+}
+
+.author-info small {
+    color: var(--text-light);
+    font-size: 0.75rem;
+}
+
+.topic-body, .reply-content {
+    margin-bottom: 15px;
+    line-height: 1.6;
+}
+
+.topic-stats {
+    display: flex;
+    gap: 15px;
+    color: var(--text-light);
+    font-size: 0.875rem;
+}
+
+.topic-actions {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border);
+}
+
+/* Reply styles */
+.reply-card {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    position: relative;
+}
+
+.reply-card.best-answer {
+    border: 2px solid #48BB78;
+    background: #F0FFF4;
+}
+
+.best-answer-badge {
+    position: absolute;
+    top: -10px;
+    right: 20px;
+    background: #48BB78;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+}
+
+.reply-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border);
+}
+
+.btn-like, .btn-best, .btn-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.btn-like:hover {
+    background: #FFE4E4;
+    color: #e74c3c;
+}
+
+.btn-best:hover {
+    background: #E8F5E9;
+    color: #48BB78;
+}
+
+.btn-delete:hover {
+    background: #FFE4E4;
+    color: #e74c3c;
+}
+
+.forum-section h3 {
+    margin: 20px 0;
+    color: var(--text-dark);
+}
+
+.no-replies {
+    text-align: center;
+    padding: 40px;
+    background: var(--gray-light);
+    border-radius: 12px;
+    color: var(--text-light);
+}
+
+/* Reply form */
+.forum-card {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.forum-card h4 {
+    margin-bottom: 15px;
+    color: var(--text-dark);
+}
+
+#replyForm textarea {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 120px;
+}
+
+#replyForm textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+#replyForm button {
+    margin-top: 10px;
+}
