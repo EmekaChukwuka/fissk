@@ -1,125 +1,97 @@
-
 // Classes Page Functionality
 class ClassesManager {
     constructor() {
         this.classes = [];
         this.filteredClasses = [];
         this.currentFilter = 'all';
+        this.searchQuery = '';
+        this.user = null;
         this.init();
     }
 
     async init() {
+        // Get logged in user
+        this.user = JSON.parse(localStorage.getItem('user'));
         await this.loadClasses();
-         this.setupEventListeners();
+        this.setupEventListeners();
         this.renderClasses();
     }
 
     async loadClasses() {
         try {
+            const response = await fetch('https://fissk-backend.onrender.com/register/classes');
+            const data = await response.json();
+            console.log('Classes loaded:', data);
             
-
-             const response = await fetch('https://fissk-backend.onrender.com/register/classes');
-    
-    const data =await response.json();
-    console.log(data);
-    const coursesArray = data.classes;
-    if(coursesArray.length!==0){
-this.classes = coursesArray;
-
-   /* for (let i = 0; i < coursesArray.length; i++) {
-        const classA = data.classes[i];
-        console.log(classA);
-        let section = document.createElement('section');
-        section.className = "home-sections";
-        classes.append(section);
-        let sectionHeader = document.createElement('h4');
-        let sectionDes = document.createElement('p');
-        let sectionP = document.createElement('p');
-        let sectionLink = document.createElement('a');
-        sectionLink.className = "visitclass";
-        section.appendChild(sectionHeader);
-        section.appendChild(sectionP);
-        section.appendChild(sectionDes);
-        section.appendChild(sectionLink);
-        sectionLink.innerHTML = "Visit Class";
-        sectionLink.addEventListener('click', () => {window.location.href="class.html"});
-        sectionHeader.innerHTML = classA['classname'];
-        sectionDes.innerHTML = classA['classDescription'] + '<br><br>';
-        sectionP.innerHTML = 'Instructor: ' + classA['Instructor'];
-    }*/
-}
-    console.log(data);
-  
-
-            // For demo purposes, using mock data
-            if (!this.classes.length) {
-                this.classes = this.getMockClasses();
+            const coursesArray = data.classes;
+            if (coursesArray && coursesArray.length !== 0) {
+                // Check which classes user is enrolled in
+                if (this.user && this.user.email) {
+                    const enrolledResponse = await fetch('https://fissk-backend.onrender.com/register/get-user-classes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: this.user.email })
+                    });
+                    const enrolledData = await enrolledResponse.json();
+                    const enrolledClassIds = new Set();
+                    
+                    if (enrolledData.classes && enrolledData.classes.length) {
+                        enrolledData.classes.forEach(c => {
+                            enrolledClassIds.add(c.class_id?.toString() || c._id?.toString());
+                        });
+                    }
+                    
+                    // Mark enrolled classes
+                    this.classes = coursesArray.map(c => ({
+                        ...c,
+                        enrolled: enrolledClassIds.has(c._id?.toString())
+                    }));
+                } else {
+                    this.classes = coursesArray;
+                }
+            } else {
+                this.classes = [];
             }
             
             this.filteredClasses = [...this.classes];
             this.hideLoading();
+            
+            if (this.classes.length === 0) {
+                this.showNoClassesMessage();
+            }
         } catch (error) {
             console.error('Error loading classes:', error);
-            this.classes = this.getMockClasses();
-            this.filteredClasses = [...this.classes];
+            this.classes = [];
+            this.filteredClasses = [];
             this.hideLoading();
+            this.showErrorMessage('Failed to load classes. Please refresh the page.');
         }
     }
 
-    getMockClasses() {
-        return [
-            {
-                id: 1,
-                title: "French for Canada Express Entry",
-                description: "Master TEF/TCF exam requirements and boost your CRS score for Canadian immigration.",
-                category: "french",
-                level: "beginner",
-                duration: "8 weeks",
-                students: 245,
-                instructor: "Mr. Adebayo",
-                thumbnail: "/api/placeholder/400/200",
-                enrolled: false
-            },
-            {
-                id: 2,
-                title: "IELTS Academic Excellence",
-                description: "Achieve band 7.0+ with our proven strategies and comprehensive practice tests.",
-                category: "english",
-                level: "intermediate",
-                duration: "6 weeks",
-                students: 189,
-                instructor: "Mrs. Johnson",
-                thumbnail: "/api/placeholder/400/200",
-                enrolled: false
-            },
-            {
-                id: 3,
-                title: "Business French for Professionals",
-                description: "Communicate confidently in corporate settings and international business meetings.",
-                category: "french",
-                level: "advanced",
-                duration: "10 weeks",
-                students: 78,
-                instructor: "Dr. Chukwu",
-                thumbnail: "/api/placeholder/400/200",
-                enrolled: true
-            },
-            {
-                id: 4,
-                title: "English for Career Growth",
-                description: "Enhance your professional communication skills for workplace success.",
-                category: "english",
-                level: "intermediate",
-                duration: "8 weeks",
-                students: 156,
-                instructor: "Ms. Bello",
-                thumbnail: "/api/placeholder/400/200",
-                enrolled: false
-            }
-        ];
+    showNoClassesMessage() {
+        const container = document.getElementById('classesContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="no-content">
+                    <p>No classes available at the moment. Please check back later.</p>
+                </div>
+            `;
+        }
     }
 
-       setupEventListeners() {
+    showErrorMessage(message) {
+        const container = document.getElementById('classesContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="error-content">
+                    <p>⚠️ ${message}</p>
+                    <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                </div>
+            `;
+        }
+    }
+
+    setupEventListeners() {
         // Filter buttons
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -142,7 +114,6 @@ this.classes = coursesArray;
     handleFilter(filter) {
         this.currentFilter = filter;
         
-        // Update active filter button
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.filter === filter);
         });
@@ -155,179 +126,159 @@ this.classes = coursesArray;
         this.applyFilters();
     }
 
-applyFilters() {
-    this.filteredClasses = this.classes.filter(classItem => {
-        const matchesFilter = this.currentFilter === 'all' || 
-                            classItem.category === this.currentFilter ||
-                            classItem.level === this.currentFilter;
-        
-        const matchesSearch = !this.searchQuery || 
-                            (classItem.title && classItem.title.toLowerCase().includes(this.searchQuery)) ||
-                            (classItem.description && classItem.description.toLowerCase().includes(this.searchQuery));
-        
-        return matchesFilter && matchesSearch;
-    });
+    applyFilters() {
+        this.filteredClasses = this.classes.filter(classItem => {
+            const matchesFilter = this.currentFilter === 'all' || 
+                                classItem.category === this.currentFilter ||
+                                classItem.level === this.currentFilter;
+            
+            const matchesSearch = !this.searchQuery || 
+                                (classItem.title && classItem.title.toLowerCase().includes(this.searchQuery)) ||
+                                (classItem.description && classItem.description.toLowerCase().includes(this.searchQuery));
+            
+            return matchesFilter && matchesSearch;
+        });
 
-    this.renderClasses();
-}
-
-   renderClasses() {
-    const container = document.getElementById('classesContainer');
-    if (!container) return;
-
-    if (this.filteredClasses.length === 0) {
-        container.innerHTML = `
-            <div class="no-content">
-                <p>No classes found matching your criteria.</p>
-            </div>
-        `;
-        return;
+        this.renderClasses();
     }
-    
-    container.innerHTML = this.filteredClasses.map(classItem => {
-        // Handle both data structures
-        const classId = classItem._id || classItem.id;
-        const classTitle = classItem.title;
-        const classDescription = classItem.description;
-        const classLevel = classItem.level;
-        const classDuration = classItem.duration;
-        const maxStudents = classItem.max_students || classItem.maxStudents || 0;
-        const enrolled = classItem.enrolled || false;
+
+    renderClasses() {
+        const container = document.getElementById('classesContainer');
+        if (!container) return;
+
+        if (this.filteredClasses.length === 0) {
+            container.innerHTML = `
+                <div class="no-content">
+                    <p>No classes found matching your criteria.</p>
+                </div>
+            `;
+            return;
+        }
         
-        return `
-            <div class="class-card" data-class-id="${classId}">
-                <div class="class-card-image" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);"></div>
-                <div class="class-card-content">
-                    <h3>${classTitle}</h3>
-                    <p>${classDescription}</p>
-                    <div class="class-meta">
-                        <span>🟢 ${classLevel}</span>
-                        <span>🕒 ${classDuration}</span>
-                        <span>👥 ${maxStudents} students</span>
-                    </div>
-                    <div class="class-actions">
-                        ${enrolled ? 
-                            `<button class="btn btn-outline" disabled>Already Enrolled</button>
-                             <a href="class.html?id=${classId}" class="btn btn-primary">Continue Learning</a>` :
-                            `<button class="btn btn-primary enroll-btn" data-class-id="${classId}" data-class-name="${classTitle}" id="${classId}">Enroll Now</button>
-                             <a href="class.html?id=${classId}" class="btn btn-outline">View Details</a>`
-                        }
+        container.innerHTML = this.filteredClasses.map(classItem => {
+            const classId = classItem._id;
+            const classTitle = classItem.title;
+            const classDescription = classItem.description;
+            const classLevel = classItem.level;
+            const classDuration = classItem.duration;
+            const maxStudents = classItem.maxStudents || 0;
+            const enrolled = classItem.enrolled || false;
+            
+            return `
+                <div class="class-card" data-class-id="${classId}">
+                    <div class="class-card-image" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);"></div>
+                    <div class="class-card-content">
+                        <h3>${this.escapeHtml(classTitle)}</h3>
+                        <p>${this.escapeHtml(classDescription)}</p>
+                        <div class="class-meta">
+                            <span>🟢 ${classLevel || 'Beginner'}</span>
+                            <span>🕒 ${classDuration || 'Self-paced'}</span>
+                            <span>👥 ${maxStudents} students</span>
+                        </div>
+                        <div class="class-actions">
+                            ${enrolled ? 
+                                `<button class="btn btn-outline" disabled>Already Enrolled</button>
+                                 <a href="class.html?id=${classId}" class="btn btn-primary">Continue Learning</a>` :
+                                `<button class="btn btn-primary enroll-btn" data-class-id="${classId}" data-class-name="${classTitle}" id="${classId}">Enroll Now</button>
+                                 <a href="class.html?id=${classId}" class="btn btn-outline">View Details</a>`
+                            }
+                        </div>
                     </div>
                 </div>
-            </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
 
-    // Add event listeners to enroll buttons
-    document.querySelectorAll('.enroll-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const classId = e.target.id;
-            this.showEnrollmentModal(classId);
+        // Add event listeners to enroll buttons
+        document.querySelectorAll('.enroll-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const classId = e.target.id;
+                this.showEnrollmentModal(classId);
+            });
         });
-    });
-}
-async showEnrollmentModal(classId) {
-    const classItem = this.classes.find(c => c.id == classId || c._id == classId);
-    if (!classItem) {
-        console.log('error');
-        return;
     }
 
-    const modal = document.getElementById('enrollmentModal');
-    const modalContent = document.getElementById('modalClassDetails');
-    
-    try {
-        const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ instructor_id: classItem.instructorId }),
-        });
-    
-        const dataA = await response.json();
-        console.log(dataA);
+    async showEnrollmentModal(classId) {
+        const classItem = this.classes.find(c => c._id == classId);
+        if (!classItem) {
+            console.error('Class not found:', classId);
+            return;
+        }
+
+        const modal = document.getElementById('enrollmentModal');
+        const modalContent = document.getElementById('modalClassDetails');
         
-        // FIXED: Use firstName and lastName (camelCase) instead of first_name/last_name
-        modalContent.innerHTML = `
-            <h3>${classItem.title}</h3>
-            <p><strong>Category:</strong> ${classItem.category?.toUpperCase() || 'N/A'}</p>
-            <p><strong>Level:</strong> ${classItem.level}</p>
-            <p><strong>Duration:</strong> ${classItem.duration}</p>
-            <p><strong>Instructor:</strong> ${dataA.instructorData.firstName} ${dataA.instructorData.lastName}</p>
-            <p>${classItem.description}</p><br>
-        `;
+        try {
+            // Get instructor info if available
+            let instructorName = 'Staff';
+            if (classItem.instructorId) {
+                const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ instructor_id: classItem.instructorId }),
+                });
+                const dataA = await response.json();
+                if (dataA.instructorData) {
+                    instructorName = `${dataA.instructorData.firstName || ''} ${dataA.instructorData.lastName || ''}`.trim() || 'Staff';
+                }
+            }
+            
+            modalContent.innerHTML = `
+                <h3>${this.escapeHtml(classItem.title)}</h3>
+                <p><strong>Category:</strong> ${classItem.category?.toUpperCase() || 'General'}</p>
+                <p><strong>Level:</strong> ${classItem.level || 'Beginner'}</p>
+                <p><strong>Duration:</strong> ${classItem.duration || 'Self-paced'}</p>
+                <p><strong>Instructor:</strong> ${this.escapeHtml(instructorName)}</p>
+                <p>${this.escapeHtml(classItem.description)}</p><br>
+            `;
 
-        modal.style.display = 'flex';
+            modal.style.display = 'flex';
 
-        const confirmBtn = document.getElementById('confirmEnroll');
-        confirmBtn.onclick = () => this.enrollInClass(classId);
-        const closeBtn = document.querySelector('.close-modal');
-        const cancelBtn = document.getElementById('cancelEnroll');
+            const confirmBtn = document.getElementById('confirmEnroll');
+            confirmBtn.onclick = () => this.enrollInClass(classId);
+            const closeBtn = document.querySelector('.close-modal');
+            const cancelBtn = document.getElementById('cancelEnroll');
 
-        const hideModal = () => {
-            modal.style.display = 'none';
-        };
+            const hideModal = () => {
+                modal.style.display = 'none';
+            };
 
-        closeBtn.addEventListener('click', hideModal);
-        cancelBtn.addEventListener('click', hideModal);
-        
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) hideModal();
-        });
-    } catch(err) {
-        console.log(err);
+            closeBtn.addEventListener('click', hideModal);
+            cancelBtn.addEventListener('click', hideModal);
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) hideModal();
+            });
+        } catch(err) {
+            console.error('Error loading instructor:', err);
+            modalContent.innerHTML = `
+                <h3>${this.escapeHtml(classItem.title)}</h3>
+                <p><strong>Category:</strong> ${classItem.category?.toUpperCase() || 'General'}</p>
+                <p><strong>Level:</strong> ${classItem.level || 'Beginner'}</p>
+                <p><strong>Duration:</strong> ${classItem.duration || 'Self-paced'}</p>
+                <p><strong>Instructor:</strong> Staff</p>
+                <p>${this.escapeHtml(classItem.description)}</p><br>
+            `;
+            modal.style.display = 'flex';
+        }
     }
-}
-
-setupModalConfirmation(classId) {
-    // Set up confirmation button without duplicating event listeners
-    const confirmBtn = document.getElementById('confirmEnroll');
-    const closeBtn = document.querySelector('.close-modal');
-    const cancelBtn = document.getElementById('cancelEnroll');
-    const modal = document.getElementById('enrollmentModal');
-
-    // Remove old listeners to prevent duplicates
-    const newConfirmBtn = confirmBtn.cloneNode(true);
-    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-    
-    newConfirmBtn.onclick = () => this.enrollInClass(classId);
-    
-    const hideModal = () => {
-        modal.style.display = 'none';
-    };
-
-    // Remove old close button listeners
-    const newCloseBtn = closeBtn.cloneNode(true);
-    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
-    newCloseBtn.addEventListener('click', hideModal);
-    
-    const newCancelBtn = cancelBtn.cloneNode(true);
-    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
-    newCancelBtn.addEventListener('click', hideModal);
-    
-    modal.onclick = (e) => {
-        if (e.target === modal) hideModal();
-    };
-}
 
     async enrollInClass(classId) {
+        if (!this.user || !this.user.email) {
+            alert('Please login to enroll in classes');
+            window.location.href = 'index.html';
+            return;
+        }
+
         try {
-            const user = JSON.parse(localStorage.getItem('user'));
-            const email = user.email;
-            console.log(email)
-            // Simulate API call - replace with your actual endpoint
             const response = await fetch('https://fissk-backend.onrender.com/register/join-class', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ classId: classId, email })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ classId: classId, email: this.user.email })
             });
 
             if (response.ok) {
                 // Update local state
-                const classItem = this.classes.find(c => c.id == classId);
+                const classItem = this.classes.find(c => c._id == classId);
                 if (classItem) {
                     classItem.enrolled = true;
                 }
@@ -335,22 +286,22 @@ setupModalConfirmation(classId) {
                 this.hideModal();
                 this.renderClasses();
                 
-                // Show success message
                 alert('Successfully enrolled in the class!');
-                
-                // Redirect to class page
                 window.location.href = `class.html?id=${classId}`;
             } else {
-                throw new Error('Enrollment failed');
+                const error = await response.json();
+                throw new Error(error.message || 'Enrollment failed');
             }
         } catch (error) {
             console.error('Error enrolling in class:', error);
-            alert('Failed to enroll in class. Please try again.');
+            alert(error.message || 'Failed to enroll in class. Please try again.');
         }
     }
 
     setupModalEvents() {
         const modal = document.getElementById('enrollmentModal');
+        if (!modal) return;
+        
         const closeBtn = document.querySelector('.close-modal');
         const cancelBtn = document.getElementById('cancelEnroll');
 
@@ -358,8 +309,8 @@ setupModalConfirmation(classId) {
             modal.style.display = 'none';
         };
 
-        closeBtn.addEventListener('click', hideModal);
-        cancelBtn.addEventListener('click', hideModal);
+        if (closeBtn) closeBtn.addEventListener('click', hideModal);
+        if (cancelBtn) cancelBtn.addEventListener('click', hideModal);
         
         modal.addEventListener('click', (e) => {
             if (e.target === modal) hideModal();
@@ -367,18 +318,22 @@ setupModalConfirmation(classId) {
     }
 
     hideModal() {
-        document.getElementById('enrollmentModal').style.display = 'none';
+        const modal = document.getElementById('enrollmentModal');
+        if (modal) modal.style.display = 'none';
     }
-
-
-   
-   
 
     hideLoading() {
         const loadingIndicator = document.getElementById('loadingIndicator');
         if (loadingIndicator) {
             loadingIndicator.style.display = 'none';
         }
+    }
+
+    escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>]/g, function(s) {
+            return ({'&': '&amp;', '<': '&lt;', '>': '&gt;'})[s];
+        });
     }
 }
 
@@ -387,28 +342,31 @@ document.addEventListener('DOMContentLoaded', () => {
     new ClassesManager();
 });
 
-
+// User dropdown and navigation
 const user = localStorage.getItem('user');
-if(user){
-    document.getElementById('login-btn').style.display = 'none';
-    document.getElementById('signup-btn').style.display = 'none';
+if (user) {
+    const userData = JSON.parse(user);
+    const loginBtn = document.getElementById('login-btn');
+    const signupBtn = document.getElementById('signup-btn');
+    const dashboardBtn = document.getElementById('dashboard-btn');
+    
+    if (loginBtn) loginBtn.style.display = 'none';
+    if (signupBtn) signupBtn.style.display = 'none';
+    if (dashboardBtn) dashboardBtn.style.display = 'block';
+} else {
+    const dashboardBtn = document.getElementById('dashboard-btn');
+    if (dashboardBtn) dashboardBtn.style.display = 'none';
 }
-if(!user){
-    document.getElementById('dashboard-btn').style.display = 'none';
-}
-
 
 // Mobile Navigation
 const hamburger = document.querySelector('.hamburger');
 const navMenu = document.querySelector('.nav-menu');
-
 
 if (hamburger) {
     hamburger.addEventListener('click', () => {
         hamburger.classList.toggle('active');
         navMenu.classList.toggle('active');
         
-        // Add mobile menu styles
         if (navMenu.classList.contains('active')) {
             navMenu.style.display = 'flex';
             document.body.style.overflow = 'hidden';
@@ -419,28 +377,11 @@ if (hamburger) {
     });
 }
 
-// Close mobile menu when clicking on links
 document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', () => {
         hamburger.classList.remove('active');
         navMenu.classList.remove('active');
         navMenu.style.display = 'none';
         document.body.style.overflow = 'auto';
-    });
-});
-
-
-
-// Smooth scrolling for anchor links
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-            target.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
-        }
     });
 });

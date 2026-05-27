@@ -1,16 +1,15 @@
-// Individual Class Page Functionality
+// Individual Class Page Functionality - Real Data Only
 class ClassManager {
     constructor() {
         this.classId = this.getClassIdFromURL();
         this.classData = null;
         this.user = JSON.parse(localStorage.getItem('user'));
-        if(this.user){
-        this.userId = this.user.id;
-    }
+        this.userId = this.user ? this.user.id : null;
         this.currentVideoIndex = null;
-        this.videoModalBound = false;
         this.progressInterval = null;
         this.videos = [];
+        this.isEnrolled = false;
+        this.isLoading = true;
         this.init();
     }
 
@@ -24,148 +23,208 @@ class ClassManager {
             window.location.href = 'classes.html';
             return;
         }
-     //   if(this.user.id){}
-        await this.loadClassData();
-        await this.loadClassVideos();
-        this.setupEventListeners();
-        this.renderClassData();
-        this.renderVideos();
+        
+        // Show loading state immediately
+        this.showLoadingState();
+        
+        try {
+            // Load all data in parallel for better performance
+            await Promise.all([
+                this.loadClassData(),
+                this.checkEnrollment(),
+                this.loadClassVideos()
+            ]);
+            
+            // Only render after ALL data is loaded
+            this.renderClassData();
+            this.renderVideos();
+            this.setupEventListeners();
+        } catch (error) {
+            console.error('Initialization error:', error);
+            this.showError('Failed to load class data. Please refresh the page.');
+        } finally {
+            this.isLoading = false;
+            this.hideLoadingState();
+        }
+    }
+
+    showLoadingState() {
+        // Show loading indicators
+        const classNameEl = document.getElementById('className');
+        if (classNameEl) classNameEl.innerHTML = '<div class="loading-pulse">Loading...</div>';
+        
+        const videosContainer = document.getElementById('videosContainer');
+        if (videosContainer) {
+            videosContainer.innerHTML = `
+                <div class="loading-skeleton">
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
+                </div>
+            `;
+        }
+    }
+
+    hideLoadingState() {
+        // Remove loading indicators (they'll be replaced with actual content)
     }
 
     async loadClassData() {
         try {
-            // Simulate API call - replace with your actual endpoint
             const response = await fetch(`https://fissk-backend.onrender.com/register/class/${this.classId}`);
-        
-            this.classData = await response.json();
-            console.log(this.classData)
             
-            // For demo purposes, using mock data
-            if (!this.classData) {
-                this.classData = this.getMockClassData();
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: Class not found`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.classA && data.classA.length > 0) {
+                this.classData = data.classA[0];
+            } else {
+                throw new Error('Class not found');
             }
         } catch (error) {
             console.error('Error loading class data:', error);
-            this.classData = this.getMockClassData();
+            this.showError('Could not load class information. Please try again.');
+            throw error;
         }
     }
 
-    getMockClassData() {
-        return {
-            id: this.classId,
-            title: "French for Canada Express Entry",
-            description: "Master TEF/TCF exam requirements and boost your CRS score for Canadian immigration.",
-            category: "french",
-            level: "beginner",
-            duration: "8 weeks",
-            students: 245,
-            instructor: {
-                name: "Mr. Adebayo",
-                bio: "Certified French tutor with 8+ years experience preparing students for TEF/TCF exams",
-                avatar: "/api/placeholder/100/100"
-            },
-            enrolled: true,
-            progress: 35
-        };
+    async checkEnrollment() {
+        if (!this.user || !this.user.email) {
+            this.isEnrolled = false;
+            return;
+        }
+        
+        try {
+            const response = await fetch('https://fissk-backend.onrender.com/register/get-user-classes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: this.user.email })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to check enrollment');
+            }
+            
+            const data = await response.json();
+            
+            if (data.classes && data.classes.length) {
+                this.isEnrolled = data.classes.some(c => 
+                    (c.class_id?.toString() === this.classId) || (c._id?.toString() === this.classId)
+                );
+            }
+        } catch (error) {
+            console.error('Error checking enrollment:', error);
+            this.isEnrolled = false;
+        }
     }
 
     async loadClassVideos() {
         try {
-            // Simulate API call - replace with your actual endpoint
             const response = await fetch(`https://fissk-backend.onrender.com/api/by-class/${this.classId}`);
-            this.videos = await response.json();
-            console.log(this.videos) 
-               const responseB = await fetch(`https://fissk-backend.onrender.com/register/user-progress`,{
-            method: 'POST',
-      headers:{
-        'Content-Type':'application/json'
-      },
-            body: JSON.stringify({userId: this.userId, classId: this.classId}),
-        });
-        const progress = await responseB.json();
-
-
-               const res = await fetch(`https://fissk-backend.onrender.com/register/class/upcoming`,{
-            method: 'POST',
-      headers:{
-        'Content-Type':'application/json'
-      },
-            body: JSON.stringify({id: this.classId}),
-        });
-        const json = await res.json();
-        const upcoming = Array.isArray(json.upcoming) ? json.upcoming : [];
-        
-        if(upcoming.length==0){
-            document.getElementById('upcomingSessions').textContent='No upcoming live sessions yet';
-        }else{
-
-            document.getElementById('upcomingSessions').innerHTML=`    ${upcoming.map(s => `
-                            <div class="enrolled-class-card upcoming">
-                                <div class="session-header"><h4>${this.escapeHtml(s.session_title)}</h4></div>
-                                <p>${this.escapeHtml(s.description || '')}</p>
-                                <div class="session-details">
-                                    <div class="session-info">
-                                        <span>📅 ${new Date(s.date).toLocaleDateString()} at ${s.time || ''}</span>
-                                          </div><br>
-                                    <div class="session-actions">
-                                        <button class="btn btn-primary join-session" data-session-id="${s.id}">Join Session</button>
-                                    </div>
-                                </div>
-                            </div><br>
-                        `).join('')}`;
-                    
-        
-        }
-
-        console.log(progress)
-        // Update progress
-        const progressBar = document.getElementById('classProgress');
-        const progressText = document.getElementById('progressText');
-        if (progressBar && progressText) {
-            progressBar.style.width = `${progress.progress[0].progress}%`;
-            progressText.textContent = `${progress.progress[0].progress}% Complete`;
-        }
-
-            // For demo purposes, using mock data
-            if (!this.videos.length) {
-                //this.videos = this.getMockVideos();
+            
+            if (!response.ok) {
+                throw new Error('Failed to load videos');
             }
+            
+            this.videos = await response.json();
+            console.log('Videos loaded:', this.videos);
+            
+            // Load user progress only if enrolled
+            if (this.userId && this.isEnrolled) {
+                await this.loadUserProgress();
+            }
+            
+            // Load upcoming sessions
+            await this.loadUpcomingSessions();
+            
         } catch (error) {
             console.error('Error loading class videos:', error);
-            this.videos = this.getMockVideos();
+            this.videos = [];
+            // Don't throw - videos are optional
         }
     }
 
-    getMockVideos() {
-        return [
-            {
-                id: 1,
-                title: "Introduction to TEF Exam",
-                description: "Overview of TEF exam structure and scoring system",
-                duration: "45:30",
-                thumbnail: "/api/placeholder/300/200",
-                videoUrl: "/api/videos/1",
-                date: "2024-01-15"
-            },
-            {
-                id: 2,
-                title: "French Pronunciation Basics",
-                description: "Mastering French sounds and accents",
-                duration: "38:15",
-                thumbnail: "/api/placeholder/300/200",
-                videoUrl: "/api/videos/2",
-                date: "2024-01-22"
-            },
-            {
-                id: 3,
-                title: "Common Vocabulary for Immigration",
-                description: "Essential words and phrases for Canadian immigration",
-                duration: "52:10",
-                thumbnail: "/api/placeholder/300/200",
-                videoUrl: "/api/videos/3",
-                date: "2024-01-29"
+    async loadUserProgress() {
+        try {
+            const response = await fetch('https://fissk-backend.onrender.com/register/user-progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: this.userId, classId: this.classId }),
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to load progress');
             }
-        ];
+            
+            const progress = await response.json();
+            
+            const progressBar = document.getElementById('classProgress');
+            const progressText = document.getElementById('progressText');
+            
+            if (progressBar && progressText && progress.progress && progress.progress[0]) {
+                const progValue = progress.progress[0].progress || 0;
+                progressBar.style.width = `${progValue}%`;
+                progressText.textContent = `${progValue}% Complete`;
+            }
+        } catch (error) {
+            console.error('Error loading progress:', error);
+            // Don't throw - progress is optional
+        }
+    }
+
+    async loadUpcomingSessions() {
+        try {
+            const res = await fetch('https://fissk-backend.onrender.com/register/class/upcoming', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: this.classId }),
+            });
+            
+            if (!res.ok) {
+                throw new Error('Failed to load sessions');
+            }
+            
+            const json = await res.json();
+            const upcoming = Array.isArray(json.upcoming) ? json.upcoming : [];
+            
+            const container = document.getElementById('upcomingSessions');
+            if (!container) return;
+            
+            if (upcoming.length === 0) {
+                container.innerHTML = '<p class="no-data">No upcoming live sessions yet</p>';
+            } else {
+                container.innerHTML = upcoming.map(s => `
+                    <div class="enrolled-class-card upcoming">
+                        <div class="session-header"><h4>${this.escapeHtml(s.session_title)}</h4></div>
+                        <p>${this.escapeHtml(s.description || '')}</p>
+                        <div class="session-details">
+                            <div class="session-info">
+                                <span>📅 ${new Date(s.date).toLocaleDateString()} at ${s.time || ''}</span>
+                            </div><br>
+                            <div class="session-actions">
+                                <button class="btn btn-primary join-session" data-session-id="${s.id}">Join Session</button>
+                            </div>
+                        </div>
+                    </div><br>
+                `).join('');
+                
+                // Add event listeners to join buttons
+                container.querySelectorAll('.join-session').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        window.open(`newlivestream.html?session=${btn.dataset.sessionId}`, '_blank');
+                    });
+                });
+            }
+        } catch (error) {
+            console.error('Error loading upcoming sessions:', error);
+            const container = document.getElementById('upcomingSessions');
+            if (container) {
+                container.innerHTML = '<p class="no-data">Unable to load upcoming sessions</p>';
+            }
+        }
     }
 
     setupEventListeners() {
@@ -187,80 +246,107 @@ class ClassManager {
         // Enrollment button
         const enrollBtn = document.getElementById('enrollBtn');
         if (enrollBtn) {
-            enrollBtn.addEventListener('click', () => {
+            // Remove existing listeners to avoid duplicates
+            const newEnrollBtn = enrollBtn.cloneNode(true);
+            enrollBtn.parentNode.replaceChild(newEnrollBtn, enrollBtn);
+            newEnrollBtn.addEventListener('click', () => {
                 this.handleEnrollment();
             });
         }
-
-        // Video modal
-        this.setupVideoModal();
     }
 
     switchTab(tabName) {
-        // Update active tab button
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
-
-        // Show active tab content
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === `${tabName}Tab`);
         });
     }
 
-   async renderClassData() {
-        if (!this.classData) return;
-try{
- const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor',{
-            method: 'POST',
-      headers:{
-        'Content-Type':'application/json'
-      },
-            body: JSON.stringify({instructor_id: this.classData.classA[0].instructor_id}),
-        }); 
-    
-    const dataA =await response.json();
-    console.log(dataA);
-        // Update page title
-        document.title = `${this.classData.classA[0].title} - FISSK Online Academy`;
-
-        // Update hero section
-        document.getElementById('className').textContent = this.classData.classA[0].title;
-        document.getElementById('classDescription').textContent = this.classData.classA[0].description;
-        
-        // Update meta information
-        document.getElementById('classLevel').textContent = `🟢 ${this.classData.classA[0].level}`;
-        document.getElementById('classDuration').textContent = `🕒 ${this.classData.classA[0].duration}`;
-        document.getElementById('classStudents').textContent = `👥 ${this.classData.classA[0].max_students} Students`;
-
-        // Update enrollment button
-        const enrollBtn = document.getElementById('enrollBtn');
-        if (this.classData.enrolled) {
-            enrollBtn.textContent = 'Already Enrolled';
-            enrollBtn.disabled = true;
+    async renderClassData() {
+        if (!this.classData) {
+            this.showError('Class data not available');
+            return;
         }
+        
+        try {
+            // Update page title
+            document.title = `${this.classData.title} - FISSK Online Academy`;
 
-        // Update instructor info
-        const instructor = this.classData.instructor;
-        document.getElementById('instructorName').textContent = dataA.instructorData.first_name + ' ' + dataA.instructorData.last_name;
-        document.getElementById('instructorBio').textContent = `Certified ${this.classData.classA[0].title} Tutor`;
+            // Update hero section
+            const classNameEl = document.getElementById('className');
+            const classDescEl = document.getElementById('classDescription');
+            
+            if (classNameEl) classNameEl.textContent = this.classData.title;
+            if (classDescEl) classDescEl.textContent = this.classData.description;
+            
+            // Update meta information
+            const levelEl = document.getElementById('classLevel');
+            const durationEl = document.getElementById('classDuration');
+            const studentsEl = document.getElementById('classStudents');
+            
+            if (levelEl) levelEl.textContent = `🟢 ${this.classData.level || 'Beginner'}`;
+            if (durationEl) durationEl.textContent = `🕒 ${this.classData.duration || 'Self-paced'}`;
+            if (studentsEl) studentsEl.textContent = `👥 ${this.classData.maxStudents || 0} Students`;
 
-        // Update class details
-        this.renderClassDetails();
-    }catch(err){
-        conole.log(err);
-    }
+            // Update enrollment button
+            const enrollBtn = document.getElementById('enrollBtn');
+            if (enrollBtn) {
+                if (this.isEnrolled) {
+                    enrollBtn.textContent = 'Already Enrolled ✓';
+                    enrollBtn.disabled = true;
+                    enrollBtn.classList.add('enrolled');
+                } else {
+                    enrollBtn.textContent = 'Enroll Now';
+                    enrollBtn.disabled = false;
+                    enrollBtn.classList.remove('enrolled');
+                }
+            }
+
+            // Load instructor info
+            if (this.classData.instructorId) {
+                try {
+                    const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ instructor_id: this.classData.instructorId }),
+                    });
+                    const dataA = await response.json();
+                    
+                    const instructorNameEl = document.getElementById('instructorName');
+                    const instructorBioEl = document.getElementById('instructorBio');
+                    
+                    if (instructorNameEl && dataA.instructorData) {
+                        const name = `${dataA.instructorData.firstName || ''} ${dataA.instructorData.lastName || ''}`.trim();
+                        instructorNameEl.textContent = name || 'Staff';
+                    }
+                    if (instructorBioEl) {
+                        instructorBioEl.textContent = `Certified ${this.classData.title} Instructor`;
+                    }
+                } catch (err) {
+                    console.error('Error loading instructor:', err);
+                    const instructorNameEl = document.getElementById('instructorName');
+                    if (instructorNameEl) instructorNameEl.textContent = 'Staff';
+                }
+            }
+
+            // Render class details
+            this.renderClassDetails();
+        } catch(err) {
+            console.error('Error rendering class data:', err);
+        }
     }
 
     renderClassDetails() {
         const detailsContent = document.getElementById('classDetailsContent');
         if (!detailsContent) return;
-const syllabus = JSON.stringify(this.classData.classA[0].syllabus);
+        
         detailsContent.innerHTML = `
             <div class="class-details">
                 <h4>Course Overview</h4>
-                <p>${this.classData.classA[0].description}</p>
-                
+                <p>${this.escapeHtml(this.classData.description || 'No description available')}</p>
+                ${this.classData.syllabus ? `<h4>Syllabus</h4><p>${this.escapeHtml(this.classData.syllabus)}</p>` : ''}
             </div>
         `;
     }
@@ -269,23 +355,28 @@ const syllabus = JSON.stringify(this.classData.classA[0].syllabus);
         const videosContainer = document.getElementById('videosContainer');
         const noVideos = document.getElementById('noVideos');
 
-        if (!this.videos.length) {
+        if (!this.videos || this.videos.length === 0) {
             if (videosContainer) videosContainer.style.display = 'none';
-            if (noVideos) noVideos.style.display = 'block';
+            if (noVideos) {
+                noVideos.style.display = 'block';
+                noVideos.innerHTML = '<p>No videos available for this class yet.</p>';
+            }
             return;
         }
         
         if (noVideos) noVideos.style.display = 'none';
         if (videosContainer) {
+            videosContainer.style.display = 'grid';
             videosContainer.innerHTML = this.videos.map((video, index) => `
-                <div class="video-card" data-video-id="${index}">
-                    <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);"></div>
+                <div class="video-card" data-video-index="${index}" data-video-id="${video._id || video.id}">
+                    <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);">
+                        <span class="play-icon">▶</span>
+                    </div>
                     <div class="video-info">
-                        <h4>${video.videoDetails.title}</h4>
-                        <p>${video.videoDetails.description}</p>
+                        <h4>${this.escapeHtml(video.videoDetails?.title || video.title || 'Untitled')}</h4>
+                        <p>${this.escapeHtml(video.videoDetails?.description || video.description || 'No description')}</p>
                         <div class="video-meta">
-                            <span>${video.videoDetails.duration}</span>
-                            <span>${new Date(video.videoDetails.date).toLocaleDateString()}</span>
+                            <span>⏱️ ${video.videoDetails?.duration || 'Unknown'}</span>
                         </div>
                     </div>
                 </div>
@@ -294,185 +385,163 @@ const syllabus = JSON.stringify(this.classData.classA[0].syllabus);
             // Add click event to video cards
             videosContainer.querySelectorAll('.video-card').forEach(card => {
                 card.addEventListener('click', () => {
-                    const videoId = card.dataset.videoId;          
-                    this.playVideo(videoId);
+                    const videoIndex = parseInt(card.dataset.videoIndex);
+                    this.playVideo(videoIndex);
                 });
             });
         }
     }
-    playVideo(videoId) {
 
-    this.currentVideoIndex =Number(videoId);
-  //  console.log(this.videos)
-        const video = this.videos[videoId];
-        if (!video) return null;
+    playVideo(videoIndex) {
+        const video = this.videos[videoIndex];
+        if (!video) return;
 
         const modal = document.getElementById('videoModal');
         const videoPlayer = document.getElementById('videoPlayer');
         const videoTitle = document.getElementById('videoTitle');
         const videoDescription = document.getElementById('videoDescription');
         
-        videoPlayer.src = `${video.url}`;
-        videoTitle.textContent = video.videoDetails.title;
-        videoDescription.textContent = video.videoDetails.description;
+        const videoUrl = video.url || video.videoUrl;
+        if (!videoUrl) {
+            alert('Video URL not available');
+            return;
+        }
+        
+        videoPlayer.src = videoUrl;
+        videoTitle.textContent = video.videoDetails?.title || video.title || 'Video';
+        videoDescription.textContent = video.videoDetails?.description || video.description || '';
 
         modal.style.display = 'flex';
+        
+        // Resume progress
+        this.restoreProgress(videoPlayer, videoIndex);
+        
+        // Track progress
+        this.trackProgress(videoPlayer, videoIndex);
 
-   // 🔁 Resume progress
-    this.restoreProgress(videoPlayer, videoId);
-
-   // videoPlayer.play();
-
-    // ▶️ Autoplay next
-    videoPlayer.onended = () => {
-        this.markCompleted(videoId);
-    };
-
-    // 💾 Save progress
-    this.trackProgress(videoPlayer, videoId);
-
-    /*// ✅ Mark complete manually
-    if (completeBtn) {
-        completeBtn.onclick = () => this.markCompleted(videoId);
-    }*/
-
-        // Close modal when video ends or when close button is clicked
+        // Close modal function
         const closeModal = () => {
             modal.style.display = 'none';
             videoPlayer.pause();
             videoPlayer.currentTime = 0;
+            clearInterval(this.progressInterval);
         };
 
-        document.querySelector('.close-modal').onclick = closeModal;
+        const closeBtn = document.querySelector('.close-modal');
+        if (closeBtn) closeBtn.onclick = closeModal;
+        
         modal.onclick = (e) => {
             if (e.target === modal) closeModal();
         };
 
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modal.style.display === 'flex') {
-            closeModal();
-        }
-    });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                closeModal();
+            }
+        });
     }
 
-    trackProgress(videoPlayer, videoId) {
-    clearInterval(this.progressInterval);
-
-    this.progressInterval = setInterval(() => {
-        if (!videoPlayer.paused && !videoPlayer.ended) {
-            const progress = {
-                time: videoPlayer.currentTime,
-                duration: videoPlayer.duration
-            };
-
-            localStorage.setItem(
-                `video_progress_${videoId}`,
-                JSON.stringify(progress)
-            );
-
-            // 🔌 OPTIONAL backend save
-            fetch('https://fissk-backend.onrender.com/register/progress/update', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    progress: progress.time, 
-                    userId: this.userId,
-                    classId: this.classId
-                })
-            }).catch(() => {});
-        }
-    }, 5000);
-}
-
-restoreProgress(videoPlayer, videoId) {
-    const saved = localStorage.getItem(`video_progress_${videoId}`);
-    if (!saved) return;
-
-    try {
-        const { time } = JSON.parse(saved);
-        videoPlayer.currentTime = time || 0;
-    } catch {}
-}
-
-async markCompleted(videoId) {
-    localStorage.removeItem(`video_progress_${videoId}`);
-
-    await fetch('https://fissk-backend.onrender.com/api/student/complete-video', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ video_id: videoId })
-    }).catch(() => {});
-
-    this.highlightCompletedVideo(videoId);
-}
-
-highlightCompletedVideo(videoId) {
-    document.querySelectorAll('.video-card').forEach(card => {
-        if (card.dataset.videoId == videoId) {
-            card.classList.add('completed');
-        }
-    });
-}
-
-closeVideoModal() {
-    const modal = document.getElementById('videoModal');
-    const videoPlayer = document.getElementById('videoPlayer');
-
-    clearInterval(this.progressInterval);
-
-    videoPlayer.pause();
-    videoPlayer.currentTime = 0;
-    videoPlayer.src = '';
-
-    modal.style.display = 'none';
-}
-
-
-    setupVideoModal() {
-        // Additional video modal setup if needed
+    trackProgress(videoPlayer, videoIndex) {
+        clearInterval(this.progressInterval);
+        
+        this.progressInterval = setInterval(() => {
+            if (!videoPlayer.paused && !videoPlayer.ended && videoPlayer.currentTime) {
+                // Save to localStorage
+                localStorage.setItem(`video_progress_${this.classId}_${videoIndex}`, videoPlayer.currentTime.toString());
+                
+                // Save to backend if enrolled
+                if (this.userId && this.isEnrolled) {
+                    const progressPercent = Math.floor((videoPlayer.currentTime / videoPlayer.duration) * 100);
+                    if (progressPercent > 0) {
+                        fetch('https://fissk-backend.onrender.com/register/progress/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                progress: progressPercent,
+                                userId: this.userId,
+                                classId: this.classId
+                            })
+                        }).catch(() => {});
+                    }
+                }
+            }
+        }, 10000);
     }
 
-  escapeHtml(str) {
-            if (!str) return '';
-            return String(str).replace(/[&<>"]/g, function (s) {
-                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[s];
-            });
+    restoreProgress(videoPlayer, videoIndex) {
+        const saved = localStorage.getItem(`video_progress_${this.classId}_${videoIndex}`);
+        if (saved) {
+            const progress = parseFloat(saved);
+            if (progress > 0 && progress < videoPlayer.duration) {
+                videoPlayer.currentTime = progress;
+            }
         }
+    }
 
     async handleEnrollment() {
-        if (this.classData.enrolled) {
+        if (this.isEnrolled) {
             alert('You are already enrolled in this class!');
             return;
         }
 
+        if (!this.user || !this.user.email) {
+            alert('Please login to enroll in this class');
+            window.location.href = 'index.html';
+            return;
+        }
+
+        const enrollBtn = document.getElementById('enrollBtn');
+        if (enrollBtn) {
+            enrollBtn.disabled = true;
+            enrollBtn.textContent = 'Processing...';
+        }
+
         try {
-            const user = JSON.parse(localStorage.getItem('user'));
-            const email = user.email;
-            // Simulate API call - replace with your actual endpoint
             const response = await fetch('https://fissk-backend.onrender.com/register/join-class', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ classId: this.classId, email })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ classId: this.classId, email: this.user.email })
             });
 
             if (response.ok) {
-                this.classData.enrolled = true;
+                this.isEnrolled = true;
                 this.renderClassData();
                 alert('Successfully enrolled in the class!');
+                location.reload();
             } else {
-                throw new Error('Enrollment failed');
+                const error = await response.json();
+                throw new Error(error.message || 'Enrollment failed');
             }
         } catch (error) {
             console.error('Error enrolling in class:', error);
-            alert('Failed to enroll in class. Please try again.');
+            alert(error.message || 'Failed to enroll in class. Please try again.');
+            if (enrollBtn) {
+                enrollBtn.disabled = false;
+                enrollBtn.textContent = 'Enroll Now';
+            }
         }
+    }
+
+    showError(message) {
+        const container = document.querySelector('.class-container') || document.querySelector('.container');
+        if (container) {
+            container.innerHTML = `
+                <div class="error-message" style="text-align: center; padding: 50px;">
+                    <p style="color: #e74c3c; font-size: 18px;">⚠️ ${message}</p>
+                    <div style="margin-top: 20px;">
+                        <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                        <a href="classes.html" class="btn btn-outline">Back to Classes</a>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>]/g, function(s) {
+            return ({'&': '&amp;', '<': '&lt;', '>': '&gt;'})[s];
+        });
     }
 }
 
@@ -481,28 +550,27 @@ document.addEventListener('DOMContentLoaded', () => {
     new ClassManager();
 });
 
-
-const user = localStorage.getItem('user');
-if(user){
-    document.getElementById('login-btn').style.display = 'none';
-    document.getElementById('signup-btn').style.display = 'none';
+// User dropdown and navigation
+const userData = localStorage.getItem('user');
+if (userData) {
+    const loginBtn = document.getElementById('login-btn');
+    const signupBtn = document.getElementById('signup-btn');
+    if (loginBtn) loginBtn.style.display = 'none';
+    if (signupBtn) signupBtn.style.display = 'none';
+} else {
+    const dashboardBtn = document.getElementById('dashboard-btn');
+    if (dashboardBtn) dashboardBtn.style.display = 'none';
 }
-if(!user){
-    document.getElementById('dashboard-btn').style.display = 'none';
-}
-
 
 // Mobile Navigation
 const hamburger = document.querySelector('.hamburger');
 const navMenu = document.querySelector('.nav-menu');
-
 
 if (hamburger) {
     hamburger.addEventListener('click', () => {
         hamburger.classList.toggle('active');
         navMenu.classList.toggle('active');
         
-        // Add mobile menu styles
         if (navMenu.classList.contains('active')) {
             navMenu.style.display = 'flex';
             document.body.style.overflow = 'hidden';
@@ -513,7 +581,6 @@ if (hamburger) {
     });
 }
 
-// Close mobile menu when clicking on links
 document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', () => {
         hamburger.classList.remove('active');
@@ -523,18 +590,47 @@ document.querySelectorAll('.nav-link').forEach(link => {
     });
 });
 
-
-
-// Smooth scrolling for anchor links
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-            target.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
-        }  
-    });
-});
+// Add CSS for loading states
+const style = document.createElement('style');
+style.textContent = `
+    .loading-pulse {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: loadingPulse 1.5s infinite;
+        border-radius: 4px;
+        height: 24px;
+        width: 200px;
+    }
+    
+    @keyframes loadingPulse {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+    
+    .loading-skeleton {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    
+    .skeleton-card {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: loadingPulse 1.5s infinite;
+        height: 200px;
+        border-radius: 8px;
+    }
+    
+    .no-data {
+        color: #666;
+        text-align: center;
+        padding: 20px;
+        font-style: italic;
+    }
+    
+    .btn.enrolled {
+        background: #48BB78;
+        cursor: default;
+    }
+`;
+document.head.appendChild(style);
