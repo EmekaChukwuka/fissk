@@ -371,7 +371,7 @@ const syllabus = JSON.stringify(this.classData.classA[0].syllabus);
             );
 
             // 🔌 OPTIONAL backend save
-            fetch('/register/progress/update', {
+            fetch('https://fissk-backend.onrender.com/register/progress/update', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -399,7 +399,7 @@ restoreProgress(videoPlayer, videoId) {
 async markCompleted(videoId) {
     localStorage.removeItem(`video_progress_${videoId}`);
 
-    await fetch('/api/student/complete-video', {
+    await fetch('https://fissk-backend.onrender.com/api/student/complete-video', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -454,7 +454,7 @@ closeVideoModal() {
             const user = JSON.parse(localStorage.getItem('user'));
             const email = user.email;
             // Simulate API call - replace with your actual endpoint
-            const response = await fetch('/register/join-class', {
+            const response = await fetch('https://fissk-backend.onrender.com/register/join-class', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

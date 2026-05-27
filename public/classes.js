@@ -317,7 +317,7 @@ setupModalConfirmation(classId) {
             const email = user.email;
             console.log(email)
             // Simulate API call - replace with your actual endpoint
-            const response = await fetch('/register/join-class', {
+            const response = await fetch('https://fissk-backend.onrender.com/register/join-class', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
