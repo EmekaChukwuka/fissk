@@ -155,99 +155,114 @@ this.classes = coursesArray;
         this.applyFilters();
     }
 
-    applyFilters() {
-        this.filteredClasses = this.classes.filter(classItem => {
-            const matchesFilter = this.currentFilter === 'all' || 
-                                classItem.category === this.currentFilter ||
-                                classItem.level === this.currentFilter;
-            
-            const matchesSearch = !this.searchQuery || 
-                                classItem.classname.toLowerCase().includes(this.searchQuery) ||
-                                classItem.classDescription.toLowerCase().includes(this.searchQuery);
-            
-            return matchesFilter && matchesSearch;
-        });
+applyFilters() {
+    this.filteredClasses = this.classes.filter(classItem => {
+        const matchesFilter = this.currentFilter === 'all' || 
+                            classItem.category === this.currentFilter ||
+                            classItem.level === this.currentFilter;
+        
+        const matchesSearch = !this.searchQuery || 
+                            (classItem.title && classItem.title.toLowerCase().includes(this.searchQuery)) ||
+                            (classItem.description && classItem.description.toLowerCase().includes(this.searchQuery));
+        
+        return matchesFilter && matchesSearch;
+    });
 
-        this.renderClasses();
+    this.renderClasses();
+}
+
+   renderClasses() {
+    const container = document.getElementById('classesContainer');
+    if (!container) return;
+
+    if (this.filteredClasses.length === 0) {
+        container.innerHTML = `
+            <div class="no-content">
+                <p>No classes found matching your criteria.</p>
+            </div>
+        `;
+        return;
     }
-
-    renderClasses() {
-        const container = document.getElementById('classesContainer');
-        if (!container) return;
-
-        if (this.filteredClasses.length === 0) {
-            container.innerHTML = `
-                <div class="no-content">
-                    <p>No classes found matching your criteria.</p>
-                </div>
-            `;
-            return;
-        }
-        container.innerHTML = this.filteredClasses.map(classItem => `
-            <div class="class-card" data-class-id="${classItem.id}">
+    
+    container.innerHTML = this.filteredClasses.map(classItem => {
+        // Handle both data structures
+        const classId = classItem._id || classItem.id;
+        const classTitle = classItem.title;
+        const classDescription = classItem.description;
+        const classLevel = classItem.level;
+        const classDuration = classItem.duration;
+        const maxStudents = classItem.max_students || classItem.maxStudents || 0;
+        const enrolled = classItem.enrolled || false;
+        
+        return `
+            <div class="class-card" data-class-id="${classId}">
                 <div class="class-card-image" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);"></div>
                 <div class="class-card-content">
-                    <h3>${classItem.title}</h3>
-                    <p>${classItem.description}</p>
+                    <h3>${classTitle}</h3>
+                    <p>${classDescription}</p>
                     <div class="class-meta">
-                        <span>🟢 ${classItem.level}</span>
-                        <span>🕒 ${classItem.duration}</span>
-                        <span>👥 ${classItem.max_students} students</span>
+                        <span>🟢 ${classLevel}</span>
+                        <span>🕒 ${classDuration}</span>
+                        <span>👥 ${maxStudents} students</span>
                     </div>
                     <div class="class-actions">
-                        ${classItem.enrolled ? 
+                        ${enrolled ? 
                             `<button class="btn btn-outline" disabled>Already Enrolled</button>
-                             <a href="class.html?id=${classItem.id}" class="btn btn-primary">Continue Learning</a>` :
-                            `<button class="btn btn-primary enroll-btn" data-class-id="${classItem.id}" data-class-name="${classItem.title}" id="${classItem.id}">Enroll Now</button>
-                             <a href="class.html?id=${classItem.id}" class="btn btn-outline">View Details</a>`
+                             <a href="class.html?id=${classId}" class="btn btn-primary">Continue Learning</a>` :
+                            `<button class="btn btn-primary enroll-btn" data-class-id="${classId}" data-class-name="${classTitle}" id="${classId}">Enroll Now</button>
+                             <a href="class.html?id=${classId}" class="btn btn-outline">View Details</a>`
                         }
                     </div>
                 </div>
             </div>
-        `).join('');
+        `;
+    }).join('');
 
-        // Add event listeners to enroll buttons
-        document.querySelectorAll('.enroll-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const classId = e.target.id;
-                this.showEnrollmentModal(classId);
-            });
+    // Add event listeners to enroll buttons
+    document.querySelectorAll('.enroll-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const classId = e.target.id;
+            this.showEnrollmentModal(classId);
         });
+    });
+}
+async showEnrollmentModal(classId) {
+    const classItem = this.classes.find(c => c.id == classId || c._id == classId);
+    if (!classItem) {
+        console.log('error');
+        return;
     }
 
- async showEnrollmentModal(classId) {
-        const classItem = this.classes.find(c => c.id == classId);
-        if (!classItem) console.log('error');
-
-        const modal = document.getElementById('enrollmentModal');
-        const modalContent = document.getElementById('modalClassDetails');
-        try{
-
-           const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor',{
-            method: 'POST',
-      headers:{
-        'Content-Type':'application/json'
-      },
-            body: JSON.stringify({instructor_id: classItem.instructor_id}),
-        }); 
+    const modal = document.getElementById('enrollmentModal');
+    const modalContent = document.getElementById('modalClassDetails');
     
-    const dataA =await response.json();
-    console.log(dataA);
+    try {
+        const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ instructor_id: classItem.instructorId }),
+        });
+    
+        const dataA = await response.json();
+        console.log(dataA);
+        
+        // FIXED: Use firstName and lastName (camelCase) instead of first_name/last_name
         modalContent.innerHTML = `
             <h3>${classItem.title}</h3>
-            <p><strong>Category:</strong> ${classItem.category.toUpperCase()}</p>
+            <p><strong>Category:</strong> ${classItem.category?.toUpperCase() || 'N/A'}</p>
             <p><strong>Level:</strong> ${classItem.level}</p>
             <p><strong>Duration:</strong> ${classItem.duration}</p>
-            <p><strong>Instructor:</strong> ${dataA.instructorData.first_name} ${dataA.instructorData.last_name} </p>
+            <p><strong>Instructor:</strong> ${dataA.instructorData.firstName} ${dataA.instructorData.lastName}</p>
             <p>${classItem.description}</p><br>
         `;
 
         modal.style.display = 'flex';
 
-        // Set up confirmation button
         const confirmBtn = document.getElementById('confirmEnroll');
         confirmBtn.onclick = () => this.enrollInClass(classId);
-          const closeBtn = document.querySelector('.close-modal');
+        const closeBtn = document.querySelector('.close-modal');
         const cancelBtn = document.getElementById('cancelEnroll');
 
         const hideModal = () => {
@@ -260,10 +275,41 @@ this.classes = coursesArray;
         modal.addEventListener('click', (e) => {
             if (e.target === modal) hideModal();
         });
-    }catch(err){
+    } catch(err) {
         console.log(err);
     }
-    }
+}
+
+setupModalConfirmation(classId) {
+    // Set up confirmation button without duplicating event listeners
+    const confirmBtn = document.getElementById('confirmEnroll');
+    const closeBtn = document.querySelector('.close-modal');
+    const cancelBtn = document.getElementById('cancelEnroll');
+    const modal = document.getElementById('enrollmentModal');
+
+    // Remove old listeners to prevent duplicates
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    
+    newConfirmBtn.onclick = () => this.enrollInClass(classId);
+    
+    const hideModal = () => {
+        modal.style.display = 'none';
+    };
+
+    // Remove old close button listeners
+    const newCloseBtn = closeBtn.cloneNode(true);
+    closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+    newCloseBtn.addEventListener('click', hideModal);
+    
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    newCancelBtn.addEventListener('click', hideModal);
+    
+    modal.onclick = (e) => {
+        if (e.target === modal) hideModal();
+    };
+}
 
     async enrollInClass(classId) {
         try {

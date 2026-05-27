@@ -66,7 +66,7 @@
   // fetch classes (uses session-based auth on backend)
   async loadInstructorClasses() {
     try {
-      const res = await fetch('/register/instructor/classes', {
+      const res = await fetch('https://fissk-backend.onrender.com/register/instructor/classes', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id : this.currentUser.id })
                 });
@@ -146,7 +146,7 @@
   async loadInstructorStats() {
     try {
       const id = this.currentUser.id;
-      const res = await fetch('/register/instructor/stats', {
+      const res = await fetch('https://fissk-backend.onrender.com/register/instructor/stats', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id })
@@ -171,8 +171,8 @@
 
   async loadEnrollments(classId = '') {
     try {
-      const url = `/register/instructor/enrollments`;
-      const res = await fetch(`/register/instructor/enrollments`, {
+      const url = `https://fissk-backend.onrender.com/register/instructor/enrollments`;
+      const res = await fetch(`https://fissk-backend.onrender.com/register/instructor/enrollments`, {
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ instructorId: this.currentUser.id })
@@ -221,7 +221,7 @@ console.log(items)
   // streams
   async loadInstructorStreams() {
     try {
-      const res = await fetch('/register/instructor/streams', {
+      const res = await fetch('https://fissk-backend.onrender.com/register/instructor/streams', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id : this.currentUser.id })
                 });
@@ -314,7 +314,7 @@ console.log(items)
    console.log(payload)
     const email = this.currentUser.email;
     try {
-      const res = await fetch('/register/create-class', {
+      const res = await fetch('https://fissk-backend.onrender.com/register/create-class', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({payload, email})
@@ -334,7 +334,7 @@ console.log(items)
       if (payload.scheduledTime) payload.scheduled_at = payload.scheduledTime;
       console.log(payload)
       const id = this.currentUser.id;
-      const res = await fetch('/register/instructor/schedule-stream', {
+      const res = await fetch('https://fissk-backend.onrender.com/register/instructor/schedule-stream', {
        method: 'POST',
        headers: { 'Content-Type': 'application/json' },
        body: JSON.stringify({payload, id})
@@ -361,7 +361,7 @@ console.log(items)
             padding: 15px 20px;
             border-radius: 10px;
             color: white;
-            background: ${type === 'success' ?  '#F56565' :'#48BB78'};
+            background: ${type === 'success' ?  '#48BB78' :'#F56565'};
             z-index: 10000;
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         `;
