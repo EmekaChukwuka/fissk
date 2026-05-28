@@ -312,7 +312,6 @@
         <button id="startStreamBtn" class="btn-primary">🎥 Start Livestream</button>
         <button id="stopStreamBtn" class="btn-danger" disabled>🔴 End Stream</button>
         <button id="joinBtn" disabled>👤 Join Stream</button>
-        <button id="viewRecordingsBtn">📹 Past Recordings</button>
     </div>
     
     <div id="videoContainer">
@@ -378,14 +377,6 @@
         </div>
     </div>
 
-    <div id="recordingsModal" class="modal">
-        <div class="modal-content" style="max-width: 800px;">
-            <span class="close-modal" onclick="closeModal('recordingsModal')">&times;</span>
-            <h2>📹 Past Livestream Recordings</h2>
-            <div id="recordingsList" style="max-height: 500px; overflow-y: auto;"></div>
-        </div>
-    </div>
-
     <script>
         // Configuration
         const BACKEND_URL = 'https://fissk-backend.onrender.com';
@@ -412,7 +403,6 @@
         const startBtn = document.getElementById('startStreamBtn');
         const joinBtn = document.getElementById('joinBtn');
         const stopBtn = document.getElementById('stopStreamBtn');
-        const viewRecordingsBtn = document.getElementById('viewRecordingsBtn');
         const hostVideo = document.getElementById('hostVideo');
         const chatInput = document.getElementById('chatInput');
         const sendChatBtn = document.getElementById('sendChatBtn');
@@ -612,7 +602,7 @@
                 // Initialize WebSocket for chat
                 initWebSocket();
                 
-                showToast('✅ Livestream started! Recording to Cloudinary on end.');
+                showToast('✅ Livestream started! Recording will be saved to Cloudinary.');
                 
             } catch (err) {
                 console.error('Error starting stream:', err);
@@ -685,18 +675,6 @@
                 const durationSec = Math.floor((Date.now() - streamStartTime) / 1000);
                 const durationMin = Math.floor(durationSec / 60);
                 
-                const formData = new FormData();
-                formData.append('userId', user.id);
-                formData.append('streamName', streamName);
-                formData.append('streamClass', currentStreamData.classId);
-                formData.append('classTitle', currentStreamData.title);
-                formData.append('classDescription', currentStreamData.description);
-                formData.append('participants', totalUniqueViewers.size);
-                formData.append('duration', `${durationMin} min, ${durationSec % 60} sec`);
-                formData.append('cloudinaryUrl', cloudinaryResult.secure_url);
-                formData.append('cloudinaryPublicId', cloudinaryResult.public_id);
-                
-                // Create a dummy blob for the form data (or send JSON)
                 const response = await fetch(`${BACKEND_URL}/api/save-stream`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -720,49 +698,7 @@
             }
         }
         
-        // Load past recordings from Cloudinary via backend
-        async function loadPastRecordings() {
-            try {
-                const classId = prompt('Enter Class ID to view recordings:');
-                if (!classId) return;
-                
-                showToast('Loading recordings...');
-                const response = await fetch(`${BACKEND_URL}/api/by-class/${classId}`);
-                const recordings = await response.json();
-                
-                const recordingsList = document.getElementById('recordingsList');
-                if (recordings.length === 0) {
-                    recordingsList.innerHTML = '<p>No recordings found for this class.</p>';
-                } else {
-                    recordingsList.innerHTML = recordings.map(rec => `
-                        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
-                            <h4>${escapeHtml(rec.filename || rec.name || 'Recording')}</h4>
-                            <p>Duration: ${rec.duration || 'Unknown'}</p>
-                            <p>Recorded: ${new Date(rec.uploadDate || rec.createdAt).toLocaleString()}</p>
-                            ${rec.hlsUrl ? `
-                                <video controls style="width: 100%; max-height: 300px; margin-top: 10px;">
-                                    <source src="${rec.hlsUrl}" type="application/x-mpegURL">
-                                </video>
-                            ` : rec.url ? `
-                                <video controls style="width: 100%; max-height: 300px; margin-top: 10px;">
-                                    <source src="${rec.url}" type="video/mp4">
-                                </video>
-                            ` : ''}
-                            <button onclick="window.open('${rec.url || rec.hlsUrl}', '_blank')" style="margin-top: 10px;">
-                                Open in Cloudinary
-                            </button>
-                        </div>
-                    `).join('');
-                }
-                
-                showModal('recordingsModal');
-            } catch (err) {
-                console.error('Error loading recordings:', err);
-                alert('Error loading recordings: ' + err.message);
-            }
-        }
-        
-        // WebSocket for chat (simplified)
+        // WebSocket for chat
         function initWebSocket() {
             if (socket && socket.readyState === WebSocket.OPEN) return;
             socket = new WebSocket('wss://fissk-backend.onrender.com');
@@ -791,7 +727,7 @@
             };
         }
         
-        // Join as viewer (WebRTC fallback)
+        // Join as viewer
         async function joinLivestream() {
             if (!streamActive) {
                 showToast('No live stream available', true);
@@ -867,7 +803,6 @@
         
         stopBtn.addEventListener('click', stopLivestream);
         joinBtn.addEventListener('click', joinLivestream);
-        viewRecordingsBtn.addEventListener('click', loadPastRecordings);
         sendChatBtn.addEventListener('click', sendChatMessage);
         chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChatMessage(); });
         

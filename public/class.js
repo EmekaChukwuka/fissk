@@ -8,6 +8,7 @@ class ClassManager {
         this.currentVideoIndex = null;
         this.progressInterval = null;
         this.videos = [];
+        this.recordings = []; // Store Cloudinary recordings
         this.isEnrolled = false;
         this.isLoading = true;
         this.init();
@@ -32,12 +33,14 @@ class ClassManager {
             await Promise.all([
                 this.loadClassData(),
                 this.checkEnrollment(),
-                this.loadClassVideos()
+                this.loadClassVideos(),
+                this.loadClassRecordings() // Load Cloudinary recordings
             ]);
             
             // Only render after ALL data is loaded
             this.renderClassData();
             this.renderVideos();
+            this.renderRecordings(); // Render recordings in the recordings tab
             this.setupEventListeners();
         } catch (error) {
             console.error('Initialization error:', error);
@@ -56,6 +59,17 @@ class ClassManager {
         const videosContainer = document.getElementById('videosContainer');
         if (videosContainer) {
             videosContainer.innerHTML = `
+                <div class="loading-skeleton">
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
+                    <div class="skeleton-card"></div>
+                </div>
+            `;
+        }
+        
+        const recordingsContainer = document.getElementById('recordingsContainer');
+        if (recordingsContainer) {
+            recordingsContainer.innerHTML = `
                 <div class="loading-skeleton">
                     <div class="skeleton-card"></div>
                     <div class="skeleton-card"></div>
@@ -144,6 +158,30 @@ class ClassManager {
             console.error('Error loading class videos:', error);
             this.videos = [];
             // Don't throw - videos are optional
+        }
+    }
+
+    // NEW: Load Cloudinary recordings for this class
+    async loadClassRecordings() {
+        try {
+            console.log('Loading recordings for class:', this.classId);
+            const response = await fetch(`https://fissk-backend.onrender.com/api/by-class/${this.classId}`);
+            
+            if (!response.ok) {
+                throw new Error('Failed to load recordings');
+            }
+            
+            const allVideos = await response.json();
+            
+            // Filter recordings (videos with cloudinaryUrl or hlsUrl)
+            this.recordings = allVideos.filter(video => 
+                video.cloudinaryUrl || video.hlsUrl || video.url
+            );
+            
+            console.log('Recordings loaded:', this.recordings.length);
+        } catch (error) {
+            console.error('Error loading class recordings:', error);
+            this.recordings = [];
         }
     }
 
@@ -262,6 +300,11 @@ class ClassManager {
         document.querySelectorAll('.tab-content').forEach(content => {
             content.classList.toggle('active', content.id === `${tabName}Tab`);
         });
+        
+        // Refresh recordings tab when switched to it
+        if (tabName === 'recordings' && this.recordings.length === 0) {
+            this.loadClassRecordings().then(() => this.renderRecordings());
+        }
     }
 
     async renderClassData() {
@@ -390,6 +433,125 @@ class ClassManager {
                 });
             });
         }
+    }
+
+    // NEW: Render Cloudinary recordings in the recordings tab
+    renderRecordings() {
+        const recordingsContainer = document.getElementById('recordingsContainer');
+        const noRecordings = document.getElementById('noRecordings');
+
+        if (!this.recordings || this.recordings.length === 0) {
+            if (recordingsContainer) recordingsContainer.style.display = 'none';
+            if (noRecordings) {
+                noRecordings.style.display = 'block';
+                noRecordings.innerHTML = '<p>No past livestream recordings available for this class yet.</p>';
+            }
+            return;
+        }
+        
+        if (noRecordings) noRecordings.style.display = 'none';
+        if (recordingsContainer) {
+            recordingsContainer.style.display = 'grid';
+            recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
+                // Get the video URL (support multiple formats)
+                const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url;
+                const thumbnailUrl = recording.thumbnailUrl || '';
+                const title = recording.classTitle || recording.name || recording.filename || `Recording ${index + 1}`;
+                const description = recording.classDescription || recording.description || 'Past livestream recording';
+                const date = recording.uploadDate || recording.createdAt;
+                const duration = recording.duration || 'Unknown';
+                
+                return `
+                    <div class="recording-card" data-recording-index="${index}" data-recording-url="${videoUrl}">
+                        <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
+                            <span class="play-icon">▶</span>
+                            ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.3;">` : ''}
+                        </div>
+                        <div class="video-info">
+                            <h4>📹 ${this.escapeHtml(title)}</h4>
+                            <p>${this.escapeHtml(description)}</p>
+                            <div class="video-meta">
+                                <span>⏱️ ${duration}</span>
+                                ${date ? `<span>📅 ${new Date(date).toLocaleDateString()}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Add click event to recording cards
+            recordingsContainer.querySelectorAll('.recording-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const recordingUrl = card.dataset.recordingUrl;
+                    if (recordingUrl) {
+                        this.playRecording(recordingUrl, card);
+                    } else {
+                        alert('Video URL not available');
+                    }
+                });
+            });
+        }
+    }
+
+    // NEW: Play recording in modal
+    playRecording(videoUrl, cardElement) {
+        const title = cardElement.querySelector('h4')?.textContent || 'Recording';
+        const description = cardElement.querySelector('p')?.textContent || '';
+
+        const modal = document.getElementById('videoModal');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const videoTitle = document.getElementById('videoTitle');
+        const videoDescription = document.getElementById('videoDescription');
+        
+        // Clear previous source
+        videoPlayer.innerHTML = '';
+        
+        // Create source element based on URL type
+        const source = document.createElement('source');
+        source.src = videoUrl;
+        
+        if (videoUrl.includes('.m3u8') || videoUrl.includes('m3u8')) {
+            source.type = 'application/x-mpegURL';
+            // For HLS, we need to use hls.js
+            if (typeof Hls !== 'undefined') {
+                const hls = new Hls();
+                hls.loadSource(videoUrl);
+                hls.attachMedia(videoPlayer);
+            }
+        } else if (videoUrl.includes('.mp4')) {
+            source.type = 'video/mp4';
+            videoPlayer.appendChild(source);
+        } else {
+            source.type = 'video/mp4';
+            videoPlayer.appendChild(source);
+        }
+        
+        videoPlayer.load();
+        videoTitle.textContent = title;
+        videoDescription.textContent = description;
+
+        modal.style.display = 'flex';
+        
+        // Close modal function
+        const closeModal = () => {
+            modal.style.display = 'none';
+            videoPlayer.pause();
+            videoPlayer.currentTime = 0;
+            if (this.progressInterval) clearInterval(this.progressInterval);
+        };
+
+        const closeBtn = document.querySelector('.close-modal');
+        if (closeBtn) closeBtn.onclick = closeModal;
+        
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+        };
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'flex') {
+                closeModal();
+            }
+        });
     }
 
     playVideo(videoIndex) {
@@ -590,7 +752,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
     });
 });
 
-// Add CSS for loading states
+// Add CSS for loading states and recordings
 const style = document.createElement('style');
 style.textContent = `
     .loading-pulse {
@@ -631,6 +793,93 @@ style.textContent = `
     .btn.enrolled {
         background: #48BB78;
         cursor: default;
+    }
+    
+    .recording-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .recording-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    
+    .recordings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px;
+        padding: 10px 0;
+    }
+    
+    .video-thumbnail {
+        height: 180px;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    
+    .play-icon {
+        font-size: 48px;
+        color: white;
+        opacity: 0.9;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        transition: transform 0.2s;
+    }
+    
+    .recording-card:hover .play-icon,
+    .video-card:hover .play-icon {
+        transform: scale(1.1);
+    }
+    
+    .video-info {
+        padding: 16px;
+    }
+    
+    .video-info h4 {
+        margin: 0 0 8px 0;
+        font-size: 1rem;
+        color: var(--text-dark);
+    }
+    
+    .video-info p {
+        margin: 0 0 12px 0;
+        font-size: 0.85rem;
+        color: var(--text-light);
+        line-height: 1.4;
+    }
+    
+    .video-meta {
+        display: flex;
+        gap: 12px;
+        font-size: 0.75rem;
+        color: var(--text-light);
+    }
+    
+    .video-meta span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .video-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .video-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
     }
 `;
 document.head.appendChild(style);
