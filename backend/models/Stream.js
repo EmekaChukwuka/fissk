@@ -18,20 +18,26 @@ const StreamSchema = new mongoose.Schema({
   classDescription: String,
   participants: { type: Number, default: 0 },
   duration: String,
-  sessionType: { type: String, enum: ['live', 'recorded'], default: 'recorded' }
+  sessionType: { type: String, enum: ['live', 'recorded'], default: 'recorded' },
+  // Cloudinary specific fields
+  cloudinaryUrl: { type: String },
+  cloudinaryPublicId: { type: String },
+  cloudinaryFormat: { type: String },
+  hlsUrl: { type: String },
+  thumbnailUrl: { type: String },
+  viewCount: { type: Number, default: 0 }
 }, { timestamps: true });
 
 StreamSchema.index({ userId: 1 });
 StreamSchema.index({ createdAt: -1 });
+StreamSchema.index({ cloudinaryPublicId: 1 });
 
 const StreamModel = mongoose.model('Stream', StreamSchema);
 
 // Wrapper class to maintain the same interface
 class Stream {
-  // Create a new stream and live session
-  static async create({ userId, name, filename, size, streamClass, classTitle, classDescription, participants, duration }) {
+  static async create({ userId, name, filename, size, streamClass, classTitle, classDescription, participants, duration, cloudinaryUrl, cloudinaryPublicId }) {
     try {
-      // Create the stream document
       const stream = await StreamModel.create({
         userId,
         name,
@@ -43,27 +49,11 @@ class Stream {
         participants: participants || 0,
         duration,
         sessionType: 'recorded',
+        cloudinaryUrl,
+        cloudinaryPublicId,
         comments: []
       });
 
-      // Create corresponding live session
-      const LiveSession = mongoose.model('LiveSession');
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      await LiveSession.create({
-        instructorId: userId,
-        classId: streamClass,
-        title: classTitle || name,
-        description: classDescription || '',
-        date: today,
-        time: new Date().toTimeString().split(' ')[0], // HH:MM:SS format
-        duration: duration || '0:00',
-        participants: participants || 0,
-        sessionType: 'recorded'
-      });
-
-      // Return the MongoDB _id (converted to string for compatibility)
       return stream._id.toString();
     } catch (error) {
       console.error('Error creating stream:', error);
@@ -71,7 +61,6 @@ class Stream {
     }
   }
 
-  // Get all streams
   static async getAll() {
     try {
       const streams = await StreamModel.find()
@@ -79,7 +68,6 @@ class Stream {
         .populate('streamClass', 'title')
         .sort({ createdAt: -1 })
         .lean();
-      
       return streams;
     } catch (error) {
       console.error('Error fetching streams:', error);
@@ -87,7 +75,6 @@ class Stream {
     }
   }
 
-  // Get stream by ID
   static async getById(id) {
     try {
       return await StreamModel.findById(id)
@@ -100,21 +87,15 @@ class Stream {
     }
   }
 
-  // Update stream
   static async update(id, updateData) {
     try {
-      return await StreamModel.findByIdAndUpdate(
-        id, 
-        updateData, 
-        { new: true, runValidators: true }
-      );
+      return await StreamModel.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
     } catch (error) {
       console.error('Error updating stream:', error);
       throw error;
     }
   }
 
-  // Delete stream
   static async delete(id) {
     try {
       return await StreamModel.findByIdAndDelete(id);
@@ -124,7 +105,6 @@ class Stream {
     }
   }
 
-  // Add comment to stream
   static async addComment(streamId, userId, userName, message) {
     try {
       const stream = await StreamModel.findById(streamId);
@@ -147,7 +127,6 @@ class Stream {
     }
   }
 
-  // Get streams by user
   static async getByUser(userId) {
     try {
       return await StreamModel.find({ userId })
@@ -156,6 +135,18 @@ class Stream {
     } catch (error) {
       console.error('Error fetching user streams:', error);
       throw error;
+    }
+  }
+
+  static async incrementViewCount(streamId) {
+    try {
+      return await StreamModel.findByIdAndUpdate(
+        streamId,
+        { $inc: { viewCount: 1 } },
+        { new: true }
+      );
+    } catch (error) {
+      console.error('Error incrementing view count:', error);
     }
   }
 }

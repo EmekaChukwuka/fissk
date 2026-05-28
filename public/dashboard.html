@@ -6,6 +6,324 @@
     <title>Dashboard - FISSK Online Academy</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="instructor-dashboard.css">
+    <style>
+    /* Additional Live Sessions Styling */
+    .live-sessions-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+    }
+
+    .upcoming-sessions-section,
+    .recorded-sessions-section {
+        background: var(--white);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    .upcoming-sessions-section h3,
+    .recorded-sessions-section h3 {
+        font-size: 1.25rem;
+        margin-bottom: 20px;
+        color: var(--text-dark);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .upcoming-sessions-section h3::before {
+        content: "🔴";
+        font-size: 1rem;
+        animation: pulse 1.5s infinite;
+    }
+
+    .recorded-sessions-section h3::before {
+        content: "📹";
+        font-size: 1rem;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .sessions-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .session-card {
+        background: var(--gray-light);
+        border-radius: 12px;
+        padding: 20px;
+        transition: all 0.3s ease;
+        border: 1px solid var(--border);
+    }
+
+    .session-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .session-card.upcoming {
+        border-left: 4px solid #e74c3c;
+    }
+
+    .session-card.recorded {
+        border-left: 4px solid var(--primary);
+    }
+
+    .session-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .session-header h4 {
+        font-size: 1.1rem;
+        color: var(--text-dark);
+        margin: 0;
+    }
+
+    .session-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .session-badge.live {
+        background: #e74c3c;
+        color: white;
+        animation: pulse 1.5s infinite;
+    }
+
+    .session-badge.recorded {
+        background: var(--primary);
+        color: white;
+    }
+
+    .session-card p {
+        color: var(--text-light);
+        margin-bottom: 16px;
+        line-height: 1.5;
+    }
+
+    .session-details {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .session-details span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.875rem;
+        color: var(--text-light);
+        background: var(--white);
+        padding: 6px 12px;
+        border-radius: 20px;
+    }
+
+    .session-card .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Overview Live Sessions Styling */
+    .live-sessions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .session-item {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px;
+        background: var(--gray-light);
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        border: 1px solid var(--border);
+    }
+
+    .session-item:hover {
+        background: var(--white);
+        transform: translateX(5px);
+    }
+
+    .session-time {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-width: 80px;
+        padding: 8px 12px;
+        background: var(--primary);
+        color: white;
+        border-radius: 10px;
+        text-align: center;
+    }
+
+    .session-time .date {
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .session-time .time {
+        font-size: 0.75rem;
+        opacity: 0.9;
+    }
+
+    .session-details {
+        flex: 1;
+        border-bottom: none;
+        padding-bottom: 0;
+        margin-bottom: 0;
+    }
+
+    .session-details h5 {
+        font-size: 1rem;
+        color: var(--text-dark);
+        margin-bottom: 4px;
+    }
+
+    .session-details p {
+        font-size: 0.875rem;
+        color: var(--text-light);
+        margin: 0;
+    }
+
+    .session-item .btn-small {
+        padding: 8px 16px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+    }
+
+    /* Empty states */
+    .no-sessions {
+        text-align: center;
+        padding: 40px;
+        color: var(--text-light);
+        background: var(--gray-light);
+        border-radius: 12px;
+    }
+
+    .no-sessions::before {
+        content: "📅";
+        font-size: 48px;
+        display: block;
+        margin-bottom: 16px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .upcoming-sessions-section,
+        .recorded-sessions-section {
+            padding: 16px;
+        }
+
+        .session-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .session-details {
+            gap: 10px;
+        }
+
+        .session-details span {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+        }
+
+        .session-item {
+            flex-wrap: wrap;
+        }
+
+        .session-time {
+            flex-direction: row;
+            gap: 10px;
+            min-width: auto;
+            width: 100%;
+        }
+
+        .session-item .btn-small {
+            width: 100%;
+        }
+    }
+
+    /* Countdown timer styling */
+    .session-countdown {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: #fff3e0;
+        color: #ed8936;
+        padding: 4px 8px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Join button animations */
+    .join-session {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .join-session::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: translate(-50%, -50%);
+        transition: width 0.6s, height 0.6s;
+    }
+
+    .join-session:hover::before {
+        width: 300px;
+        height: 300px;
+    }
+
+    /* Recording indicator */
+    .recording-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(231, 76, 60, 0.1);
+        color: #e74c3c;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        margin-left: 10px;
+    }
+
+    .recording-indicator::before {
+        content: "●";
+        animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+</style>
+    </style>
     <link rel="icon" href="fissklogo.jpg">
    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -476,91 +794,126 @@
             `).join('');
         }
 
-        renderLiveSessions() {
-            const container = document.getElementById('liveSessionsGrid');
-            if (!container) return;
+renderLiveSessions() {
+    const container = document.getElementById('liveSessionsGrid');
+    if (!container) return;
+    
+    const upcomingHtml = this.upcomingSessions.length > 0 
+        ? this.upcomingSessions.map(s => {
+            const sessionDate = new Date(s.date);
+            const now = new Date();
+            const timeDiff = sessionDate - now;
+            const daysLeft = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
             
-            const upcomingHtml = this.upcomingSessions.length > 0 
-                ? this.upcomingSessions.map(s => `
-                    <div class="session-card upcoming">
-                        <div class="session-header">
-                            <h4>${this.escapeHtml(s.class_title)}</h4>
-                            <span class="session-badge live">LIVE</span>
-                        </div>
-                        <p>${this.escapeHtml(s.description || 'No description')}</p>
-                        <div class="session-details">
-                            <span>📅 ${new Date(s.date).toLocaleDateString()}</span>
-                            <span>⏰ ${s.time || 'TBD'}</span>
-                            <span>⏱️ ${s.duration || '1 hour'}</span>
-                            <span>👤 ${this.escapeHtml(s.instructor)}</span>
-                        </div>
-                        <button class="btn btn-primary join-session" data-session-id="${s.session_id}">Join Session</button>
-                    </div>
-                `).join('')
-                : '<p>No upcoming live sessions scheduled.</p>';
-            
-            const recordedHtml = this.recordedSessions.length > 0
-                ? this.recordedSessions.map(s => `
-                    <div class="session-card recorded">
-                        <div class="session-header">
-                            <h4>${this.escapeHtml(s.class_title)}</h4>
-                            <span class="session-badge recorded">RECORDED</span>
-                        </div>
-                        <p>${this.escapeHtml(s.description || 'No description')}</p>
-                        <div class="session-details">
-                            <span>📅 ${new Date(s.date).toLocaleDateString()}</span>
-                            <span>⏱️ ${s.duration || '1 hour'}</span>
-                            <span>👤 ${this.escapeHtml(s.instructor)}</span>
-                        </div>
-                        <button class="btn btn-primary watch-session" data-class-id="${s.class_id}">Watch Recording</button>
-                    </div>
-                `).join('')
-                : '<p>No recorded sessions available.</p>';
-            
-            container.innerHTML = `
-                <div class="upcoming-sessions-section">
-                    <h3>Upcoming Live Sessions</h3>
-                    <div class="sessions-list">${upcomingHtml}</div>
-                </div>
-                <div class="recorded-sessions-section" style="margin-top: 30px;">
-                    <h3>Recorded Sessions</h3>
-                    <div class="sessions-list">${recordedHtml}</div>
-                </div>
-            `;
-            
-            // Add event listeners
-            container.querySelectorAll('.join-session').forEach(btn => {
-                btn.addEventListener('click', (e) => this.joinLiveSession(btn.dataset.sessionId));
-            });
-            container.querySelectorAll('.watch-session').forEach(btn => {
-                btn.addEventListener('click', (e) => this.watchRecordedSession(btn.dataset.classId));
-            });
-        }
-
-        renderOverviewLiveSessions() {
-            const container = document.getElementById('overviewLiveSessions');
-            if (!container) return;
-            
-            if (!this.upcomingSessions.length) {
-                container.innerHTML = '<p>No upcoming live sessions. Check back later!</p>';
-                return;
+            let countdownHtml = '';
+            if (daysLeft > 0 && daysLeft <= 7) {
+                countdownHtml = `<span class="session-countdown">⏰ ${daysLeft} day${daysLeft > 1 ? 's' : ''} left</span>`;
+            } else if (daysLeft === 0) {
+                countdownHtml = `<span class="session-countdown" style="background:#e74c3c;color:white;">🔴 Today!</span>`;
+            } else if (daysLeft < 0) {
+                countdownHtml = `<span class="session-countdown" style="background:#48BB78;color:white;">✅ Passed</span>`;
             }
             
-            container.innerHTML = this.upcomingSessions.slice(0, 3).map(s => `
-                <div class="session-item">
-                    <div class="session-time">
-                        <span class="date">${new Date(s.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</span>
-                        <span class="time">${s.time || 'TBD'}</span>
+            return `
+                <div class="session-card upcoming">
+                    <div class="session-header">
+                        <h4>${this.escapeHtml(s.class_title)}</h4>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <span class="session-badge live">LIVE</span>
+                            ${countdownHtml}
+                        </div>
                     </div>
+                    <p>${this.escapeHtml(s.description || 'No description')}</p>
                     <div class="session-details">
-                        <h5>${this.escapeHtml(s.class_title)}</h5>
-                        <p>${this.escapeHtml(s.description || '').substring(0, 60)}</p>
+                        <span>📅 ${new Date(s.date).toLocaleDateString()}</span>
+                        <span>⏰ ${s.time || 'TBD'}</span>
+                        <span>⏱️ ${s.duration || '1 hour'}</span>
+                        <span>👤 ${this.escapeHtml(s.instructor)}</span>
                     </div>
-                    <button class="btn btn-outline btn-small" onclick="location.href='#live'">View</button>
+                    <button class="btn btn-primary join-session" data-session-id="${s.session_id}">
+                        ${daysLeft < 0 ? 'Watch Recording' : 'Join Session'} →
+                    </button>
                 </div>
-            `).join('');
-        }
-
+            `;
+        }).join('')
+        : '<div class="no-sessions">No upcoming live sessions scheduled</div>';
+    
+    const recordedHtml = this.recordedSessions.length > 0
+        ? this.recordedSessions.map(s => `
+            <div class="session-card recorded">
+                <div class="session-header">
+                    <h4>${this.escapeHtml(s.class_title)}</h4>
+                    <span class="session-badge recorded">RECORDED</span>
+                </div>
+                <p>${this.escapeHtml(s.description || 'No description')}</p>
+                <div class="session-details">
+                    <span>📅 ${new Date(s.date).toLocaleDateString()}</span>
+                    <span>⏱️ ${s.duration || '1 hour'}</span>
+                    <span>👤 ${this.escapeHtml(s.instructor)}</span>
+                    <span>👥 ${s.participants || 0} viewed</span>
+                </div>
+                <button class="btn btn-primary watch-session" data-class-id="${s.class_id}">
+                    📺 Watch Recording
+                </button>
+            </div>
+        `).join('')
+        : '<div class="no-sessions">No recorded sessions available</div>';
+    
+    container.innerHTML = `
+        <div class="upcoming-sessions-section">
+            <h3>Upcoming Live Sessions</h3>
+            <div class="sessions-list">${upcomingHtml}</div>
+        </div>
+        <div class="recorded-sessions-section" style="margin-top: 30px;">
+            <h3>Recorded Sessions</h3>
+            <div class="sessions-list">${recordedHtml}</div>
+        </div>
+    `;
+    
+    // Add event listeners
+    container.querySelectorAll('.join-session').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const sessionId = btn.dataset.sessionId;
+            this.joinLiveSession(sessionId);
+        });
+    });
+    container.querySelectorAll('.watch-session').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const classId = btn.dataset.classId;
+            this.watchRecordedSession(classId);
+        });
+    });
+}
+       renderOverviewLiveSessions() {
+    const container = document.getElementById('overviewLiveSessions');
+    if (!container) return;
+    
+    if (!this.upcomingSessions.length) {
+        container.innerHTML = '<div class="no-sessions" style="padding: 20px;">No upcoming live sessions. Check back later!</div>';
+        return;
+    }
+    
+    container.innerHTML = this.upcomingSessions.slice(0, 3).map(s => {
+        const sessionDate = new Date(s.date);
+        const today = new Date();
+        const isToday = sessionDate.toDateString() === today.toDateString();
+        
+        return `
+            <div class="session-item">
+                <div class="session-time">
+                    <span class="date">${new Date(s.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}</span>
+                    <span class="time">${s.time || 'TBD'}</span>
+                    ${isToday ? '<span class="recording-indicator">LIVE</span>' : ''}
+                </div>
+                <div class="session-details">
+                    <h5>${this.escapeHtml(s.class_title)}</h5>
+                    <p>${this.escapeHtml(s.description || '').substring(0, 60)}${(s.description || '').length > 60 ? '...' : ''}</p>
+                </div>
+                <button class="btn btn-outline btn-small" onclick="location.href='#live'">View Details →</button>
+            </div>
+        `;
+    }).join('');
+}
         filterSessions(type) {
             const upcomingSection = document.querySelector('.upcoming-sessions-section');
             const recordedSection = document.querySelector('.recorded-sessions-section');
