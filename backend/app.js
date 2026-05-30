@@ -32,7 +32,7 @@ app.use('/register', Regisrouter);
 // ===== LIVEKIT CONFIGURATION =====
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
-const LIVEKIT_WS_URL = process.env.LIVEKIT_WS_URL || 'wss://your-project.livekit.cloud';
+const LIVEKIT_WS_URL = process.env.LIVEKIT_URL;
 
 // Track active LiveKit rooms
 let activeLiveKitRooms = new Map();
