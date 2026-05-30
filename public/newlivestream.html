@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FISSK Online Academy - Live Streaming</title>
-    <!-- Cloudinary Upload Widget Script -->
     <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@latest/dist/livekit-client.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -40,6 +40,7 @@
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            align-items: center;
         }
         button {
             padding: 10px 20px;
@@ -66,22 +67,22 @@
         .btn-danger {
             background-color: #e74c3c;
         }
-        #videoContainer {
+        .video-container {
             display: flex;
             gap: 20px;
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
         .video-wrapper {
-            flex: 1;
-            min-width: 300px;
+            flex: 2;
+            min-width: 500px;
             background: #000;
             border-radius: 10px;
             overflow: hidden;
             aspect-ratio: 16/9;
             position: relative;
         }
-        #hostVideo {
+        #hostVideo, #remoteVideo {
             width: 100%;
             height: 100%;
             object-fit: contain;
@@ -96,6 +97,7 @@
             padding: 4px 10px;
             border-radius: 20px;
             font-size: 12px;
+            z-index: 1;
         }
         .recording-badge {
             position: absolute;
@@ -109,6 +111,7 @@
             display: none;
             align-items: center;
             gap: 8px;
+            z-index: 1;
         }
         .recording-badge.active {
             display: flex;
@@ -125,11 +128,14 @@
             50% { opacity: 0.3; }
         }
         #viewersList {
-            width: 280px;
+            flex: 1;
+            min-width: 250px;
             background-color: #fff;
             border-radius: 5px;
             padding: 15px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            max-height: 400px;
         }
         #chatContainer {
             background-color: #fff;
@@ -234,7 +240,7 @@
         }
         @keyframes pulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+            50% { opacity: 0.3; }
         }
         #connectionStatus {
             font-size: 12px;
@@ -253,6 +259,20 @@
         .upload-status.active {
             display: block;
         }
+        .stream-info {
+            font-size: 12px;
+            margin-top: 5px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        .stream-info.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .stream-info.inactive {
+            background: #fee2e2;
+            color: #991b1b;
+        }
     </style>
 </head>
 <body>
@@ -262,36 +282,43 @@
         <p>
             <span id="streamStatus" class="status-indicator status-offline"></span>
             <span id="statusText">Offline</span>
+            <span id="streamTitle" style="margin-left: 15px;"></span>
         </p>
         <div id="connectionStatus" class="connecting">🔌 Connecting to server...</div>
+        <div id="streamInfo" class="stream-info inactive">📭 No active livestream</div>
     </div>
     
     <div id="controls">
         <button id="startStreamBtn" class="btn-primary">🎥 Start Livestream</button>
         <button id="stopStreamBtn" class="btn-danger" disabled>🔴 End Stream</button>
         <button id="joinBtn" disabled>👤 Join Stream</button>
+        <button id="refreshStatusBtn" style="background-color:#6c5ce7;">🔄 Refresh Status</button>
     </div>
     
-    <div id="videoContainer">
+    <div class="video-container">
         <div class="video-wrapper">
-            <video id="hostVideo" autoplay playsinline muted></video>
-            <div class="video-label" id="videoLabel">📹 No Stream</div>
+            <video id="hostVideo" autoplay playsinline muted style="width:100%;height:100%;"></video>
+            <div class="video-label" id="videoLabel">📹 Your Camera (Host only)</div>
             <div id="recordingBadge" class="recording-badge">
                 <span class="recording-dot"></span>
                 <span>RECORDING</span>
             </div>
         </div>
+        <div class="video-wrapper" id="viewerVideoWrapper">
+            <video id="remoteVideo" autoplay playsinline style="width:100%;height:100%;"></video>
+            <div class="video-label" id="remoteVideoLabel">📺 Instructor's Stream</div>
+        </div>
         <div id="viewersList">
-            <h3>Viewers (<span id="viewerCount">0</span>)</h3>
+            <h3>👥 Students (<span id="viewerCount">0</span>)</h3>
             <ul id="viewers"></ul>
         </div>
     </div>
     
     <div id="chatContainer">
-        <h2>Live Chat</h2>
+        <h2>💬 Live Chat</h2>
         <div id="chatMessages"></div>
-        <div>
-            <input type="text" id="chatInput" placeholder="Type your message..." disabled>
+        <div style="display: flex; gap: 10px;">
+            <input type="text" id="chatInput" placeholder="Type your message..." disabled style="flex:1;">
             <button id="sendChatBtn" disabled>Send</button>
         </div>
     </div>
@@ -299,15 +326,15 @@
     <div id="createClassModal" class="modal">
         <div class="modal-content">
             <span class="close-modal" onclick="closeModal('createClassModal')">&times;</span>
-            <h2>Start Livestream</h2>
+            <h2>🎬 Start Livestream</h2>
             <div class="form-group">
-                <label>Select Class</label>
+                <label>Select Class *</label>
                 <select id="streamClass" required>
                     <option value="">Choose a class...</option>
                 </select>
             </div>
             <div class="form-group">
-                <label>Stream Title</label>
+                <label>Stream Title *</label>
                 <input type="text" id="title" placeholder="e.g., Advanced JavaScript" required>
             </div>
             <div class="form-group">
@@ -315,7 +342,7 @@
                 <textarea id="description" rows="3" placeholder="What will you teach?"></textarea>
             </div>
             <div id="uploadStatus" class="upload-status">
-                <p>📤 Preparing upload...</p>
+                <p>📤 Preparing...</p>
             </div>
             <div class="form-actions">
                 <button id="confirmStartBtn" class="btn-primary">Go Live</button>
@@ -327,18 +354,12 @@
     <script>
         // ===== CONFIGURATION =====
         const BACKEND_URL = 'https://fissk-backend.onrender.com';
-        const WS_URL = 'wss://fissk-backend.onrender.com';
-        
-        // Cloudinary configuration (from your test)
-        const CLOUDINARY_CLOUD_NAME = 'dqlvw79pw';
-        const CLOUDINARY_API_KEY = '832826671417898';
-        const CLOUDINARY_UPLOAD_PRESET = 'fissk_live'; // Create this unsigned preset
         
         // ===== GLOBAL VARIABLES =====
+        let liveKitRoom = null;
         let localStream = null;
         let mediaRecorder = null;
         let recordedChunks = [];
-        let socket = null;
         let isHost = false;
         let streamActive = false;
         let userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
@@ -346,14 +367,19 @@
         let totalUniqueViewers = new Set();
         let streamStartTime = null;
         let currentStreamData = { title: '', description: '', classId: '' };
-        let cloudinaryWidget = null;
+        let currentRoomName = null;
+        let statusCheckInterval = null;
         
         // ===== DOM ELEMENTS =====
         const startBtn = document.getElementById('startStreamBtn');
         const stopBtn = document.getElementById('stopStreamBtn');
         const joinBtn = document.getElementById('joinBtn');
+        const refreshStatusBtn = document.getElementById('refreshStatusBtn');
         const hostVideo = document.getElementById('hostVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const viewerVideoWrapper = document.getElementById('viewerVideoWrapper');
         const videoLabel = document.getElementById('videoLabel');
+        const remoteVideoLabel = document.getElementById('remoteVideoLabel');
         const chatInput = document.getElementById('chatInput');
         const sendChatBtn = document.getElementById('sendChatBtn');
         const chatMessages = document.getElementById('chatMessages');
@@ -363,6 +389,8 @@
         const statusTextSpan = document.getElementById('statusText');
         const connectionStatusDiv = document.getElementById('connectionStatus');
         const recordingBadge = document.getElementById('recordingBadge');
+        const streamTitleSpan = document.getElementById('streamTitle');
+        const streamInfoDiv = document.getElementById('streamInfo');
         
         // ===== HELPER FUNCTIONS =====
         function escapeHtml(s) {
@@ -381,8 +409,13 @@
             } catch(e) { return ''; }
         }
         
-        function showModal(id) { document.getElementById(id).style.display = 'flex'; }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function showModal(id) { 
+            document.getElementById(id).style.display = 'flex'; 
+        }
+        
+        function closeModal(id) { 
+            document.getElementById(id).style.display = 'none'; 
+        }
         
         function showToast(msg, isError = false) {
             const toast = document.createElement('div');
@@ -390,8 +423,10 @@
             toast.style.cssText = `
                 position: fixed; bottom: 20px; right: 20px;
                 background: ${isError ? '#ef4444' : '#10b981'};
-                color: white; padding: 10px 20px; border-radius: 8px;
+                color: white; padding: 12px 20px; border-radius: 8px;
                 z-index: 9999; animation: slideIn 0.3s ease;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
             `;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);
@@ -402,64 +437,72 @@
             connectionStatusDiv.innerHTML = msg;
         }
         
-        function updateStreamStatus(isLive) {
+        function updateStreamStatus(isLive, title = '') {
             streamActive = isLive;
+            console.log(`updateStreamStatus: isLive=${isLive}, isHost=${isHost}`);
+            
             if (isLive) {
                 streamStatusSpan.className = 'status-indicator status-live';
                 statusTextSpan.textContent = 'Live';
-                if (!isHost) joinBtn.disabled = false;
+                streamInfoDiv.className = 'stream-info active';
+                streamInfoDiv.innerHTML = '🎬 A livestream is currently active! Click "Join Stream" to watch.';
+                
+                if (!isHost) {
+                    joinBtn.disabled = false;
+                }
+                if (title) streamTitleSpan.textContent = `- ${title}`;
             } else {
                 streamStatusSpan.className = 'status-indicator status-offline';
                 statusTextSpan.textContent = 'Offline';
+                streamInfoDiv.className = 'stream-info inactive';
+                streamInfoDiv.innerHTML = '📭 No active livestream at the moment.';
                 joinBtn.disabled = true;
+                streamTitleSpan.textContent = '';
+                if (!isHost && remoteVideo) {
+                    remoteVideo.srcObject = null;
+                    remoteVideoLabel.textContent = '📺 No Live Stream';
+                }
             }
         }
         
-        // ===== CLOUDINARY UPLOAD USING FETCH (NO XHR) =====
+        async function checkStreamStatus() {
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/stream-status`);
+                const data = await response.json();
+                updateStreamStatus(data.active === true);
+                return data.active;
+            } catch (err) {
+                console.error('Status check failed:', err);
+                return false;
+            }
+        }
+        
+        // ===== CLOUDINARY UPLOAD =====
         async function uploadToCloudinary(blob, streamName, classId) {
             const uploadStatus = document.getElementById('uploadStatus');
             uploadStatus.classList.add('active');
             uploadStatus.innerHTML = '<p>📤 Uploading to Cloudinary...</p>';
             
             try {
-                // First, get the upload signature from your backend
-                const signRes = await fetch(`${BACKEND_URL}/api/cloudinary/sign-upload`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        folder: `livestreams/${classId}`,
-                        publicId: streamName,
-                        resourceType: 'video'
-                    })
-                });
-                
-                const signData = await signRes.json();
-                console.log('Signature received');
-                
-                // Prepare form data for Cloudinary
                 const formData = new FormData();
                 formData.append('file', blob);
-                formData.append('api_key', signData.api_key);
-                formData.append('timestamp', signData.timestamp);
-                formData.append('signature', signData.signature);
-                formData.append('folder', signData.folder);
+                formData.append('upload_preset', 'fissk_live');
+                formData.append('folder', `livestreams/${classId}`);
                 formData.append('public_id', streamName);
                 formData.append('resource_type', 'video');
                 
-                // Use fetch API instead of XHR
-                const response = await fetch(`https://api.cloudinary.com/v1_1/${signData.cloud_name}/video/upload`, {
+                const response = await fetch(`https://api.cloudinary.com/v1_1/dqlvw79pw/video/upload`, {
                     method: 'POST',
                     body: formData
                 });
                 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+                    throw new Error(`Upload failed: ${response.status}`);
                 }
                 
                 const result = await response.json();
                 uploadStatus.classList.remove('active');
-                console.log('✅ Upload successful:', result.secure_url);
+                console.log('Upload successful:', result.secure_url);
                 return result;
                 
             } catch (err) {
@@ -469,272 +512,7 @@
             }
         }
         
-        // Alternative: Use the Cloudinary Upload Widget (even simpler!)
-        function uploadWithWidget(blob, streamName, classId) {
-            return new Promise((resolve, reject) => {
-                // Create a File from the blob
-                const file = new File([blob], `${streamName}.webm`, { type: 'video/webm' });
-                
-                // Initialize Cloudinary Widget
-                const widget = cloudinary.createUploadWidget(
-                    {
-                        cloudName: CLOUDINARY_CLOUD_NAME,
-                        uploadPreset: CLOUDINARY_UPLOAD_PRESET,
-                        folder: `livestreams/${classId}`,
-                        publicId: streamName,
-                        resourceType: 'video',
-                        sources: ['local'],
-                        multiple: false,
-                        showUploadMoreButton: false,
-                        showCompletedButton: false
-                    },
-                    (error, result) => {
-                        if (error) {
-                            reject(error);
-                        } else if (result && result.event === 'success') {
-                            resolve(result.info);
-                        }
-                    }
-                );
-                
-                // Open widget with the file
-                widget.open();
-                // Programmatically add the file
-                widget.setFileList([file]);
-            });
-        }
-        
-        // ===== LOAD CLASSES =====
-        async function loadInstructorClasses() {
-            try {
-                const user = JSON.parse(localStorage.getItem('user'));
-                if (!user) return;
-                const res = await fetch(`${BACKEND_URL}/register/instructor/classes`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: user.id })
-                });
-                const json = await res.json();
-                const classes = json.classes || [];
-                const select = document.getElementById('streamClass');
-                select.innerHTML = '<option value="">Choose a class...</option>' + 
-                    classes.map(c => `<option value="${c._id || c.id}">${escapeHtml(c.title)}</option>`).join('');
-            } catch(err) {
-                console.error(err);
-            }
-        }
-        
-        // ===== WEBSOCKET =====
-        function initWebSocket() {
-            if (socket && socket.readyState === WebSocket.OPEN) return;
-            
-            updateConnectionStatus('connecting', '🔌 Connecting...');
-            
-            try {
-                socket = new WebSocket(WS_URL);
-                socket.onopen = () => {
-                    console.log('WebSocket connected');
-                    updateConnectionStatus('connected', '✅ Connected');
-                    
-                    if (isHost) {
-                        socket.send(JSON.stringify({ type: 'register_host', userId, userName: 'Instructor' }));
-                        if (localStream) socket.send(JSON.stringify({ type: 'stream_started', userId }));
-                    } else {
-                        socket.send(JSON.stringify({ type: 'register_viewer', userId, userName }));
-                    }
-                    socket.send(JSON.stringify({ type: 'request_stream_status' }));
-                };
-                
-                socket.onmessage = (e) => {
-                    try {
-                        const msg = JSON.parse(e.data);
-                        console.log('📨', msg.type);
-                        handleMessage(msg);
-                    } catch(err) {}
-                };
-                
-                socket.onerror = () => updateConnectionStatus('disconnected', '❌ Connection error');
-                socket.onclose = () => {
-                    updateConnectionStatus('disconnected', '❌ Disconnected');
-                    setTimeout(initWebSocket, 3000);
-                };
-            } catch(err) {
-                console.error(err);
-            }
-        }
-        
-        function handleMessage(msg) {
-            switch(msg.type) {
-                case 'stream_status':
-                    updateStreamStatus(msg.active);
-                    break;
-                case 'chat_message':
-                    displayChatMessage(msg);
-                    break;
-                case 'viewer_list':
-                    updateViewersList(msg.viewers);
-                    break;
-                case 'stream_ended':
-                    if (!isHost) {
-                        hostVideo.srcObject = null;
-                        videoLabel.textContent = '📹 Stream Ended';
-                        updateStreamStatus(false);
-                        showToast('Stream ended');
-                    }
-                    break;
-            }
-        }
-        
-        function updateViewersList(viewers) {
-            viewersList.innerHTML = '';
-            viewers.forEach(v => {
-                const li = document.createElement('li');
-                li.className = 'viewer-item';
-                li.textContent = v.name || v.userName;
-                viewersList.appendChild(li);
-                totalUniqueViewers.add(v.id || v.userId);
-            });
-            viewerCountSpan.textContent = viewers.length;
-        }
-        
-        function displayChatMessage(msg) {
-            const div = document.createElement('div');
-            div.className = 'message';
-            div.innerHTML = `<strong>${escapeHtml(msg.userName)}:</strong> ${escapeHtml(msg.message)}<span class="message-time">${formatTime(msg.timestamp)}</span>`;
-            chatMessages.appendChild(div);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-        
-        function sendChatMessage() {
-            const message = chatInput.value.trim();
-            if (!message) return;
-            const chatMsg = {
-                type: 'chat_message',
-                userId, userName: isHost ? '🎙️ Instructor' : userName,
-                message, timestamp: new Date().toISOString()
-            };
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify(chatMsg));
-                displayChatMessage(chatMsg);
-                chatInput.value = '';
-            }
-        }
-        
-        // ===== START LIVESTREAM =====
-        async function startLivestream() {
-            const title = document.getElementById('title').value;
-            const description = document.getElementById('description').value;
-            const classId = document.getElementById('streamClass').value;
-            
-            if (!classId || !title) {
-                alert('Please select a class and enter a title');
-                return;
-            }
-            
-            try {
-                closeModal('createClassModal');
-                isHost = true;
-                currentStreamData = { title, description, classId };
-                
-                showToast('Requesting camera...');
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                hostVideo.srcObject = localStream;
-                videoLabel.textContent = '🎥 Your Stream (Host)';
-                hostVideo.muted = false;
-                
-                initWebSocket();
-                await new Promise(r => setTimeout(r, 500));
-                
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-                joinBtn.disabled = true;
-                chatInput.disabled = false;
-                sendChatBtn.disabled = false;
-                recordingBadge.classList.add('active');
-                updateStreamStatus(true);
-                streamStartTime = Date.now();
-                
-                // Start recording
-                recordedChunks = [];
-                mediaRecorder = new MediaRecorder(localStream, { mimeType: 'video/webm' });
-                mediaRecorder.ondataavailable = (e) => {
-                    if (e.data.size > 0) recordedChunks.push(e.data);
-                };
-                mediaRecorder.start(5000);
-                
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({ type: 'stream_started', userId }));
-                }
-                
-                showToast('✅ Livestream started!');
-            } catch(err) {
-                console.error(err);
-                alert('Failed to start: ' + err.message);
-                isHost = false;
-                startBtn.disabled = false;
-            }
-        }
-        
-        // ===== STOP & SAVE TO CLOUDINARY (USING FETCH) =====
-        async function stopLivestream() {
-            if (!confirm('End stream and save recording?')) return;
-            
-            try {
-                recordingBadge.classList.remove('active');
-                showToast('Processing recording...');
-                
-                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                    await new Promise(r => { mediaRecorder.onstop = r; mediaRecorder.stop(); });
-                    
-                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                    const streamName = `${currentStreamData.title.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}`;
-                    
-                    // Upload to Cloudinary using fetch (no XHR)
-                    try {
-                        showToast('📤 Uploading to Cloudinary...');
-                        const result = await uploadToCloudinary(blob, streamName, currentStreamData.classId);
-                        showToast('✅ Saved to Cloudinary!');
-                        console.log('Cloudinary URL:', result.secure_url);
-                        
-                        // Save metadata to backend
-                        await saveMetadata(result, streamName);
-                    } catch(uploadErr) {
-                        console.error('Cloudinary failed:', uploadErr);
-                        showToast('⚠️ Cloudinary failed - saving locally', true);
-                        // Fallback: download locally
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `${streamName}.webm`;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                    }
-                }
-                
-                if (localStream) localStream.getTracks().forEach(t => t.stop());
-                if (socket && socket.readyState === WebSocket.OPEN) {
-                    socket.send(JSON.stringify({ type: 'stream_ended' }));
-                }
-                
-                hostVideo.srcObject = null;
-                videoLabel.textContent = '📹 No Stream';
-                startBtn.disabled = false;
-                stopBtn.disabled = true;
-                chatInput.disabled = true;
-                sendChatBtn.disabled = true;
-                isHost = false;
-                updateStreamStatus(false);
-                showToast('Stream ended');
-                
-            } catch(err) {
-                console.error(err);
-                alert('Error: ' + err.message);
-            }
-        }
-        
-        async function saveMetadata(cloudinaryResult, streamName) {
+        async function saveMetadataToBackend(cloudinaryResult, streamName) {
             try {
                 const user = JSON.parse(localStorage.getItem('user'));
                 const duration = Math.floor((Date.now() - streamStartTime) / 1000);
@@ -755,42 +533,464 @@
                         cloudinaryPublicId: cloudinaryResult.public_id
                     })
                 });
-                console.log('Metadata saved');
-            } catch(err) { console.error(err); }
+                console.log('Metadata saved to backend');
+            } catch(err) { 
+                console.error('Metadata save error:', err); 
+            }
         }
         
+        // ===== LOAD CLASSES =====
+        async function loadInstructorClasses() {
+            try {
+                const user = JSON.parse(localStorage.getItem('user'));
+                if (!user) return [];
+                const res = await fetch(`${BACKEND_URL}/register/instructor/classes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: user.id })
+                });
+                const json = await res.json();
+                const classes = json.classes || [];
+                const select = document.getElementById('streamClass');
+                select.innerHTML = '<option value="">Choose a class...</option>' + 
+                    classes.map(c => `<option value="${c._id || c.id}">${escapeHtml(c.title)}</option>`).join('');
+                return classes;
+            } catch(err) {
+                console.error('Error loading classes:', err);
+                return [];
+            }
+        }
+        
+        // ===== LIVEKIT FUNCTIONS =====
+        
+        async function getLiveKitToken(roomName, participantName, isHostUser) {
+            const response = await fetch(`${BACKEND_URL}/api/livekit/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    roomName: roomName,
+                    participantName: participantName,
+                    isHost: isHostUser
+                })
+            });
+            const data = await response.json();
+            return data;
+        }
+        
+        // Setup chat using LiveKit data channels
+        function setupLiveKitChat(room) {
+            room.on(LiveKitClient.RoomEvent.DataReceived, (payload, participant) => {
+                try {
+                    const message = JSON.parse(new TextDecoder().decode(payload));
+                    if (message.type === 'chat') {
+                        const msgDiv = document.createElement('div');
+                        msgDiv.className = 'message';
+                        msgDiv.innerHTML = `<strong>${escapeHtml(participant.identity)}:</strong> ${escapeHtml(message.text)} <span class="message-time">${formatTime(new Date())}</span>`;
+                        chatMessages.appendChild(msgDiv);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                } catch (e) {
+                    console.error('Chat parse error:', e);
+                }
+            });
+        }
+        
+        async function sendLiveKitChatMessage(room, message) {
+            if (!room || !message.trim()) return;
+            
+            const encoder = new TextEncoder();
+            const data = encoder.encode(JSON.stringify({ type: 'chat', text: message }));
+            await room.localParticipant.publishData(data);
+            
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message';
+            msgDiv.innerHTML = `<strong>You (${escapeHtml(room.localParticipant.identity)}):</strong> ${escapeHtml(message)} <span class="message-time">${formatTime(new Date())}</span>`;
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Update viewers list from LiveKit participants (only other viewers, not host)
+        function updateViewersFromLiveKit(room) {
+            if (!room) return;
+            
+            const participants = Array.from(room.remoteParticipants.values());
+            viewersList.innerHTML = '';
+            
+            participants.forEach(p => {
+                // Only show viewers, not the instructor
+                if (p.identity !== 'Instructor') {
+                    const li = document.createElement('li');
+                    li.className = 'viewer-item';
+                    li.textContent = p.identity;
+                    viewersList.appendChild(li);
+                    totalUniqueViewers.add(p.identity);
+                }
+            });
+            
+            viewerCountSpan.textContent = participants.length;
+        }
+        
+        // ===== HOST: START LIVESTREAM =====
+        async function startLivestream() {
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+            const classId = document.getElementById('streamClass').value;
+            
+            if (!classId || !title) {
+                alert('Please select a class and enter a title');
+                return;
+            }
+            
+            try {
+                closeModal('createClassModal');
+                isHost = true;
+                currentStreamData = { title, description, classId };
+                currentRoomName = `class_${classId}_${Date.now()}`;
+                streamTitleSpan.textContent = `- ${title}`;
+                
+                showToast('Requesting camera and microphone...');
+                
+                // Get user media
+                localStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }, 
+                    audio: true 
+                });
+                
+                hostVideo.srcObject = localStream;
+                videoLabel.textContent = '🎥 Your Camera';
+                hostVideo.muted = false;
+                
+                showToast('Connecting to LiveKit...');
+                updateConnectionStatus('connecting', '🔌 Connecting to LiveKit...');
+                
+                // Get token and connect
+                const { token, url } = await getLiveKitToken(currentRoomName, 'Instructor', true);
+                
+                liveKitRoom = new LiveKitClient.Room();
+                
+                liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
+                    updateConnectionStatus('connected', '✅ Connected to LiveKit');
+                    showToast('Connected! Publishing stream...');
+                });
+                
+                liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
+                    updateConnectionStatus('disconnected', '❌ Disconnected');
+                });
+                
+                liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, (participant) => {
+                    showToast(`${participant.identity} joined the class`);
+                    updateViewersFromLiveKit(liveKitRoom);
+                });
+                
+                liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+                    showToast(`${participant.identity} left`);
+                    updateViewersFromLiveKit(liveKitRoom);
+                });
+                
+                await liveKitRoom.connect(url, token);
+                
+                // Publish camera and microphone
+                await liveKitRoom.localParticipant.setCameraEnabled(true);
+                await liveKitRoom.localParticipant.setMicrophoneEnabled(true);
+                
+                // Setup chat
+                setupLiveKitChat(liveKitRoom);
+                
+                // Notify backend that stream started
+                await fetch(`${BACKEND_URL}/api/livekit/start-session`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        roomName: currentRoomName,
+                        title: title,
+                        description: description,
+                        classId: classId,
+                        userId: userId
+                    })
+                });
+                
+                // Update UI
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                joinBtn.disabled = true;
+                chatInput.disabled = false;
+                sendChatBtn.disabled = false;
+                recordingBadge.classList.add('active');
+                updateStreamStatus(true, title);
+                streamStartTime = Date.now();
+                
+                // Start recording for Cloudinary
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(localStream, { 
+                    mimeType: 'video/webm',
+                    videoBitsPerSecond: 1000000
+                });
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) {
+                        recordedChunks.push(e.data);
+                    }
+                };
+                mediaRecorder.start(10000);
+                
+                updateConnectionStatus('connected', '🎥 Live - Streaming');
+                showToast('✅ Livestream started! Students can now join.');
+                
+            } catch(err) {
+                console.error('Start stream error:', err);
+                showToast('Failed to start: ' + err.message, true);
+                isHost = false;
+                startBtn.disabled = false;
+                if (localStream) {
+                    localStream.getTracks().forEach(t => t.stop());
+                    localStream = null;
+                }
+            }
+        }
+        
+        // ===== STOP LIVESTREAM =====
+        async function stopLivestream() {
+            if (!confirm('End stream and save recording?')) return;
+            
+            try {
+                recordingBadge.classList.remove('active');
+                showToast('Processing recording...');
+                
+                // Stop LiveKit room
+                if (liveKitRoom) {
+                    await liveKitRoom.disconnect();
+                    liveKitRoom = null;
+                }
+                
+                // Stop recording and upload to Cloudinary
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    await new Promise(r => { mediaRecorder.onstop = r; mediaRecorder.stop(); });
+                    
+                    if (recordedChunks.length > 0) {
+                        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                        const streamName = `${currentStreamData.title.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}`;
+                        
+                        try {
+                            showToast('📤 Uploading recording to Cloudinary...');
+                            const result = await uploadToCloudinary(blob, streamName, currentStreamData.classId);
+                            showToast('✅ Recording saved to Cloudinary!');
+                            await saveMetadataToBackend(result, streamName);
+                        } catch(uploadErr) {
+                            console.error('Upload failed:', uploadErr);
+                            showToast('⚠️ Upload failed - recording saved locally', true);
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `${streamName}.webm`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                        }
+                    }
+                }
+                
+                // Stop camera
+                if (localStream) {
+                    localStream.getTracks().forEach(t => t.stop());
+                    localStream = null;
+                }
+                hostVideo.srcObject = null;
+                
+                // Notify backend
+                await fetch(`${BACKEND_URL}/api/livekit/end-session`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomName: currentRoomName })
+                });
+                
+                // Update UI
+                videoLabel.textContent = '📹 No Stream';
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                chatInput.disabled = true;
+                sendChatBtn.disabled = true;
+                isHost = false;
+                streamStartTime = null;
+                currentRoomName = null;
+                updateStreamStatus(false);
+                streamTitleSpan.textContent = '';
+                updateConnectionStatus('disconnected', '🔌 Disconnected');
+                
+                showToast('Stream ended successfully');
+                
+            } catch(err) {
+                console.error('Stop stream error:', err);
+                alert('Error ending stream: ' + err.message);
+            }
+        }
+        
+        // ===== JOIN STREAM (VIEWER) =====
         async function joinLivestream() {
-            if (!streamActive) {
+            // First check if there's an active stream
+            const isActive = await checkStreamStatus();
+            if (!isActive) {
                 showToast('No live stream available', true);
                 return;
             }
+            
+            // Get active stream info
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/active-stream`);
+                const data = await response.json();
+                if (!data.isActive || data.streams.length === 0) {
+                    showToast('No active stream found', true);
+                    return;
+                }
+                
+                const activeStream = data.streams[0];
+                currentRoomName = activeStream.roomName;
+                currentStreamData.title = activeStream.title;
+                streamTitleSpan.textContent = `- ${activeStream.title}`;
+                
+            } catch(err) {
+                console.error('Get active stream error:', err);
+                showToast('Could not find active stream', true);
+                return;
+            }
+            
             joinBtn.disabled = true;
-            isHost = false;
-            initWebSocket();
-            showToast('Joining stream...');
-            setTimeout(() => { joinBtn.disabled = false; }, 3000);
+            joinBtn.textContent = 'Connecting...';
+            remoteVideoLabel.textContent = '📺 Connecting...';
+            updateConnectionStatus('connecting', '🔌 Connecting to class...');
+            
+            try {
+                const studentName = localStorage.getItem('studentName') || prompt('Enter your name:', 'Student') || 'Student';
+                localStorage.setItem('studentName', studentName);
+                
+                const { token, url } = await getLiveKitToken(currentRoomName, studentName, false);
+                
+                liveKitRoom = new LiveKitClient.Room();
+                
+                // Handle remote tracks (ONLY host's video)
+                liveKitRoom.on(LiveKitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+                    // Only attach video from the Instructor (host)
+                    if (track.kind === 'video' && participant.identity === 'Instructor') {
+                        track.attach(remoteVideo);
+                        remoteVideoLabel.textContent = `📺 Instructor's Stream`;
+                        updateConnectionStatus('connected', '📺 Watching class');
+                        showToast('Connected to class!');
+                    }
+                });
+                
+                liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
+                    updateStreamStatus(true);
+                    chatInput.disabled = false;
+                    sendChatBtn.disabled = false;
+                    updateConnectionStatus('connected', '📺 Connected to class');
+                });
+                
+                liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
+                    updateConnectionStatus('disconnected', '❌ Disconnected');
+                    updateStreamStatus(false);
+                    remoteVideo.srcObject = null;
+                });
+                
+                liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+                    if (participant.identity === 'Instructor') {
+                        showToast('Instructor has ended the class', true);
+                        remoteVideo.srcObject = null;
+                        updateStreamStatus(false);
+                        remoteVideoLabel.textContent = '📺 Class Ended';
+                    }
+                });
+                
+                liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, () => {
+                    updateViewersFromLiveKit(liveKitRoom);
+                });
+                
+                liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, () => {
+                    updateViewersFromLiveKit(liveKitRoom);
+                });
+                
+                await liveKitRoom.connect(url, token);
+                
+                setupLiveKitChat(liveKitRoom);
+                updateViewersFromLiveKit(liveKitRoom);
+                
+                joinBtn.disabled = false;
+                joinBtn.textContent = '👤 Join Stream';
+                
+            } catch(err) {
+                console.error('Join error:', err);
+                showToast('Failed to join: ' + err.message, true);
+                joinBtn.disabled = false;
+                joinBtn.textContent = '👤 Join Stream';
+                updateConnectionStatus('disconnected', '❌ Connection failed');
+            }
+        }
+        
+        // Send chat message (works for both host and viewer)
+        async function sendChatMessage() {
+            const message = chatInput.value.trim();
+            if (!message || !liveKitRoom) return;
+            
+            await sendLiveKitChatMessage(liveKitRoom, message);
+            chatInput.value = '';
         }
         
         // ===== EVENT LISTENERS =====
         document.getElementById('confirmStartBtn').addEventListener('click', startLivestream);
-        startBtn.addEventListener('click', () => {
+        
+        startBtn.addEventListener('click', async () => {
             const user = JSON.parse(localStorage.getItem('user'));
             if (!user || user.user_type !== 'instructor') {
                 alert('Only instructors can start livestreams');
                 return;
             }
-            loadInstructorClasses().then(() => showModal('createClassModal'));
+            userName = user.name || user.email || 'Instructor';
+            userId = user.id || userId;
+            await loadInstructorClasses();
+            showModal('createClassModal');
         });
+        
         stopBtn.addEventListener('click', stopLivestream);
         joinBtn.addEventListener('click', joinLivestream);
+        refreshStatusBtn.addEventListener('click', async () => {
+            showToast('Checking stream status...');
+            await checkStreamStatus();
+        });
         sendChatBtn.addEventListener('click', sendChatMessage);
-        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChatMessage(); });
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChatMessage();
+        });
+        
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        };
         
         // ===== INITIALIZE =====
         const storedUser = JSON.parse(localStorage.getItem('user'));
-        if (storedUser) userName = storedUser.name || storedUser.email || 'Viewer';
-        initWebSocket();
-        updateStreamStatus(false);
+        if (storedUser) {
+            userName = storedUser.name || storedUser.email || 'User';
+            userId = storedUser.id || userId;
+        } else {
+            userName = prompt('Enter your name:', 'Viewer') || 'Viewer';
+        }
+        
+        // Initialize as viewer by default
+        isHost = false;
+        
+        // Periodically check stream status
+        statusCheckInterval = setInterval(() => {
+            if (!isHost && !liveKitRoom) {
+                checkStreamStatus();
+            }
+        }, 5000);
+        
+        // Initial status check
+        checkStreamStatus();
+        
+        console.log('App initialized with LiveKit. User:', userId, userName);
     </script>
 </body>
 </html>
