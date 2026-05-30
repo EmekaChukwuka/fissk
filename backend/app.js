@@ -40,7 +40,7 @@ let activeLiveKitRooms = new Map();
 // ===== LIVEKIT ENDPOINTS =====
 
 // Generate token for LiveKit
-app.post('/api/livekit/token', (req, res) => {
+app.post('/api/livekit/token', async (req, res) => {
     const { roomName, participantName, isHost } = req.body;
     
     if (!roomName || !participantName) {
@@ -57,14 +57,14 @@ app.post('/api/livekit/token', (req, res) => {
         at.addGrant({
             roomJoin: true,
             room: roomName,
-            roomPublish: isHost,
-            roomSubscribe: true,
             canPublish: isHost,
             canSubscribe: true,
         });
         
+        const token = await at.toJwt();  // ← the critical fix
+
         res.json({
-            token: at.toJwt(),
+            token: token,
             url: LIVEKIT_WS_URL,
         });
     } catch (err) {
