@@ -32,12 +32,11 @@ router.post('/mux/create-upload', async (req, res) => {
   try {
     const { streamName, classId, classTitle } = req.body;
     
-    // Create a direct upload URL - REMOVED deprecated mp4_support
+    // Create a direct upload URL
     const upload = await mux.video.uploads.create({
       cors_origin: '*',
       new_asset_settings: {
         playback_policy: ['public'],
-        // REMOVED: mp4_support: 'standard' - this is deprecated
         max_resolution_tier: '1080p',
         passthrough: JSON.stringify({
           streamName,
@@ -61,18 +60,21 @@ router.post('/mux/create-upload', async (req, res) => {
   }
 });
 
-// Get upload status and asset details
+// Get upload status and asset details - FIXED: use retrieve() not get()
 router.get('/mux/upload-status/:uploadId', async (req, res) => {
   try {
     const { uploadId } = req.params;
-    const upload = await mux.video.uploads.get(uploadId);
+    
+    // CORRECT METHOD: retrieve() instead of get()
+    const upload = await mux.video.uploads.retrieve(uploadId);
     
     let assetId = null;
     let playbackId = null;
     
     if (upload.asset_id) {
       assetId = upload.asset_id;
-      const asset = await mux.video.assets.get(assetId);
+      // Get the asset to retrieve playback ID
+      const asset = await mux.video.assets.retrieve(assetId);
       playbackId = asset.playback_ids?.[0]?.id;
     }
     
