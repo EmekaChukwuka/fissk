@@ -1,57 +1,18 @@
 import express from "express";
 import multer from "multer";
-import { v2 as cloudinary } from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
 import Stream from "../models/Stream.js";
 import LiveSession from "../models/LiveSession.js";
-import fs from 'fs';
-import path from "path";
+import Mux from '@mux/mux-node';
 
 const router = express.Router();
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+// ===== MUX CONFIGURATION =====
+const mux = new Mux({
+  tokenId: process.env.MUX_TOKEN_ID,
+  tokenSecret: process.env.MUX_TOKEN_SECRET,
 });
 
-// Configure Cloudinary storage for multer
-const cloudinaryStorage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: (req, file) => {
-      const { streamClass, classTitle } = req.body;
-      return `livestreams/${streamClass || 'general'}/${classTitle || 'untitled'}`;
-    },
-    resource_type: 'video',
-    allowed_formats: ['webm', 'mp4', 'mov'],
-    public_id: (req, file) => {
-      const { streamName } = req.body;
-      return streamName || `stream_${Date.now()}`;
-    },
-    transformation: [
-      { quality: 'auto' },
-      { fetch_format: 'auto' }
-    ]
-  }
-});
-
-// Multer configuration for Cloudinary
-const upload = multer({
-  storage: cloudinaryStorage,
-  limits: { fileSize: 500000000 }, // 500MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['video/webm', 'video/mp4', 'video/quicktime'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only webm, mp4, and mov are allowed!'), false);
-    }
-  }
-});
-
-// Alternative: Local storage as fallback (optional)
+// Local storage fallback (if needed)
 const localStorage = multer.diskStorage({
   destination: 'uploads/',
   filename: function(req, file, cb) {
@@ -64,35 +25,68 @@ const localUpload = multer({
   limits: { fileSize: 500000000 }
 });
 
-// Helper function to generate signed upload URL
-router.post('/cloudinary/sign-upload', async (req, res) => {
+// ===== MUX ENDPOINTS =====
+
+// Create a direct upload URL for Mux
+router.post('/mux/create-upload', async (req, res) => {
   try {
-    const { folder, publicId, resourceType = 'video' } = req.body;
-    const timestamp = Math.round(Date.now() / 1000);
+    const { streamName, classId, classTitle } = req.body;
     
-    const signature = cloudinary.utils.api_sign_request({
-      timestamp: timestamp,
-      folder: folder || 'livestreams',
-      public_id: publicId,
-      resource_type: resourceType
-    }, process.env.CLOUDINARY_API_SECRET);
+    const upload = await mux.video.uploads.create({
+      cors_origin: '*',
+      new_asset_settings: {
+        playback_policy: ['public'],
+        mp4_support: 'standard',
+        max_resolution_tier: '1080p',
+        passthrough: JSON.stringify({
+          streamName,
+          classId,
+          classTitle,
+          source: 'fissk-frontend-upload'
+        }),
+      },
+    });
     
     res.json({
       success: true,
-      signature,
-      timestamp,
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      folder: folder || 'livestreams'
+      uploadUrl: upload.url,
+      uploadId: upload.id,
     });
   } catch (error) {
-    console.error('Sign upload error:', error);
+    console.error('Create Mux upload error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Save recorded livestream to Cloudinary
-router.post('/save-stream', upload.single('video'), async (req, res) => {
+// Get upload status and asset details
+router.get('/mux/upload-status/:uploadId', async (req, res) => {
+  try {
+    const { uploadId } = req.params;
+    const upload = await mux.video.uploads.get(uploadId);
+    
+    let assetId = null;
+    let playbackId = null;
+    
+    if (upload.asset_id) {
+      assetId = upload.asset_id;
+      const asset = await mux.video.assets.get(assetId);
+      playbackId = asset.playback_ids?.[0]?.id;
+    }
+    
+    res.json({
+      success: true,
+      status: upload.status,
+      assetId: assetId,
+      playbackId: playbackId,
+    });
+  } catch (error) {
+    console.error('Get Mux upload status error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Save stream with Mux data
+router.post('/save-stream', async (req, res) => {
   try {
     const { 
       userId, 
@@ -102,36 +96,30 @@ router.post('/save-stream', upload.single('video'), async (req, res) => {
       classDescription, 
       participants, 
       duration,
-      cloudinaryUrl,
-      cloudinaryPublicId
+      muxAssetId,
+      muxPlaybackId
     } = req.body;
     
-    // If file was uploaded via multer to Cloudinary
-    let finalCloudinaryUrl = cloudinaryUrl;
-    let finalCloudinaryPublicId = cloudinaryPublicId;
-    let fileSize = 0;
-    let filename = streamName;
-    
-    if (req.file) {
-      finalCloudinaryUrl = req.file.path;
-      finalCloudinaryPublicId = req.file.filename;
-      fileSize = req.file.size;
-      filename = req.file.originalname;
+    if (!muxAssetId || !muxPlaybackId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Mux asset ID and playback ID are required' 
+      });
     }
     
     // Create stream record in database
-    const result = await Stream.create({
+    const streamId = await Stream.create({
       userId,
       name: streamName,
-      filename: filename,
-      size: fileSize,
+      filename: `${streamName}.mp4`,
+      size: 0,
       streamClass,
       classTitle,
       classDescription,
       participants: participants || 0,
       duration: duration || '0:00',
-      cloudinaryUrl: finalCloudinaryUrl,
-      cloudinaryPublicId: finalCloudinaryPublicId
+      muxAssetId: muxAssetId,
+      muxPlaybackId: muxPlaybackId,
     });
     
     // Create corresponding live session record
@@ -147,16 +135,15 @@ router.post('/save-stream', upload.single('video'), async (req, res) => {
       duration: duration || '0:00',
       participants: participants || 0,
       sessionType: 'recorded',
-      cloudinaryUrl: finalCloudinaryUrl,
-      cloudinaryPublicId: finalCloudinaryPublicId
+      muxAssetId: muxAssetId,
+      muxPlaybackId: muxPlaybackId,
     });
     
     res.json({
       success: true,
-      streamId: result.streamId || result._id,
-      filename,
-      cloudinaryUrl: finalCloudinaryUrl,
-      cloudinaryPublicId: finalCloudinaryPublicId
+      streamId,
+      playbackId: muxPlaybackId,
+      playbackUrl: `https://stream.mux.com/${muxPlaybackId}.m3u8`,
     });
   } catch (error) {
     console.error('Save stream error:', error);
@@ -164,62 +151,35 @@ router.post('/save-stream', upload.single('video'), async (req, res) => {
   }
 });
 
-// Get Cloudinary upload signature for direct client upload
-router.post('/cloudinary/upload-signature', async (req, res) => {
-  try {
-    const { folder, publicId, tags } = req.body;
-    const timestamp = Math.round(Date.now() / 1000);
-    
-    const params = {
-      timestamp: timestamp,
-      folder: folder || 'livestreams',
-      resource_type: 'video'
-    };
-    
-    if (publicId) params.public_id = publicId;
-    if (tags) params.tags = tags;
-    
-    const signature = cloudinary.utils.api_sign_request(params, process.env.CLOUDINARY_API_SECRET);
-    
-    res.json({
-      signature,
-      timestamp,
-      cloudname: process.env.CLOUDINARY_CLOUD_NAME,
-      apiKey: process.env.CLOUDINARY_API_KEY,
-      ...params
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+// Get Mux thumbnail
+router.get('/mux/thumbnail/:playbackId', async (req, res) => {
+  const { playbackId } = req.params;
+  const time = req.query.time || 5;
+  
+  res.json({
+    thumbnailUrl: `https://image.mux.com/${playbackId}/thumbnail.jpg?time=${time}`,
+    storyboardUrl: `https://image.mux.com/${playbackId}/storyboard.vtt`,
+  });
 });
 
-// Get past streams with Cloudinary URLs
+// Get all past streams
 router.get('/past-streams', async (req, res) => {
   try {
     const streams = await Stream.getAll();
     
-    // Add Cloudinary optimized URLs
     const streamsWithUrls = streams.map(stream => ({
       ...stream,
-      playbackUrl: stream.cloudinaryUrl ? 
-        cloudinary.url(stream.cloudinaryPublicId, {
-          resource_type: 'video',
-          quality: 'auto',
-          fetch_format: 'auto'
-        }) : null,
-      thumbnailUrl: stream.cloudinaryPublicId ?
-        cloudinary.url(stream.cloudinaryPublicId, {
-          resource_type: 'video',
-          format: 'jpg',
-          transformation: [
-            { start_offset: '5' },
-            { width: 320, height: 180, crop: 'fill' }
-          ]
-        }) : null
+      playbackUrl: stream.muxPlaybackId ? 
+        `https://stream.mux.com/${stream.muxPlaybackId}.m3u8` : null,
+      thumbnailUrl: stream.muxPlaybackId ?
+        `https://image.mux.com/${stream.muxPlaybackId}/thumbnail.jpg?time=5` : null,
+      storyboardUrl: stream.muxPlaybackId ?
+        `https://image.mux.com/${stream.muxPlaybackId}/storyboard.vtt` : null,
     }));
     
     res.json({ success: true, streams: streamsWithUrls });
   } catch (error) {
+    console.error('Get past streams error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -230,103 +190,46 @@ router.get('/stream-hls/:streamId', async (req, res) => {
     const { streamId } = req.params;
     const stream = await Stream.getById(streamId);
     
-    if (!stream || !stream.cloudinaryPublicId) {
+    if (!stream || !stream.muxPlaybackId) {
       return res.status(404).json({ success: false, message: 'Stream not found' });
     }
     
-    // Generate HLS URL for adaptive streaming
-    const hlsUrl = cloudinary.url(stream.cloudinaryPublicId, {
-      resource_type: 'video',
-      format: 'm3u8',
-      streaming_profile: 'full_hd',
-      quality: 'auto'
-    });
-    
     res.json({
       success: true,
-      hlsUrl,
-      mp4Url: stream.cloudinaryUrl,
-      thumbnail: cloudinary.url(stream.cloudinaryPublicId, {
-        resource_type: 'video',
-        format: 'jpg',
-        transformation: { start_offset: '5' }
-      })
+      hlsUrl: `https://stream.mux.com/${stream.muxPlaybackId}.m3u8`,
+      thumbnailUrl: `https://image.mux.com/${stream.muxPlaybackId}/thumbnail.jpg?time=5`,
     });
   } catch (error) {
+    console.error('Get stream HLS error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get streams by class with Cloudinary data
+// Get streams by class
 router.get('/by-class/:classId', async (req, res) => {
   try {
-    const classId = req.params.classId;
+    const { classId } = req.params;
+    const StreamModel = (await import('../models/Stream.js')).default;
     
-    // Get streams from database
     const streams = await StreamModel.find({ streamClass: classId })
       .sort({ createdAt: -1 })
       .lean();
     
-    // Also fetch from Cloudinary directly for any missing streams
-    let cloudinaryResources = [];
-    try {
-      const result = await cloudinary.api.resources({
-        type: 'upload',
-        prefix: `livestreams/${classId}`,
-        resource_type: 'video',
-        max_results: 50
-      });
-      cloudinaryResources = result.resources || [];
-    } catch (err) {
-      console.log('Cloudinary fetch optional:', err.message);
-    }
-    
-    // Combine database streams with Cloudinary resources
-    const allStreams = [...streams];
-    
-    for (const cloudRes of cloudinaryResources) {
-      if (!allStreams.some(s => s.cloudinaryPublicId === cloudRes.public_id)) {
-        allStreams.push({
-          cloudinaryUrl: cloudRes.secure_url,
-          cloudinaryPublicId: cloudRes.public_id,
-          name: cloudRes.public_id.split('/').pop(),
-          filename: cloudRes.public_id,
-          size: cloudRes.bytes,
-          duration: Math.floor(cloudRes.duration),
-          createdAt: cloudRes.created_at,
-          participants: 0
-        });
-      }
-    }
-    
-    // Generate thumbnails and HLS URLs
-    const classVideos = allStreams.map(stream => {
-      const publicId = stream.cloudinaryPublicId;
-      return {
-        _id: stream._id,
-        filename: stream.filename || stream.name,
-        url: stream.cloudinaryUrl,
-        hlsUrl: publicId ? cloudinary.url(publicId, {
-          resource_type: 'video',
-          format: 'm3u8',
-          streaming_profile: 'full_hd'
-        }) : null,
-        thumbnailUrl: publicId ? cloudinary.url(publicId, {
-          resource_type: 'video',
-          format: 'jpg',
-          transformation: [
-            { start_offset: '5' },
-            { width: 320, height:180, crop: 'fill' }
-          ]
-        }) : '/api/placeholder/320/180',
-        uploadDate: stream.createdAt,
-        size: stream.size,
-        classTitle: stream.classTitle,
-        duration: stream.duration,
-        participants: stream.participants,
-        classDescription: stream.classDescription
-      };
-    });
+    const classVideos = streams.map(stream => ({
+      _id: stream._id,
+      filename: stream.filename,
+      title: stream.classTitle,
+      description: stream.classDescription,
+      playbackUrl: stream.muxPlaybackId ? 
+        `https://stream.mux.com/${stream.muxPlaybackId}.m3u8` : null,
+      thumbnailUrl: stream.muxPlaybackId ?
+        `https://image.mux.com/${stream.muxPlaybackId}/thumbnail.jpg?time=5` : null,
+      storyboardUrl: stream.muxPlaybackId ?
+        `https://image.mux.com/${stream.muxPlaybackId}/storyboard.vtt` : null,
+      uploadDate: stream.createdAt,
+      duration: stream.duration,
+      participants: stream.participants,
+    }));
     
     res.json(classVideos);
   } catch (error) {
@@ -335,7 +238,7 @@ router.get('/by-class/:classId', async (req, res) => {
   }
 });
 
-// Delete stream from Cloudinary
+// Delete stream from Mux
 router.delete('/delete-stream/:streamId', async (req, res) => {
   try {
     const { streamId } = req.params;
@@ -345,11 +248,14 @@ router.delete('/delete-stream/:streamId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Stream not found' });
     }
     
-    // Delete from Cloudinary if public ID exists
-    if (stream.cloudinaryPublicId) {
-      await cloudinary.uploader.destroy(stream.cloudinaryPublicId, {
-        resource_type: 'video'
-      });
+    // Delete from Mux if asset exists
+    if (stream.muxAssetId) {
+      try {
+        await mux.video.assets.del(stream.muxAssetId);
+        console.log(`Deleted Mux asset: ${stream.muxAssetId}`);
+      } catch (muxError) {
+        console.error('Mux delete error:', muxError);
+      }
     }
     
     // Delete from database
@@ -357,6 +263,7 @@ router.delete('/delete-stream/:streamId', async (req, res) => {
     
     res.json({ success: true, message: 'Stream deleted successfully' });
   } catch (error) {
+    console.error('Delete stream error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -389,31 +296,6 @@ router.post('/add-comment', async (req, res) => {
     res.json({ success: true, message: 'Comment added' });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
-  }
-});
-
-// Generate video thumbnail
-router.post('/generate-thumbnail', async (req, res) => {
-  try {
-    const { publicId, timestamp } = req.body;
-    
-    if (!publicId) {
-      return res.status(400).json({ error: 'Public ID required' });
-    }
-    
-    const thumbnailUrl = cloudinary.url(publicId, {
-      resource_type: 'video',
-      format: 'jpg',
-      transformation: [
-        { start_offset: timestamp || '5' },
-        { width: 640, height: 360, crop: 'fill' },
-        { quality: 'auto' }
-      ]
-    });
-    
-    res.json({ success: true, thumbnailUrl });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
   }
 });
 

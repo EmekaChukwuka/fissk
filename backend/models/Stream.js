@@ -19,38 +19,51 @@ const StreamSchema = new mongoose.Schema({
   participants: { type: Number, default: 0 },
   duration: String,
   sessionType: { type: String, enum: ['live', 'recorded'], default: 'recorded' },
-  // Cloudinary specific fields
-  cloudinaryUrl: { type: String },
-  cloudinaryPublicId: { type: String },
-  cloudinaryFormat: { type: String },
-  hlsUrl: { type: String },
-  thumbnailUrl: { type: String },
+  
+  // Mux fields
+  muxAssetId: { type: String },
+  muxPlaybackId: { type: String },
+  muxStatus: { type: String, enum: ['preparing', 'ready', 'errored', 'deleted'], default: 'preparing' },
+  muxDuration: { type: Number },
+  
   viewCount: { type: Number, default: 0 }
 }, { timestamps: true });
 
+// Virtual for playback URL
+StreamSchema.virtual('playbackUrl').get(function() {
+  if (this.muxPlaybackId) {
+    return `https://stream.mux.com/${this.muxPlaybackId}.m3u8`;
+  }
+  return null;
+});
+
+// Indexes
 StreamSchema.index({ userId: 1 });
 StreamSchema.index({ createdAt: -1 });
-StreamSchema.index({ cloudinaryPublicId: 1 });
+StreamSchema.index({ muxAssetId: 1 });
+StreamSchema.index({ muxPlaybackId: 1 });
+StreamSchema.index({ streamClass: 1 });
 
 const StreamModel = mongoose.model('Stream', StreamSchema);
 
-// Wrapper class to maintain the same interface
+// Wrapper class
 class Stream {
-  static async create({ userId, name, filename, size, streamClass, classTitle, classDescription, participants, duration, cloudinaryUrl, cloudinaryPublicId }) {
+  static async create({ userId, name, filename, size, streamClass, classTitle, classDescription, participants, duration, muxAssetId, muxPlaybackId }) {
     try {
       const stream = await StreamModel.create({
         userId,
         name,
         filename,
-        size,
+        size: size || 0,
         streamClass,
         classTitle,
         classDescription,
         participants: participants || 0,
         duration,
         sessionType: 'recorded',
-        cloudinaryUrl,
-        cloudinaryPublicId,
+        muxAssetId,
+        muxPlaybackId,
+        muxStatus: muxAssetId ? 'preparing' : null,
         comments: []
       });
 
@@ -147,6 +160,23 @@ class Stream {
       );
     } catch (error) {
       console.error('Error incrementing view count:', error);
+    }
+  }
+
+  static async updateMuxStatus(assetId, status, playbackId = null, duration = null) {
+    try {
+      const updateData = { muxStatus: status };
+      if (playbackId) updateData.muxPlaybackId = playbackId;
+      if (duration) updateData.muxDuration = duration;
+      
+      return await StreamModel.findOneAndUpdate(
+        { muxAssetId: assetId },
+        updateData,
+        { new: true }
+      );
+    } catch (error) {
+      console.error('Error updating Mux status:', error);
+      throw error;
     }
   }
 }

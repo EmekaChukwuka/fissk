@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>FISSK Online Academy - Live Class</title>
-    <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
     <script src="https://cdn.jsdelivr.net/npm/livekit-client@2.5.6/dist/livekit-client.umd.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600&family=Google+Sans+Display:wght@400;500&display=swap" rel="stylesheet">
     <style>
@@ -585,187 +584,58 @@
         ::-webkit-scrollbar-thumb { background: var(--bg-elevated); border-radius: 4px; }
 
         /* ===== RESPONSIVE BREAKPOINTS ===== */
-        
-        /* Tablet (768px - 1024px) */
         @media (max-width: 1024px) {
-            .side-panel {
-                width: 280px;
-            }
-            .ctrl-btn {
-                padding: 10px 16px;
-                min-width: 80px;
-            }
+            .side-panel { width: 280px; }
+            .ctrl-btn { padding: 10px 16px; min-width: 80px; }
         }
 
-        /* Mobile Landscape & Small Tablet (600px - 768px) */
         @media (max-width: 768px) {
-            .topbar {
-                padding: 10px 16px;
-            }
-            .topbar-logo {
-                font-size: 16px;
-            }
-            .stream-title-bar {
-                max-width: 150px;
-                font-size: 12px;
-            }
-            .conn-pill {
-                font-size: 10px;
-                padding: 3px 8px;
-            }
-            .main {
-                flex-direction: column;
-                height: auto;
-            }
-            .video-area {
-                padding: 12px;
-            }
-            .video-grid {
-                grid-template-columns: 1fr;
-                gap: 12px;
-            }
-            .side-panel {
-                width: 100%;
-                border-left: none;
-                border-top: 1px solid var(--border);
-                max-height: 350px;
-            }
-            .control-bar {
-                padding: 8px 0;
-                gap: 8px;
-            }
-            .ctrl-btn {
-                padding: 8px 12px;
-                min-width: 70px;
-                font-size: 11px;
-            }
-            .ctrl-btn .btn-icon {
-                font-size: 16px;
-            }
-            .stream-banner {
-                margin: 0 12px;
-                font-size: 12px;
-                padding: 6px 12px;
-            }
-            .tile-empty-icon {
-                width: 48px;
-                height: 48px;
-                font-size: 20px;
-            }
-            .tile-empty p {
-                font-size: 12px;
-            }
+            .topbar { padding: 10px 16px; }
+            .topbar-logo { font-size: 16px; }
+            .stream-title-bar { max-width: 150px; font-size: 12px; }
+            .conn-pill { font-size: 10px; padding: 3px 8px; }
+            .main { flex-direction: column; height: auto; }
+            .video-area { padding: 12px; }
+            .video-grid { grid-template-columns: 1fr; gap: 12px; }
+            .side-panel { width: 100%; border-left: none; border-top: 1px solid var(--border); max-height: 350px; }
+            .control-bar { padding: 8px 0; gap: 8px; }
+            .ctrl-btn { padding: 8px 12px; min-width: 70px; font-size: 11px; }
+            .ctrl-btn .btn-icon { font-size: 16px; }
+            .stream-banner { margin: 0 12px; font-size: 12px; padding: 6px 12px; }
+            .tile-empty-icon { width: 48px; height: 48px; font-size: 20px; }
+            .tile-empty p { font-size: 12px; }
         }
 
-        /* Mobile Portrait (up to 600px) */
         @media (max-width: 600px) {
-            .topbar {
-                flex-direction: column;
-                align-items: stretch;
-                text-align: center;
-            }
-            .topbar-left {
-                justify-content: center;
-            }
-            .topbar-right {
-                justify-content: center;
-            }
-            .stream-title-bar {
-                max-width: none;
-                white-space: normal;
-                text-align: center;
-            }
-            .ctrl-btn {
-                padding: 6px 10px;
-                min-width: 60px;
-                font-size: 10px;
-            }
-            .ctrl-btn .btn-icon {
-                font-size: 14px;
-            }
-            .side-panel {
-                max-height: 300px;
-            }
-            .panel-tab {
-                padding: 10px;
-                font-size: 12px;
-            }
-            .people-header {
-                padding: 12px;
-                font-size: 12px;
-            }
-            .chat-input-area {
-                padding: 10px;
-            }
-            #chatInput {
-                padding: 8px 12px;
-                font-size: 12px;
-            }
-            #sendChatBtn {
-                width: 32px;
-                height: 32px;
-                font-size: 14px;
-            }
-            .modal-content {
-                padding: 20px;
-                width: 95%;
-            }
-            .modal-header h2 {
-                font-size: 16px;
-            }
-            .form-group input,
-            .form-group select,
-            .form-group textarea {
-                padding: 8px 12px;
-                font-size: 13px;
-            }
-            .btn-modal-cancel,
-            .btn-modal-confirm {
-                padding: 8px 16px;
-                font-size: 13px;
-            }
-            .viewer-avatar {
-                width: 28px;
-                height: 28px;
-                font-size: 12px;
-            }
-            .viewer-name {
-                font-size: 12px;
-            }
-            .chat-msg-name,
-            .chat-msg-text {
-                font-size: 12px;
-            }
+            .topbar { flex-direction: column; align-items: stretch; text-align: center; }
+            .topbar-left { justify-content: center; }
+            .topbar-right { justify-content: center; }
+            .stream-title-bar { max-width: none; white-space: normal; text-align: center; }
+            .ctrl-btn { padding: 6px 10px; min-width: 60px; font-size: 10px; }
+            .ctrl-btn .btn-icon { font-size: 14px; }
+            .side-panel { max-height: 300px; }
+            .panel-tab { padding: 10px; font-size: 12px; }
+            .people-header { padding: 12px; font-size: 12px; }
+            .chat-input-area { padding: 10px; }
+            #chatInput { padding: 8px 12px; font-size: 12px; }
+            #sendChatBtn { width: 32px; height: 32px; font-size: 14px; }
+            .modal-content { padding: 20px; width: 95%; }
+            .modal-header h2 { font-size: 16px; }
+            .form-group input, .form-group select, .form-group textarea { padding: 8px 12px; font-size: 13px; }
+            .btn-modal-cancel, .btn-modal-confirm { padding: 8px 16px; font-size: 13px; }
+            .viewer-avatar { width: 28px; height: 28px; font-size: 12px; }
+            .viewer-name { font-size: 12px; }
+            .chat-msg-name, .chat-msg-text { font-size: 12px; }
         }
 
-        /* Very small devices (up to 400px) */
         @media (max-width: 400px) {
-            .control-bar {
-                gap: 6px;
-            }
-            .ctrl-btn {
-                padding: 5px 8px;
-                min-width: 55px;
-                font-size: 9px;
-            }
-            .ctrl-btn .btn-icon {
-                font-size: 12px;
-            }
-            .video-area {
-                padding: 8px;
-            }
-            .tile-label {
-                font-size: 10px;
-                padding: 3px 8px;
-            }
-            .recording-badge {
-                font-size: 9px;
-                padding: 3px 8px;
-            }
-            .stream-banner {
-                font-size: 11px;
-                padding: 5px 10px;
-            }
+            .control-bar { gap: 6px; }
+            .ctrl-btn { padding: 5px 8px; min-width: 55px; font-size: 9px; }
+            .ctrl-btn .btn-icon { font-size: 12px; }
+            .video-area { padding: 8px; }
+            .tile-label { font-size: 10px; padding: 3px 8px; }
+            .recording-badge { font-size: 9px; padding: 3px 8px; }
+            .stream-banner { font-size: 11px; padding: 5px 10px; }
         }
     </style>
 </head>
@@ -912,7 +782,7 @@
     let mediaRecorder = null;
     let recordedChunks = [];
     let isHost = false;
-    let isViewer = false;   // ← NEW: track viewer state separately
+    let isViewer = false;
     let streamActive = false;
     let userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
     let userName = '';
@@ -1004,7 +874,6 @@
             streamInfoDiv.innerHTML = '🎬 A livestream is currently active! Click "Join Stream" to watch.';
             if (title) streamTitleSpan.textContent = title;
 
-            // Only enable join if not already host or viewer
             if (!isHost && !isViewer) {
                 joinBtn.disabled = false;
             }
@@ -1034,55 +903,106 @@
         }
     }
 
-    // ===== CLOUDINARY UPLOAD =====
-    async function uploadToCloudinary(blob, streamName, classId) {
+    // ===== MUX UPLOAD FUNCTIONS =====
+    async function uploadToMux(blob, streamName, classId, classTitle) {
         const uploadStatus = document.getElementById('uploadStatus');
         uploadStatus.classList.add('active');
-        uploadStatus.innerHTML = '<p>📤 Uploading to Cloudinary…</p>';
+        uploadStatus.innerHTML = '<p>📤 Getting upload URL from Mux…</p>';
+        
         try {
-            const formData = new FormData();
-            formData.append('file', blob, `${streamName}.webm`);
-            formData.append('upload_preset', 'fissk_live');
-            // Use public_id that includes the folder path — don't send 'folder' separately
-            formData.append('public_id', `livestreams/${classId}/${streamName}`);
-            // resource_type goes in the URL, NOT in the form body
-            const response = await fetch(`https://api.cloudinary.com/v1_1/dqlvw79pw/video/upload`, {
-                method: 'POST', body: formData
+            // 1. Get a direct upload URL from Mux
+            const uploadResponse = await fetch(`${BACKEND_URL}/api/mux/create-upload`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    streamName: streamName,
+                    classId: classId,
+                    classTitle: classTitle,
+                }),
             });
-            if (!response.ok) {
-                const errBody = await response.json().catch(() => ({}));
-                throw new Error(`Upload failed: ${response.status} — ${errBody?.error?.message || 'unknown error'}`);
+            
+            const { success, uploadUrl, uploadId } = await uploadResponse.json();
+            
+            if (!success) {
+                throw new Error('Failed to get upload URL from Mux');
             }
-            const result = await response.json();
-            uploadStatus.classList.remove('active');
-            return result;
-        } catch (err) {
-            uploadStatus.classList.remove('active');
-            throw err;
-        }
-    }
-
-    async function saveMetadataToBackend(cloudinaryResult, streamName) {
-        try {
+            
+            uploadStatus.innerHTML = '<p>📤 Uploading to Mux… (this may take a few minutes)</p>';
+            
+            // 2. Upload the blob directly to Mux
+            const response = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: blob,
+                headers: {
+                    'Content-Type': 'video/webm',
+                },
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Upload to Mux failed: ${response.status}`);
+            }
+            
+            uploadStatus.innerHTML = '<p>⏳ Processing upload… Mux is creating your asset</p>';
+            
+            // 3. Poll for upload completion
+            let assetId = null;
+            let playbackId = null;
+            let attempts = 0;
+            const maxAttempts = 60; // 5 minutes max (60 * 5 seconds)
+            
+            while (attempts < maxAttempts) {
+                await new Promise(r => setTimeout(r, 5000));
+                
+                const statusResponse = await fetch(`${BACKEND_URL}/api/mux/upload-status/${uploadId}`);
+                const statusData = await statusResponse.json();
+                
+                if (statusData.status === 'asset_created' || statusData.status === 'ready') {
+                    assetId = statusData.assetId;
+                    playbackId = statusData.playbackId;
+                    break;
+                } else if (statusData.status === 'errored') {
+                    throw new Error('Mux processing failed');
+                }
+                
+                attempts++;
+                uploadStatus.innerHTML = `<p>⏳ Processing upload… (${Math.floor(attempts * 5)} seconds)</p>`;
+            }
+            
+            if (!assetId || !playbackId) {
+                throw new Error('Upload timed out - asset not ready');
+            }
+            
+            uploadStatus.innerHTML = '<p>✅ Upload complete! Saving to database…</p>';
+            
+            // 4. Save metadata to your backend
             const user = JSON.parse(localStorage.getItem('user'));
             const duration = Math.floor((Date.now() - streamStartTime) / 1000);
             const minutes = Math.floor(duration / 60);
+            
             await fetch(`${BACKEND_URL}/api/save-stream`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     userId: user?.id,
-                    streamName,
+                    streamName: streamName,
                     streamClass: currentStreamData.classId,
                     classTitle: currentStreamData.title,
                     classDescription: currentStreamData.description,
                     participants: totalUniqueViewers.size,
                     duration: `${minutes} min, ${duration % 60} sec`,
-                    cloudinaryUrl: cloudinaryResult.secure_url,
-                    cloudinaryPublicId: cloudinaryResult.public_id
-                })
+                    muxAssetId: assetId,
+                    muxPlaybackId: playbackId,
+                }),
             });
-        } catch(err) { console.error('Metadata save error:', err); }
+            
+            uploadStatus.classList.remove('active');
+            return { assetId, playbackId, playbackUrl: `https://stream.mux.com/${playbackId}.m3u8` };
+            
+        } catch (err) {
+            uploadStatus.classList.remove('active');
+            console.error('Mux upload error:', err);
+            throw err;
+        }
     }
 
     // ===== LOAD CLASSES =====
@@ -1140,7 +1060,6 @@
         `;
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
-        // auto-switch to chat tab
         switchTab('chat');
     }
 
@@ -1234,7 +1153,6 @@
                 body: JSON.stringify({ roomName: currentRoomName, title, description, classId, userId })
             });
 
-            // Update UI — host can't join their own stream
             startBtn.disabled = true;
             stopBtn.disabled = false;
             joinBtn.disabled = true;
@@ -1245,7 +1163,6 @@
             updateStreamStatus(true, title);
             streamStartTime = Date.now();
 
-            // Start recording
             recordedChunks = [];
             mediaRecorder = new MediaRecorder(localStream, {
                 mimeType: 'video/webm',
@@ -1267,48 +1184,66 @@
         }
     }
 
-    // ===== STOP LIVESTREAM =====
+    // ===== STOP LIVESTREAM (MUX VERSION) =====
     async function stopLivestream() {
         if (!confirm('End stream and save recording?')) return;
+        
         try {
             recordingBadge.classList.remove('active');
             showToast('Processing recording…');
-
-            if (liveKitRoom) { await liveKitRoom.disconnect(); liveKitRoom = null; }
-
+            
+            let recordingBlob = null;
+            
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 await new Promise(r => { mediaRecorder.onstop = r; mediaRecorder.stop(); });
+                
                 if (recordedChunks.length > 0) {
-                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
-                    const streamName = `${currentStreamData.title.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}`;
-                    try {
-                        showToast('📤 Uploading recording to Cloudinary…');
-                        const result = await uploadToCloudinary(blob, streamName, currentStreamData.classId);
-                        showToast('✅ Recording saved to Cloudinary!');
-                        await saveMetadataToBackend(result, streamName);
-                    } catch(uploadErr) {
-                        console.error('Upload failed:', uploadErr);
-                        showToast('⚠️ Upload failed - recording saved locally', true);
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url; a.download = `${streamName}.webm`;
-                        document.body.appendChild(a); a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                    }
+                    recordingBlob = new Blob(recordedChunks, { type: 'video/webm' });
                 }
             }
-
-            if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+            
+            if (liveKitRoom) {
+                await liveKitRoom.disconnect();
+                liveKitRoom = null;
+            }
+            
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
             hostVideo.srcObject = null;
             showHostVideo(false);
-
+            
+            if (recordingBlob && recordingBlob.size > 0) {
+                const streamName = `${currentStreamData.title.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}`;
+                
+                try {
+                    showToast('📤 Uploading recording to Mux…');
+                    const result = await uploadToMux(recordingBlob, streamName, currentStreamData.classId, currentStreamData.title);
+                    showToast('✅ Recording saved to Mux!');
+                    console.log('Mux asset:', result);
+                } catch(uploadErr) {
+                    console.error('Upload failed:', uploadErr);
+                    showToast('⚠️ Upload failed - recording saved locally', true);
+                    const url = URL.createObjectURL(recordingBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${streamName}.webm`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }
+            } else {
+                showToast('No recording to save', true);
+            }
+            
             await fetch(`${BACKEND_URL}/api/livekit/end-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomName: currentRoomName })
             });
-
+            
             startBtn.disabled = false;
             stopBtn.disabled = true;
             chatInput.disabled = true;
@@ -1320,8 +1255,9 @@
             streamTitleSpan.textContent = '';
             updateConnectionStatus('disconnected', 'Disconnected');
             liveBadge.classList.remove('active');
+            
             showToast('Stream ended successfully');
-
+            
         } catch(err) {
             console.error('Stop stream error:', err);
             alert('Error ending stream: ' + err.message);
@@ -1348,10 +1284,9 @@
             showToast('Could not find active stream', true); return;
         }
 
-        // ── DISABLE START BUTTON WHEN JOINING AS VIEWER ──
         joinBtn.disabled = true;
         joinBtn.querySelector('.btn-icon').textContent = '⏳';
-        startBtn.disabled = true;   // ← KEY FIX: viewers can't start a new stream
+        startBtn.disabled = true;
         remoteEmptyText.textContent = 'Connecting…';
         updateConnectionStatus('connecting', 'Connecting…');
 
@@ -1377,7 +1312,6 @@
                 chatInput.disabled = false;
                 sendChatBtn.disabled = false;
                 updateConnectionStatus('connected', '📺 Watching');
-                // Keep start btn disabled while watching
                 startBtn.disabled = true;
             });
 
@@ -1386,7 +1320,6 @@
                 updateStreamStatus(false);
                 showRemoteVideo(false);
                 isViewer = false;
-                // Re-enable start only if user is an instructor
                 const user = JSON.parse(localStorage.getItem('user'));
                 if (user && user.user_type === 'instructor') startBtn.disabled = false;
             });
@@ -1400,10 +1333,8 @@
                     isViewer = false;
                     chatInput.disabled = true;
                     sendChatBtn.disabled = true;
-                    // Re-enable join button so they can rejoin if stream restarts
                     joinBtn.disabled = false;
                     joinBtn.querySelector('.btn-icon').textContent = '👤';
-                    // Re-enable start for instructors
                     const user = JSON.parse(localStorage.getItem('user'));
                     if (user && user.user_type === 'instructor') startBtn.disabled = false;
                 }
@@ -1417,7 +1348,7 @@
             updateViewersFromLiveKit(liveKitRoom);
 
             joinBtn.querySelector('.btn-icon').textContent = '✅';
-            joinBtn.disabled = true; // already connected, no need to join again
+            joinBtn.disabled = true;
 
         } catch(err) {
             console.error('Join error:', err);
@@ -1425,7 +1356,6 @@
             joinBtn.disabled = false;
             joinBtn.querySelector('.btn-icon').textContent = '👤';
             isViewer = false;
-            // Re-enable start for instructors on failure
             const user = JSON.parse(localStorage.getItem('user'));
             if (user && user.user_type === 'instructor') startBtn.disabled = false;
             updateConnectionStatus('disconnected', 'Connection failed');
