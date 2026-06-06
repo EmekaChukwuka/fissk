@@ -1,309 +1,115 @@
-import express from "express";
-import multer from "multer";
-import Stream from "../models/Stream.js";
-import LiveSession from "../models/LiveSession.js";
-import Mux from '@mux/mux-node';
-
-const router = express.Router();
-
-// ===== MUX CONFIGURATION =====
-const mux = new Mux({
-  tokenId: process.env.MUX_TOKEN_ID,
-  tokenSecret: process.env.MUX_TOKEN_SECRET,
-});
-
-// Local storage fallback (if needed)
-const localStorage = multer.diskStorage({
-  destination: 'uploads/',
-  filename: function(req, file, cb) {
-    cb(null, file.originalname);
-  }
-});
-
-const localUpload = multer({
-  storage: localStorage,
-  limits: { fileSize: 500000000 }
-});
-
-// ===== MUX ENDPOINTS =====
-
-// Create a direct upload URL for Mux
-router.post('/mux/create-upload', async (req, res) => {
-  try {
-    const { streamName, classId, classTitle } = req.body;
+async function uploadToMux(blob, streamName, classId, classTitle) {
+    const uploadStatus = document.getElementById('uploadStatus');
+    uploadStatus.classList.add('active');
+    uploadStatus.innerHTML = '<p>📤 Getting upload URL from Mux…</p>';
     
-    // Create a direct upload URL
-    const upload = await mux.video.uploads.create({
-      cors_origin: '*',
-      new_asset_settings: {
-        playback_policy: ['public'],
-        max_resolution_tier: '1080p',
-        passthrough: JSON.stringify({
-          streamName,
-          classId,
-          classTitle,
-          source: 'fissk-frontend-upload'
-        }),
-      },
-    });
-    
-    console.log(`✅ Mux upload created: ${upload.id}`);
-    
-    res.json({
-      success: true,
-      uploadUrl: upload.url,
-      uploadId: upload.id,
-    });
-  } catch (error) {
-    console.error('Create Mux upload error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Get upload status and asset details - FIXED: use retrieve() not get()
-router.get('/mux/upload-status/:uploadId', async (req, res) => {
-  try {
-    const { uploadId } = req.params;
-    
-    // CORRECT METHOD: retrieve() instead of get()
-    const upload = await mux.video.uploads.retrieve(uploadId);
-    
-    let assetId = null;
-    let playbackId = null;
-    
-    if (upload.asset_id) {
-      assetId = upload.asset_id;
-      // Get the asset to retrieve playback ID
-      const asset = await mux.video.assets.retrieve(assetId);
-      playbackId = asset.playback_ids?.[0]?.id;
+    try {
+        const user = JSON.parse(localStorage.getItem('user'));
+        const instructorName = user?.name || 'Instructor';
+        
+        // 1. Get a direct upload URL from Mux with title
+        const uploadResponse = await fetch(`${BACKEND_URL}/api/mux/create-upload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                streamName: streamName,
+                classId: classId,
+                classTitle: classTitle,
+                instructorName: instructorName,
+            }),
+        });
+        
+        if (!uploadResponse.ok) {
+            throw new Error(`Mux API error: ${uploadResponse.status}`);
+        }
+        
+        const { success, uploadUrl, uploadId } = await uploadResponse.json();
+        
+        if (!success) {
+            throw new Error('Failed to get upload URL from Mux');
+        }
+        
+        uploadStatus.innerHTML = '<p>📤 Uploading to Mux… (this may take a few minutes)</p>';
+        
+        // 2. Upload the blob directly to Mux
+        const response = await fetch(uploadUrl, {
+            method: 'PUT',
+            body: blob,
+            headers: {
+                'Content-Type': 'video/webm',
+            },
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Upload to Mux failed: ${response.status}`);
+        }
+        
+        uploadStatus.innerHTML = '<p>⏳ Processing upload… Mux is creating your asset</p>';
+        
+        // 3. Poll for upload completion
+        let assetId = null;
+        let playbackId = null;
+        let attempts = 0;
+        const maxAttempts = 60;
+        
+        while (attempts < maxAttempts) {
+            await new Promise(r => setTimeout(r, 5000));
+            
+            const statusResponse = await fetch(`${BACKEND_URL}/api/mux/upload-status/${uploadId}`);
+            const statusData = await statusResponse.json();
+            
+            if (statusData.status === 'asset_created' || statusData.status === 'ready') {
+                assetId = statusData.assetId;
+                playbackId = statusData.playbackId;
+                console.log(`✅ Mux asset ready: ${assetId}, title: ${classTitle}`);
+                break;
+            } else if (statusData.status === 'errored') {
+                throw new Error('Mux processing failed');
+            }
+            
+            attempts++;
+            uploadStatus.innerHTML = `<p>⏳ Processing upload… (${Math.floor(attempts * 5)} seconds)</p>`;
+        }
+        
+        if (!assetId || !playbackId) {
+            throw new Error('Upload timed out - asset not ready');
+        }
+        
+        uploadStatus.innerHTML = '<p>✅ Upload complete! Saving to database…</p>';
+        
+        const duration = Math.floor((Date.now() - streamStartTime) / 1000);
+        const minutes = Math.floor(duration / 60);
+        
+        // 4. Save metadata to your backend
+        const saveResponse = await fetch(`${BACKEND_URL}/api/save-stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: user?.id,
+                streamName: streamName,
+                streamClass: currentStreamData.classId,
+                classTitle: currentStreamData.title,
+                classDescription: currentStreamData.description,
+                participants: totalUniqueViewers.size,
+                duration: `${minutes} min, ${duration % 60} sec`,
+                muxAssetId: assetId,
+                muxPlaybackId: playbackId,
+            }),
+        });
+        
+        if (!saveResponse.ok) {
+            console.warn('Metadata save failed, but video was uploaded');
+            showWarning('Video saved to Mux, but metadata save failed. Contact support.');
+        }
+        
+        uploadStatus.classList.remove('active');
+        showSuccess(`✅ Recording "${classTitle}" saved to Mux successfully!`);
+        return { assetId, playbackId, playbackUrl: `https://stream.mux.com/${playbackId}.m3u8` };
+        
+    } catch (err) {
+        uploadStatus.classList.remove('active');
+        console.error('Mux upload error:', err);
+        showError(`Mux upload failed: ${err.message}`, null);
+        throw err;
     }
-    
-    res.json({
-      success: true,
-      status: upload.status,
-      assetId: assetId,
-      playbackId: playbackId,
-    });
-  } catch (error) {
-    console.error('Get Mux upload status error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Save stream with Mux data
-router.post('/save-stream', async (req, res) => {
-  try {
-    const { 
-      userId, 
-      streamName, 
-      streamClass, 
-      classTitle, 
-      classDescription, 
-      participants, 
-      duration,
-      muxAssetId,
-      muxPlaybackId
-    } = req.body;
-    
-    if (!muxAssetId || !muxPlaybackId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Mux asset ID and playback ID are required' 
-      });
-    }
-    
-    // Create stream record in database
-    const streamId = await Stream.create({
-      userId,
-      name: streamName,
-      filename: `${streamName}.mp4`,
-      size: 0,
-      streamClass,
-      classTitle,
-      classDescription,
-      participants: participants || 0,
-      duration: duration || '0:00',
-      muxAssetId: muxAssetId,
-      muxPlaybackId: muxPlaybackId,
-    });
-    
-    // Create corresponding live session record
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    await LiveSession.create({
-      instructorId: userId,
-      classId: streamClass,
-      title: classTitle || streamName,
-      description: classDescription || '',
-      date: today,
-      duration: duration || '0:00',
-      participants: participants || 0,
-      sessionType: 'recorded',
-      muxAssetId: muxAssetId,
-      muxPlaybackId: muxPlaybackId,
-    });
-    
-    console.log(`✅ Stream saved to DB: ${streamId}, Mux asset: ${muxAssetId}`);
-    
-    res.json({
-      success: true,
-      streamId,
-      playbackId: muxPlaybackId,
-      playbackUrl: `https://stream.mux.com/${muxPlaybackId}.m3u8`,
-    });
-  } catch (error) {
-    console.error('Save stream error:', error);
-    res.status(400).json({ success: false, message: error.message });
-  }
-});
-
-// Get Mux thumbnail
-router.get('/mux/thumbnail/:playbackId', async (req, res) => {
-  const { playbackId } = req.params;
-  const time = req.query.time || 5;
-  
-  res.json({
-    thumbnailUrl: `https://image.mux.com/${playbackId}/thumbnail.jpg?time=${time}`,
-    storyboardUrl: `https://image.mux.com/${playbackId}/storyboard.vtt`,
-  });
-});
-
-// Get all past streams
-router.get('/past-streams', async (req, res) => {
-  try {
-    const streams = await Stream.getAll();
-    
-    const streamsWithUrls = streams.map(stream => ({
-      ...stream,
-      playbackUrl: stream.muxPlaybackId ? 
-        `https://stream.mux.com/${stream.muxPlaybackId}.m3u8` : null,
-      thumbnailUrl: stream.muxPlaybackId ?
-        `https://image.mux.com/${stream.muxPlaybackId}/thumbnail.jpg?time=5` : null,
-      storyboardUrl: stream.muxPlaybackId ?
-        `https://image.mux.com/${stream.muxPlaybackId}/storyboard.vtt` : null,
-    }));
-    
-    res.json({ success: true, streams: streamsWithUrls });
-  } catch (error) {
-    console.error('Get past streams error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Get HLS streaming URL for a recorded stream
-router.get('/stream-hls/:streamId', async (req, res) => {
-  try {
-    const { streamId } = req.params;
-    const stream = await Stream.getById(streamId);
-    
-    if (!stream || !stream.muxPlaybackId) {
-      return res.status(404).json({ success: false, message: 'Stream not found' });
-    }
-    
-    res.json({
-      success: true,
-      hlsUrl: `https://stream.mux.com/${stream.muxPlaybackId}.m3u8`,
-      thumbnailUrl: `https://image.mux.com/${stream.muxPlaybackId}/thumbnail.jpg?time=5`,
-    });
-  } catch (error) {
-    console.error('Get stream HLS error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get streams by class
-router.get('/by-class/:classId', async (req, res) => {
-  try {
-    const { classId } = req.params;
-    const StreamModel = (await import('../models/Stream.js')).default;
-    
-    const streams = await StreamModel.find({ streamClass: classId })
-      .sort({ createdAt: -1 })
-      .lean();
-    
-    const classVideos = streams.map(stream => ({
-      _id: stream._id,
-      filename: stream.filename,
-      title: stream.classTitle,
-      description: stream.classDescription,
-      playbackUrl: stream.muxPlaybackId ? 
-        `https://stream.mux.com/${stream.muxPlaybackId}.m3u8` : null,
-      thumbnailUrl: stream.muxPlaybackId ?
-        `https://image.mux.com/${stream.muxPlaybackId}/thumbnail.jpg?time=5` : null,
-      storyboardUrl: stream.muxPlaybackId ?
-        `https://image.mux.com/${stream.muxPlaybackId}/storyboard.vtt` : null,
-      uploadDate: stream.createdAt,
-      duration: stream.duration,
-      participants: stream.participants,
-    }));
-    
-    res.json(classVideos);
-  } catch (error) {
-    console.error('Get videos by class error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-});
-
-// Delete stream from Mux
-router.delete('/delete-stream/:streamId', async (req, res) => {
-  try {
-    const { streamId } = req.params;
-    const stream = await Stream.getById(streamId);
-    
-    if (!stream) {
-      return res.status(404).json({ success: false, message: 'Stream not found' });
-    }
-    
-    // Delete from Mux if asset exists
-    if (stream.muxAssetId) {
-      try {
-        await mux.video.assets.del(stream.muxAssetId);
-        console.log(`Deleted Mux asset: ${stream.muxAssetId}`);
-      } catch (muxError) {
-        console.error('Mux delete error:', muxError);
-      }
-    }
-    
-    // Delete from database
-    await Stream.delete(streamId);
-    
-    res.json({ success: true, message: 'Stream deleted successfully' });
-  } catch (error) {
-    console.error('Delete stream error:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Get stream comments
-router.get('/stream-comments', async (req, res) => {
-  try {
-    const { streamId } = req.query;
-    if (!streamId) throw new Error('Stream ID required');
-    
-    const stream = await Stream.getById(streamId);
-    res.json({ 
-      success: true, 
-      comments: stream ? stream.comments : [] 
-    });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-});
-
-// Add comment
-router.post('/add-comment', async (req, res) => {
-  try {
-    const { streamId, userId, userName, message } = req.body;
-    if (!streamId || !userId || !userName || !message) {
-      throw new Error('Missing required fields');
-    }
-    
-    await Stream.addComment(streamId, userId, userName, message);
-    res.json({ success: true, message: 'Comment added' });
-  } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
-  }
-});
-
-export default router;
+}
