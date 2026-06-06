@@ -45,7 +45,7 @@ router.post('/mux/create-upload', async (req, res) => {
         passthrough: JSON.stringify({
           streamName,
           classId,
-          classTitle,
+          title: classTitle,
           instructorName,
           source: 'fissk-frontend-upload',
           recordedAt: new Date().toISOString()
