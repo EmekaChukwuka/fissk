@@ -578,6 +578,79 @@
             to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
 
+        /* Error message banner */
+        .error-banner {
+            display: none;
+            background: rgba(242,139,130,0.12);
+            border: 1px solid rgba(242,139,130,0.3);
+            color: var(--accent-red);
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            margin: 0 16px 12px 16px;
+            font-size: 13px;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .error-banner.show {
+            display: flex;
+        }
+        .error-banner .error-icon {
+            font-size: 18px;
+        }
+        .error-banner .error-text {
+            flex: 1;
+        }
+        .error-banner .error-retry {
+            background: rgba(242,139,130,0.2);
+            border: none;
+            color: var(--accent-red);
+            padding: 4px 12px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: inherit;
+        }
+        .error-banner .error-retry:hover {
+            background: rgba(242,139,130,0.3);
+        }
+
+        /* Warning banner */
+        .warning-banner {
+            display: none;
+            background: rgba(253,214,99,0.12);
+            border: 1px solid rgba(253,214,99,0.3);
+            color: var(--accent-yellow);
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            margin: 0 16px 12px 16px;
+            font-size: 13px;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .warning-banner.show {
+            display: flex;
+        }
+
+        /* Success banner */
+        .success-banner {
+            display: none;
+            background: rgba(129,201,149,0.12);
+            border: 1px solid rgba(129,201,149,0.3);
+            color: var(--accent-green);
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            margin: 0 16px 12px 16px;
+            font-size: 13px;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        .success-banner.show {
+            display: flex;
+        }
+
         /* scrollbar global */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -637,6 +710,28 @@
             .recording-badge { font-size: 9px; padding: 3px 8px; }
             .stream-banner { font-size: 11px; padding: 5px 10px; }
         }
+
+        /* Loading spinner for class preloader */
+        .class-loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        .class-loading::after {
+            content: '';
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin-left: 8px;
+            border: 2px solid var(--accent-blue);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -654,6 +749,23 @@
         <div class="conn-pill connecting" id="connectionStatus">Connecting…</div>
     </div>
 </header>
+
+<!-- ERROR/WARNING BANNERS -->
+<div id="errorBanner" class="error-banner">
+    <span class="error-icon">⚠️</span>
+    <span class="error-text" id="errorText">Something went wrong</span>
+    <button class="error-retry" onclick="retryLastAction()">Retry</button>
+</div>
+
+<div id="warningBanner" class="warning-banner">
+    <span class="error-icon">⚠️</span>
+    <span class="error-text" id="warningText">Warning</span>
+</div>
+
+<div id="successBanner" class="success-banner">
+    <span class="error-icon">✅</span>
+    <span class="error-text" id="successText">Success</span>
+</div>
 
 <!-- MAIN -->
 <div class="main">
@@ -791,6 +903,9 @@
     let currentStreamData = { title: '', description: '', classId: '' };
     let currentRoomName = null;
     let statusCheckInterval = null;
+    let preloadedClasses = [];
+    let classesLoaded = false;
+    let lastFailedAction = null; // Track last failed action for retry
 
     // ===== DOM ELEMENTS =====
     const startBtn         = document.getElementById('startStreamBtn');
@@ -814,8 +929,59 @@
     const streamTitleSpan  = document.getElementById('streamTitle');
     const streamInfoDiv    = document.getElementById('streamInfo');
     const liveBadge        = document.getElementById('liveBadge');
+    const streamClassSelect = document.getElementById('streamClass');
+    const errorBanner      = document.getElementById('errorBanner');
+    const errorText        = document.getElementById('errorText');
+    const warningBanner    = document.getElementById('warningBanner');
+    const warningText      = document.getElementById('warningText');
+    const successBanner    = document.getElementById('successBanner');
+    const successText      = document.getElementById('successText');
 
-    // ===== TAB SWITCHING =====
+    // ===== HELPER FUNCTIONS =====
+    function showError(message, action = null) {
+        errorText.textContent = message;
+        errorBanner.classList.add('show');
+        if (action) lastFailedAction = action;
+        
+        // Auto-hide after 8 seconds
+        setTimeout(() => {
+            errorBanner.classList.remove('show');
+        }, 8000);
+    }
+
+    function hideError() {
+        errorBanner.classList.remove('show');
+    }
+
+    function showWarning(message) {
+        warningText.textContent = message;
+        warningBanner.classList.add('show');
+        setTimeout(() => {
+            warningBanner.classList.remove('show');
+        }, 5000);
+    }
+
+    function showSuccess(message) {
+        successText.textContent = message;
+        successBanner.classList.add('show');
+        setTimeout(() => {
+            successBanner.classList.remove('show');
+        }, 4000);
+    }
+
+    function retryLastAction() {
+        hideError();
+        if (lastFailedAction === 'startStream') {
+            startLivestream();
+        } else if (lastFailedAction === 'joinStream') {
+            joinLivestream();
+        } else if (lastFailedAction === 'loadClasses') {
+            preloadInstructorClasses();
+        } else if (lastFailedAction === 'checkStatus') {
+            checkStreamStatus();
+        }
+    }
+
     function switchTab(tab) {
         document.querySelectorAll('.panel-tab').forEach((t, i) => {
             t.classList.toggle('active', (i === 0 && tab === 'people') || (i === 1 && tab === 'chat'));
@@ -824,7 +990,6 @@
         document.getElementById('chatSection').classList.toggle('active', tab === 'chat');
     }
 
-    // ===== HELPER FUNCTIONS =====
     function escapeHtml(s) {
         if (!s) return '';
         return String(s).replace(/[&<>]/g, m =>
@@ -837,8 +1002,22 @@
         catch(e) { return ''; }
     }
 
-    function showModal(id) { document.getElementById(id).style.display = 'flex'; }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function showModal(id) { 
+        if (classesLoaded && preloadedClasses.length > 0) {
+            document.getElementById(id).style.display = 'flex';
+        } else if (!classesLoaded) {
+            streamClassSelect.innerHTML = '<option value="" disabled selected>Loading classes...</option>';
+            document.getElementById(id).style.display = 'flex';
+            preloadInstructorClasses();
+        } else {
+            document.getElementById(id).style.display = 'flex';
+        }
+    }
+    
+    function closeModal(id) { 
+        document.getElementById(id).style.display = 'none';
+        hideError();
+    }
 
     function showToast(msg, isError = false) {
         const t = document.createElement('div');
@@ -851,6 +1030,9 @@
     function updateConnectionStatus(status, msg) {
         connectionStatusDiv.className = 'conn-pill ' + status;
         connectionStatusDiv.textContent = msg;
+        
+        // Also show in console for debugging
+        console.log(`[Connection] ${status}: ${msg}`);
     }
 
     function showHostVideo(show) {
@@ -893,14 +1075,77 @@
 
     async function checkStreamStatus() {
         try {
+            updateConnectionStatus('connecting', 'Checking server status...');
             const response = await fetch(`${BACKEND_URL}/api/stream-status`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
             updateStreamStatus(data.active === true);
+            updateConnectionStatus('connected', 'Connected to server');
             return data.active;
         } catch (err) {
             console.error('Status check failed:', err);
+            updateConnectionStatus('disconnected', 'Cannot connect to server');
+            showError(`Cannot connect to server: ${err.message}`, 'checkStatus');
             return false;
         }
+    }
+
+    // ===== PRELOAD CLASSES FUNCTION =====
+    async function preloadInstructorClasses() {
+        try {
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (!user || user.user_type !== 'instructor') {
+                console.log('Not an instructor, skipping class preload');
+                classesLoaded = true;
+                return;
+            }
+            
+            console.log('Preloading instructor classes...');
+            updateConnectionStatus('connecting', 'Loading your classes...');
+            
+            const res = await fetch(`${BACKEND_URL}/register/instructor/classes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: user.id })
+            });
+            
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: Failed to load classes`);
+            }
+            
+            const json = await res.json();
+            preloadedClasses = json.classes || [];
+            
+            if (preloadedClasses.length > 0) {
+                streamClassSelect.innerHTML = '<option value="">Choose a class…</option>' +
+                    preloadedClasses.map(c => `<option value="${c._id || c.id}">${escapeHtml(c.title)}</option>`).join('');
+                console.log(`✅ Preloaded ${preloadedClasses.length} classes`);
+                showSuccess(`Loaded ${preloadedClasses.length} classes`);
+            } else {
+                streamClassSelect.innerHTML = '<option value="">No classes found. Please create a class first.</option>';
+                showWarning('No classes found. Please create a class before starting a livestream.');
+            }
+            classesLoaded = true;
+            updateConnectionStatus('connected', 'Ready');
+            return preloadedClasses;
+        } catch(err) {
+            console.error('Error preloading classes:', err);
+            streamClassSelect.innerHTML = '<option value="">Error loading classes. Click Retry.</option>';
+            showError(`Failed to load classes: ${err.message}`, 'loadClasses');
+            classesLoaded = true;
+            return [];
+        }
+    }
+
+    async function loadInstructorClasses() {
+        if (classesLoaded && preloadedClasses.length > 0) {
+            return preloadedClasses;
+        }
+        return await preloadInstructorClasses();
     }
 
     // ===== MUX UPLOAD FUNCTIONS =====
@@ -910,7 +1155,6 @@
         uploadStatus.innerHTML = '<p>📤 Getting upload URL from Mux…</p>';
         
         try {
-            // 1. Get a direct upload URL from Mux
             const uploadResponse = await fetch(`${BACKEND_URL}/api/mux/create-upload`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -921,6 +1165,10 @@
                 }),
             });
             
+            if (!uploadResponse.ok) {
+                throw new Error(`Mux API error: ${uploadResponse.status}`);
+            }
+            
             const { success, uploadUrl, uploadId } = await uploadResponse.json();
             
             if (!success) {
@@ -929,7 +1177,6 @@
             
             uploadStatus.innerHTML = '<p>📤 Uploading to Mux… (this may take a few minutes)</p>';
             
-            // 2. Upload the blob directly to Mux
             const response = await fetch(uploadUrl, {
                 method: 'PUT',
                 body: blob,
@@ -944,11 +1191,10 @@
             
             uploadStatus.innerHTML = '<p>⏳ Processing upload… Mux is creating your asset</p>';
             
-            // 3. Poll for upload completion
             let assetId = null;
             let playbackId = null;
             let attempts = 0;
-            const maxAttempts = 60; // 5 minutes max (60 * 5 seconds)
+            const maxAttempts = 60;
             
             while (attempts < maxAttempts) {
                 await new Promise(r => setTimeout(r, 5000));
@@ -974,12 +1220,11 @@
             
             uploadStatus.innerHTML = '<p>✅ Upload complete! Saving to database…</p>';
             
-            // 4. Save metadata to your backend
             const user = JSON.parse(localStorage.getItem('user'));
             const duration = Math.floor((Date.now() - streamStartTime) / 1000);
             const minutes = Math.floor(duration / 60);
             
-            await fetch(`${BACKEND_URL}/api/save-stream`, {
+            const saveResponse = await fetch(`${BACKEND_URL}/api/save-stream`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -995,46 +1240,41 @@
                 }),
             });
             
+            if (!saveResponse.ok) {
+                console.warn('Metadata save failed, but video was uploaded');
+                showWarning('Video saved to Mux, but metadata save failed. Contact support.');
+            }
+            
             uploadStatus.classList.remove('active');
+            showSuccess('Recording saved to Mux successfully!');
             return { assetId, playbackId, playbackUrl: `https://stream.mux.com/${playbackId}.m3u8` };
             
         } catch (err) {
             uploadStatus.classList.remove('active');
             console.error('Mux upload error:', err);
+            showError(`Mux upload failed: ${err.message}`, null);
             throw err;
-        }
-    }
-
-    // ===== LOAD CLASSES =====
-    async function loadInstructorClasses() {
-        try {
-            const user = JSON.parse(localStorage.getItem('user'));
-            if (!user) return [];
-            const res = await fetch(`${BACKEND_URL}/register/instructor/classes`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: user.id })
-            });
-            const json = await res.json();
-            const classes = json.classes || [];
-            const select = document.getElementById('streamClass');
-            select.innerHTML = '<option value="">Choose a class…</option>' +
-                classes.map(c => `<option value="${c._id || c.id}">${escapeHtml(c.title)}</option>`).join('');
-            return classes;
-        } catch(err) {
-            console.error('Error loading classes:', err);
-            return [];
         }
     }
 
     // ===== LIVEKIT FUNCTIONS =====
     async function getLiveKitToken(roomName, participantName, isHostUser) {
-        const response = await fetch(`${BACKEND_URL}/api/livekit/token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomName, participantName, isHost: isHostUser })
-        });
-        return await response.json();
+        try {
+            const response = await fetch(`${BACKEND_URL}/api/livekit/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomName, participantName, isHost: isHostUser })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Token request failed: ${response.status}`);
+            }
+            
+            return await response.json();
+        } catch (err) {
+            console.error('Token fetch error:', err);
+            throw new Error(`Cannot connect to server: ${err.message}`);
+        }
     }
 
     function setupLiveKitChat(room) {
@@ -1100,11 +1340,16 @@
         const classId     = document.getElementById('streamClass').value;
 
         if (!classId || !title) {
+            showError('Please select a class and enter a title', null);
             alert('Please select a class and enter a title');
             return;
         }
 
         try {
+            hideError();
+            lastFailedAction = 'startStream';
+            updateConnectionStatus('connecting', 'Starting stream...');
+            
             closeModal('createClassModal');
             isHost = true;
             currentStreamData = { title, description, classId };
@@ -1112,31 +1357,58 @@
             streamTitleSpan.textContent = title;
 
             showToast('Requesting camera and microphone…');
-            localStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-                audio: true
-            });
+            updateConnectionStatus('connecting', 'Requesting camera access...');
+            
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: true
+                });
+                showSuccess('Camera and microphone access granted');
+            } catch (cameraErr) {
+                if (cameraErr.name === 'NotAllowedError') {
+                    throw new Error('Camera/microphone access denied. Please allow access and try again.');
+                } else if (cameraErr.name === 'NotFoundError') {
+                    throw new Error('No camera or microphone found on this device.');
+                } else {
+                    throw new Error(`Camera error: ${cameraErr.message}`);
+                }
+            }
 
             hostVideo.srcObject = localStream;
             showHostVideo(true);
 
+            updateConnectionStatus('connecting', 'Connecting to LiveKit...');
             showToast('Connecting to LiveKit…');
-            updateConnectionStatus('connecting', 'Connecting…');
 
             const { token, url } = await getLiveKitToken(currentRoomName, 'Instructor', true);
+            
+            if (!token) {
+                throw new Error('Invalid token received from server');
+            }
 
             liveKitRoom = new LiveKitClient.Room();
+            
             liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
-                updateConnectionStatus('connected', '🔴 Live');
-                showToast('Connected! Publishing stream…');
+                updateConnectionStatus('connected', '🔴 Live - Streaming');
+                showSuccess('Connected to LiveKit! Publishing stream...');
             });
+            
             liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
-                updateConnectionStatus('disconnected', 'Disconnected');
+                updateConnectionStatus('disconnected', 'Disconnected from LiveKit');
+                showWarning('Disconnected from LiveKit. Stream may have ended.');
             });
+            
+            liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
+                updateConnectionStatus('connecting', 'Reconnecting to LiveKit...');
+                showWarning('Connection lost. Reconnecting...');
+            });
+            
             liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, (participant) => {
-                showToast(`${participant.identity} joined the class`);
+                showSuccess(`${participant.identity} joined the class`);
                 updateViewersFromLiveKit(liveKitRoom);
             });
+            
             liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
                 showToast(`${participant.identity} left`);
                 updateViewersFromLiveKit(liveKitRoom);
@@ -1147,11 +1419,16 @@
             await liveKitRoom.localParticipant.setMicrophoneEnabled(true);
             setupLiveKitChat(liveKitRoom);
 
-            await fetch(`${BACKEND_URL}/api/livekit/start-session`, {
+            const sessionResponse = await fetch(`${BACKEND_URL}/api/livekit/start-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomName: currentRoomName, title, description, classId, userId })
             });
+            
+            if (!sessionResponse.ok) {
+                console.warn('Session start notification failed, but stream continues');
+                showWarning('Stream started but session notification failed');
+            }
 
             startBtn.disabled = true;
             stopBtn.disabled = false;
@@ -1171,25 +1448,32 @@
             mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
             mediaRecorder.start(10000);
 
-            updateConnectionStatus('connected', '🔴 Live');
-            showToast('✅ Livestream started! Students can now join.');
+            showSuccess('✅ Livestream started! Students can now join.');
+            updateConnectionStatus('connected', '🔴 Live - Streaming');
+            lastFailedAction = null;
 
         } catch(err) {
             console.error('Start stream error:', err);
-            showToast('Failed to start: ' + err.message, true);
+            showError(`Failed to start stream: ${err.message}`, 'startStream');
             isHost = false;
             startBtn.disabled = false;
-            if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+            if (localStream) { 
+                localStream.getTracks().forEach(t => t.stop()); 
+                localStream = null; 
+            }
             showHostVideo(false);
+            updateConnectionStatus('disconnected', 'Stream start failed');
         }
     }
 
-    // ===== STOP LIVESTREAM (MUX VERSION) =====
+    // ===== STOP LIVESTREAM =====
     async function stopLivestream() {
         if (!confirm('End stream and save recording?')) return;
         
         try {
+            hideError();
             recordingBadge.classList.remove('active');
+            updateConnectionStatus('connecting', 'Ending stream...');
             showToast('Processing recording…');
             
             let recordingBlob = null;
@@ -1199,6 +1483,7 @@
                 
                 if (recordedChunks.length > 0) {
                     recordingBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                    console.log(`Recording size: ${(recordingBlob.size / 1024 / 1024).toFixed(2)} MB`);
                 }
             }
             
@@ -1218,13 +1503,13 @@
                 const streamName = `${currentStreamData.title.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}`;
                 
                 try {
+                    updateConnectionStatus('connecting', 'Uploading to Mux...');
                     showToast('📤 Uploading recording to Mux…');
                     const result = await uploadToMux(recordingBlob, streamName, currentStreamData.classId, currentStreamData.title);
-                    showToast('✅ Recording saved to Mux!');
                     console.log('Mux asset:', result);
                 } catch(uploadErr) {
                     console.error('Upload failed:', uploadErr);
-                    showToast('⚠️ Upload failed - recording saved locally', true);
+                    showError(`Mux upload failed: ${uploadErr.message}. Recording saved locally.`, null);
                     const url = URL.createObjectURL(recordingBlob);
                     const a = document.createElement('a');
                     a.href = url;
@@ -1235,14 +1520,14 @@
                     URL.revokeObjectURL(url);
                 }
             } else {
-                showToast('No recording to save', true);
+                showWarning('No recording data to save');
             }
             
             await fetch(`${BACKEND_URL}/api/livekit/end-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomName: currentRoomName })
-            });
+            }).catch(e => console.warn('Session end notification failed:', e));
             
             startBtn.disabled = false;
             stopBtn.disabled = true;
@@ -1253,13 +1538,14 @@
             currentRoomName = null;
             updateStreamStatus(false);
             streamTitleSpan.textContent = '';
-            updateConnectionStatus('disconnected', 'Disconnected');
+            updateConnectionStatus('disconnected', 'Stream ended');
             liveBadge.classList.remove('active');
             
-            showToast('Stream ended successfully');
+            showSuccess('Stream ended successfully');
             
         } catch(err) {
             console.error('Stop stream error:', err);
+            showError(`Error ending stream: ${err.message}`, null);
             alert('Error ending stream: ' + err.message);
         }
     }
@@ -1267,34 +1553,55 @@
     // ===== JOIN STREAM (VIEWER) =====
     async function joinLivestream() {
         const isActive = await checkStreamStatus();
-        if (!isActive) { showToast('No live stream available', true); return; }
+        if (!isActive) { 
+            showError('No live stream available', null);
+            showToast('No live stream available', true); 
+            return; 
+        }
 
         try {
+            hideError();
+            lastFailedAction = 'joinStream';
+            updateConnectionStatus('connecting', 'Finding active stream...');
+            
             const response = await fetch(`${BACKEND_URL}/api/active-stream`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
             const data = await response.json();
             if (!data.isActive || data.streams.length === 0) {
-                showToast('No active stream found', true); return;
+                throw new Error('No active stream found');
             }
+            
             const activeStream = data.streams[0];
             currentRoomName = activeStream.roomName;
             currentStreamData.title = activeStream.title;
             streamTitleSpan.textContent = activeStream.title;
+            
         } catch(err) {
             console.error('Get active stream error:', err);
-            showToast('Could not find active stream', true); return;
+            showError(`Cannot find active stream: ${err.message}`, 'joinStream');
+            updateConnectionStatus('disconnected', 'No stream found');
+            return;
         }
 
         joinBtn.disabled = true;
         joinBtn.querySelector('.btn-icon').textContent = '⏳';
         startBtn.disabled = true;
         remoteEmptyText.textContent = 'Connecting…';
-        updateConnectionStatus('connecting', 'Connecting…');
+        updateConnectionStatus('connecting', 'Connecting to class...');
 
         try {
             const studentName = localStorage.getItem('studentName') || prompt('Enter your name:', 'Student') || 'Student';
             localStorage.setItem('studentName', studentName);
 
             const { token, url } = await getLiveKitToken(currentRoomName, studentName, false);
+            
+            if (!token) {
+                throw new Error('Invalid token received');
+            }
+            
             liveKitRoom = new LiveKitClient.Room();
 
             liveKitRoom.on(LiveKitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
@@ -1302,8 +1609,8 @@
                     track.attach(remoteVideo);
                     showRemoteVideo(true);
                     remoteVideoLabel.textContent = "Instructor's Stream";
-                    updateConnectionStatus('connected', '📺 Watching');
-                    showToast('Connected to class!');
+                    updateConnectionStatus('connected', '📺 Watching class');
+                    showSuccess('Connected to class!');
                 }
             });
 
@@ -1311,7 +1618,7 @@
                 isViewer = true;
                 chatInput.disabled = false;
                 sendChatBtn.disabled = false;
-                updateConnectionStatus('connected', '📺 Watching');
+                updateConnectionStatus('connected', '📺 Watching class');
                 startBtn.disabled = true;
             });
 
@@ -1322,11 +1629,17 @@
                 isViewer = false;
                 const user = JSON.parse(localStorage.getItem('user'));
                 if (user && user.user_type === 'instructor') startBtn.disabled = false;
+                showWarning('Disconnected from stream');
+            });
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
+                updateConnectionStatus('connecting', 'Reconnecting...');
+                showWarning('Connection lost. Reconnecting...');
             });
 
             liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
                 if (participant.identity === 'Instructor') {
-                    showToast('Instructor has ended the class', true);
+                    showError('Instructor has ended the class', null);
                     showRemoteVideo(false);
                     remoteEmptyText.textContent = 'Class ended';
                     updateStreamStatus(false);
@@ -1349,10 +1662,11 @@
 
             joinBtn.querySelector('.btn-icon').textContent = '✅';
             joinBtn.disabled = true;
+            lastFailedAction = null;
 
         } catch(err) {
             console.error('Join error:', err);
-            showToast('Failed to join: ' + err.message, true);
+            showError(`Failed to join: ${err.message}`, 'joinStream');
             joinBtn.disabled = false;
             joinBtn.querySelector('.btn-icon').textContent = '👤';
             isViewer = false;
@@ -1366,8 +1680,13 @@
     async function sendChatMessage() {
         const message = chatInput.value.trim();
         if (!message || !liveKitRoom) return;
-        await sendLiveKitChatMessage(liveKitRoom, message);
-        chatInput.value = '';
+        try {
+            await sendLiveKitChatMessage(liveKitRoom, message);
+            chatInput.value = '';
+        } catch (err) {
+            console.error('Chat send error:', err);
+            showWarning('Failed to send message. Try again.');
+        }
     }
 
     // ===== EVENT LISTENERS =====
@@ -1376,13 +1695,20 @@
     startBtn.addEventListener('click', async () => {
         const user = JSON.parse(localStorage.getItem('user'));
         if (!user || user.user_type !== 'instructor') {
+            showError('Only instructors can start livestreams', null);
             alert('Only instructors can start livestreams');
             return;
         }
         userName = user.name || user.email || 'Instructor';
         userId = user.id || userId;
-        await loadInstructorClasses();
-        showModal('createClassModal');
+        
+        if (classesLoaded && preloadedClasses.length > 0) {
+            showModal('createClassModal');
+        } else {
+            showToast('Loading your classes...');
+            await preloadInstructorClasses();
+            showModal('createClassModal');
+        }
     });
 
     stopBtn.addEventListener('click', stopLivestream);
@@ -1410,13 +1736,24 @@
     isHost = false;
     isViewer = false;
 
+    if (storedUser && storedUser.user_type === 'instructor') {
+        console.log('Instructor detected, preloading classes...');
+        preloadInstructorClasses();
+    } else {
+        console.log('Not an instructor, skipping class preload');
+        classesLoaded = true;
+    }
+
     statusCheckInterval = setInterval(() => {
         if (!isHost && !liveKitRoom) checkStreamStatus();
-    }, 5000);
+    }, 15000); // Check every 15 seconds
 
     checkStreamStatus();
-    updateConnectionStatus('connecting', 'Checking status…');
+    updateConnectionStatus('connecting', 'Initializing...');
     console.log('App initialized. User:', userId, userName);
+    
+    // Expose retry function globally
+    window.retryLastAction = retryLastAction;
 </script>
 </body>
 </html>

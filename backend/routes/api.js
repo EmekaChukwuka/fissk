@@ -32,11 +32,12 @@ router.post('/mux/create-upload', async (req, res) => {
   try {
     const { streamName, classId, classTitle } = req.body;
     
+    // Create a direct upload URL - REMOVED deprecated mp4_support
     const upload = await mux.video.uploads.create({
       cors_origin: '*',
       new_asset_settings: {
         playback_policy: ['public'],
-        mp4_support: 'standard',
+        // REMOVED: mp4_support: 'standard' - this is deprecated
         max_resolution_tier: '1080p',
         passthrough: JSON.stringify({
           streamName,
@@ -46,6 +47,8 @@ router.post('/mux/create-upload', async (req, res) => {
         }),
       },
     });
+    
+    console.log(`✅ Mux upload created: ${upload.id}`);
     
     res.json({
       success: true,
@@ -138,6 +141,8 @@ router.post('/save-stream', async (req, res) => {
       muxAssetId: muxAssetId,
       muxPlaybackId: muxPlaybackId,
     });
+    
+    console.log(`✅ Stream saved to DB: ${streamId}, Mux asset: ${muxAssetId}`);
     
     res.json({
       success: true,
