@@ -1,4 +1,4 @@
-// Individual Class Page Functionality - Real Data Only
+// Individual Class Page Functionality - Real Data Only with Mux Support
 class ClassManager {
     constructor() {
         this.classId = this.getClassIdFromURL();
@@ -8,7 +8,7 @@ class ClassManager {
         this.currentVideoIndex = null;
         this.progressInterval = null;
         this.videos = [];
-        this.recordings = []; // Store Cloudinary recordings
+        this.recordings = []; // Store Mux recordings
         this.isEnrolled = false;
         this.isLoading = true;
         this.init();
@@ -25,22 +25,20 @@ class ClassManager {
             return;
         }
         
-        // Show loading state immediately
         this.showLoadingState();
         
         try {
-            // Load all data in parallel for better performance
+            // Load all data in parallel
             await Promise.all([
                 this.loadClassData(),
                 this.checkEnrollment(),
                 this.loadClassVideos(),
-                this.loadClassRecordings() // Load Cloudinary recordings
+                this.loadClassRecordings() // Now loads from Mux
             ]);
             
-            // Only render after ALL data is loaded
             this.renderClassData();
             this.renderVideos();
-            this.renderRecordings(); // Render recordings in the recordings tab
+            this.renderRecordings(); // Render Mux recordings in the recordings tab
             this.setupEventListeners();
         } catch (error) {
             console.error('Initialization error:', error);
@@ -52,7 +50,6 @@ class ClassManager {
     }
 
     showLoadingState() {
-        // Show loading indicators
         const classNameEl = document.getElementById('className');
         if (classNameEl) classNameEl.innerHTML = '<div class="loading-pulse">Loading...</div>';
         
@@ -80,7 +77,7 @@ class ClassManager {
     }
 
     hideLoadingState() {
-        // Remove loading indicators (they'll be replaced with actual content)
+        // Loading indicators will be replaced with actual content
     }
 
     async loadClassData() {
@@ -146,41 +143,81 @@ class ClassManager {
             this.videos = await response.json();
             console.log('Videos loaded:', this.videos);
             
-            // Load user progress only if enrolled
             if (this.userId && this.isEnrolled) {
                 await this.loadUserProgress();
             }
             
-            // Load upcoming sessions
             await this.loadUpcomingSessions();
             
         } catch (error) {
             console.error('Error loading class videos:', error);
             this.videos = [];
-            // Don't throw - videos are optional
         }
     }
 
-    // NEW: Load Cloudinary recordings for this class
+    // UPDATED: Load Mux recordings for this class
     async loadClassRecordings() {
         try {
-            console.log('Loading recordings for class:', this.classId);
+            console.log('Loading Mux recordings for class:', this.classId);
+            
+            // Call the Mux endpoint to get videos by class ID
+            const response = await fetch(`https://fissk-backend.onrender.com/api/mux/class-videos/${this.classId}`);
+            
+            if (!response.ok) {
+                // If Mux endpoint fails, try the fallback
+                console.log('Mux endpoint failed, trying fallback...');
+                await this.loadRecordingsFallback();
+                return;
+            }
+            
+            const data = await response.json();
+            
+            if (data.success && data.videos) {
+                this.recordings = data.videos;
+                console.log('Mux recordings loaded:', this.recordings.length);
+            } else {
+                this.recordings = [];
+                console.log('No Mux recordings found');
+            }
+        } catch (error) {
+            console.error('Error loading Mux recordings:', error);
+            // Try fallback
+            await this.loadRecordingsFallback();
+        }
+    }
+
+    // Fallback: Load from your existing API (for backward compatibility)
+    async loadRecordingsFallback() {
+        try {
             const response = await fetch(`https://fissk-backend.onrender.com/api/by-class/${this.classId}`);
             
             if (!response.ok) {
-                throw new Error('Failed to load recordings');
+                throw new Error('Failed to load recordings fallback');
             }
             
             const allVideos = await response.json();
             
             // Filter recordings (videos with cloudinaryUrl or hlsUrl)
             this.recordings = allVideos.filter(video => 
-                video.cloudinaryUrl || video.hlsUrl || video.url
-            );
+                video.cloudinaryUrl || video.hlsUrl || video.url || video.muxPlaybackId
+            ).map(video => ({
+                assetId: video.muxAssetId || video._id,
+                title: video.classTitle || video.name || video.filename || 'Recording',
+                description: video.classDescription || video.description || '',
+                playbackId: video.muxPlaybackId,
+                playbackUrl: video.muxPlaybackId ? 
+                    `https://stream.mux.com/${video.muxPlaybackId}.m3u8` : 
+                    (video.cloudinaryUrl || video.hlsUrl || video.url),
+                thumbnailUrl: video.muxPlaybackId ?
+                    `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` : 
+                    (video.thumbnailUrl || ''),
+                duration: video.duration,
+                createdAt: video.createdAt || video.uploadDate,
+            }));
             
-            console.log('Recordings loaded:', this.recordings.length);
-        } catch (error) {
-            console.error('Error loading class recordings:', error);
+            console.log('Fallback recordings loaded:', this.recordings.length);
+        } catch (fallbackError) {
+            console.error('Fallback recordings error:', fallbackError);
             this.recordings = [];
         }
     }
@@ -209,7 +246,6 @@ class ClassManager {
             }
         } catch (error) {
             console.error('Error loading progress:', error);
-            // Don't throw - progress is optional
         }
     }
 
@@ -249,7 +285,6 @@ class ClassManager {
                     </div><br>
                 `).join('');
                 
-                // Add event listeners to join buttons
                 container.querySelectorAll('.join-session').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         window.open(`newlivestream.html?session=${btn.dataset.sessionId}`, '_blank');
@@ -266,14 +301,13 @@ class ClassManager {
     }
 
     setupEventListeners() {
-        // Tab switching
+        // Tab switching - ADDED recordings tab
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 this.switchTab(e.target.dataset.tab);
             });
         });
 
-        // Back to classes button
         const backBtn = document.getElementById('backToClasses');
         if (backBtn) {
             backBtn.addEventListener('click', () => {
@@ -281,10 +315,8 @@ class ClassManager {
             });
         }
 
-        // Enrollment button
         const enrollBtn = document.getElementById('enrollBtn');
         if (enrollBtn) {
-            // Remove existing listeners to avoid duplicates
             const newEnrollBtn = enrollBtn.cloneNode(true);
             enrollBtn.parentNode.replaceChild(newEnrollBtn, enrollBtn);
             newEnrollBtn.addEventListener('click', () => {
@@ -301,7 +333,6 @@ class ClassManager {
             content.classList.toggle('active', content.id === `${tabName}Tab`);
         });
         
-        // Refresh recordings tab when switched to it
         if (tabName === 'recordings' && this.recordings.length === 0) {
             this.loadClassRecordings().then(() => this.renderRecordings());
         }
@@ -314,17 +345,14 @@ class ClassManager {
         }
         
         try {
-            // Update page title
             document.title = `${this.classData.title} - FISSK Online Academy`;
 
-            // Update hero section
             const classNameEl = document.getElementById('className');
             const classDescEl = document.getElementById('classDescription');
             
             if (classNameEl) classNameEl.textContent = this.classData.title;
             if (classDescEl) classDescEl.textContent = this.classData.description;
             
-            // Update meta information
             const levelEl = document.getElementById('classLevel');
             const durationEl = document.getElementById('classDuration');
             const studentsEl = document.getElementById('classStudents');
@@ -333,7 +361,6 @@ class ClassManager {
             if (durationEl) durationEl.textContent = `🕒 ${this.classData.duration || 'Self-paced'}`;
             if (studentsEl) studentsEl.textContent = `👥 ${this.classData.maxStudents || 0} Students`;
 
-            // Update enrollment button
             const enrollBtn = document.getElementById('enrollBtn');
             if (enrollBtn) {
                 if (this.isEnrolled) {
@@ -347,7 +374,6 @@ class ClassManager {
                 }
             }
 
-            // Load instructor info
             if (this.classData.instructorId) {
                 try {
                     const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
@@ -374,7 +400,6 @@ class ClassManager {
                 }
             }
 
-            // Render class details
             this.renderClassDetails();
         } catch(err) {
             console.error('Error rendering class data:', err);
@@ -425,7 +450,6 @@ class ClassManager {
                 </div>
             `).join('');
 
-            // Add click event to video cards
             videosContainer.querySelectorAll('.video-card').forEach(card => {
                 card.addEventListener('click', () => {
                     const videoIndex = parseInt(card.dataset.videoIndex);
@@ -435,7 +459,7 @@ class ClassManager {
         }
     }
 
-    // NEW: Render Cloudinary recordings in the recordings tab
+    // UPDATED: Render Mux recordings
     renderRecordings() {
         const recordingsContainer = document.getElementById('recordingsContainer');
         const noRecordings = document.getElementById('noRecordings');
@@ -453,16 +477,17 @@ class ClassManager {
         if (recordingsContainer) {
             recordingsContainer.style.display = 'grid';
             recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
-                // Get the video URL (support multiple formats)
-                const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url;
-                const thumbnailUrl = recording.thumbnailUrl || '';
-                const title = recording.classTitle || recording.name || recording.filename || `Recording ${index + 1}`;
-                const description = recording.classDescription || recording.description || 'Past livestream recording';
-                const date = recording.uploadDate || recording.createdAt;
-                const duration = recording.duration || 'Unknown';
+                const thumbnailUrl = recording.thumbnailUrl || 
+                    (recording.playbackId ? `https://image.mux.com/${recording.playbackId}/thumbnail.jpg?time=5` : '');
+                const title = recording.title || `Recording ${index + 1}`;
+                const description = recording.description || 'Past livestream recording';
+                const date = recording.createdAt;
+                const duration = recording.duration ? this.formatDuration(recording.duration) : 'Unknown';
+                const playbackUrl = recording.playbackUrl || 
+                    (recording.playbackId ? `https://stream.mux.com/${recording.playbackId}.m3u8` : null);
                 
                 return `
-                    <div class="recording-card" data-recording-index="${index}" data-recording-url="${videoUrl}">
+                    <div class="recording-card" data-recording-index="${index}" data-recording-url="${playbackUrl}" data-recording-title="${this.escapeHtml(title)}" data-recording-description="${this.escapeHtml(description)}">
                         <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
                             <span class="play-icon">▶</span>
                             ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.3;">` : ''}
@@ -479,12 +504,13 @@ class ClassManager {
                 `;
             }).join('');
 
-            // Add click event to recording cards
             recordingsContainer.querySelectorAll('.recording-card').forEach(card => {
                 card.addEventListener('click', () => {
                     const recordingUrl = card.dataset.recordingUrl;
+                    const title = card.dataset.recordingTitle;
+                    const description = card.dataset.recordingDescription;
                     if (recordingUrl) {
-                        this.playRecording(recordingUrl, card);
+                        this.playRecording(recordingUrl, title, description);
                     } else {
                         alert('Video URL not available');
                     }
@@ -493,11 +519,20 @@ class ClassManager {
         }
     }
 
-    // NEW: Play recording in modal
-    playRecording(videoUrl, cardElement) {
-        const title = cardElement.querySelector('h4')?.textContent || 'Recording';
-        const description = cardElement.querySelector('p')?.textContent || '';
+    formatDuration(seconds) {
+        if (!seconds) return 'Unknown';
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        if (hours > 0) {
+            return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
 
+    // UPDATED: Play Mux recording with HLS support
+    playRecording(videoUrl, title, description) {
         const modal = document.getElementById('videoModal');
         const videoPlayer = document.getElementById('videoPlayer');
         const videoTitle = document.getElementById('videoTitle');
@@ -506,38 +541,49 @@ class ClassManager {
         // Clear previous source
         videoPlayer.innerHTML = '';
         
-        // Create source element based on URL type
-        const source = document.createElement('source');
-        source.src = videoUrl;
-        
-        if (videoUrl.includes('.m3u8') || videoUrl.includes('m3u8')) {
-            source.type = 'application/x-mpegURL';
-            // For HLS, we need to use hls.js
+        // Check if it's an HLS stream (.m3u8)
+        if (videoUrl && (videoUrl.includes('.m3u8') || videoUrl.includes('m3u8'))) {
+            // Check if Hls.js is available
             if (typeof Hls !== 'undefined') {
-                const hls = new Hls();
-                hls.loadSource(videoUrl);
-                hls.attachMedia(videoPlayer);
+                if (this.hls) {
+                    this.hls.destroy();
+                }
+                this.hls = new Hls();
+                this.hls.loadSource(videoUrl);
+                this.hls.attachMedia(videoPlayer);
+                this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    videoPlayer.play();
+                });
+            } else {
+                // Fallback for browsers that support HLS natively (Safari)
+                const source = document.createElement('source');
+                source.src = videoUrl;
+                source.type = 'application/x-mpegURL';
+                videoPlayer.appendChild(source);
+                videoPlayer.load();
             }
-        } else if (videoUrl.includes('.mp4')) {
+        } else if (videoUrl) {
+            // Regular MP4 or other format
+            const source = document.createElement('source');
+            source.src = videoUrl;
             source.type = 'video/mp4';
             videoPlayer.appendChild(source);
-        } else {
-            source.type = 'video/mp4';
-            videoPlayer.appendChild(source);
+            videoPlayer.load();
         }
         
-        videoPlayer.load();
-        videoTitle.textContent = title;
-        videoDescription.textContent = description;
+        videoTitle.textContent = title || 'Recording';
+        videoDescription.textContent = description || '';
 
         modal.style.display = 'flex';
         
-        // Close modal function
         const closeModal = () => {
             modal.style.display = 'none';
             videoPlayer.pause();
             videoPlayer.currentTime = 0;
-            if (this.progressInterval) clearInterval(this.progressInterval);
+            if (this.hls) {
+                this.hls.destroy();
+                this.hls = null;
+            }
         };
 
         const closeBtn = document.querySelector('.close-modal');
@@ -575,13 +621,9 @@ class ClassManager {
 
         modal.style.display = 'flex';
         
-        // Resume progress
         this.restoreProgress(videoPlayer, videoIndex);
-        
-        // Track progress
         this.trackProgress(videoPlayer, videoIndex);
 
-        // Close modal function
         const closeModal = () => {
             modal.style.display = 'none';
             videoPlayer.pause();
@@ -608,10 +650,8 @@ class ClassManager {
         
         this.progressInterval = setInterval(() => {
             if (!videoPlayer.paused && !videoPlayer.ended && videoPlayer.currentTime) {
-                // Save to localStorage
                 localStorage.setItem(`video_progress_${this.classId}_${videoIndex}`, videoPlayer.currentTime.toString());
                 
-                // Save to backend if enrolled
                 if (this.userId && this.isEnrolled) {
                     const progressPercent = Math.floor((videoPlayer.currentTime / videoPlayer.duration) * 100);
                     if (progressPercent > 0) {
@@ -752,7 +792,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
     });
 });
 
-// Add CSS for loading states and recordings
+// Add CSS for recordings and HLS player
 const style = document.createElement('style');
 style.textContent = `
     .loading-pulse {
@@ -795,6 +835,13 @@ style.textContent = `
         cursor: default;
     }
     
+    .recordings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px;
+        padding: 10px 0;
+    }
+    
     .recording-card {
         background: white;
         border-radius: 12px;
@@ -807,13 +854,6 @@ style.textContent = `
     .recording-card:hover {
         transform: translateY(-4px);
         box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    }
-    
-    .recordings-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 24px;
-        padding: 10px 0;
     }
     
     .video-thumbnail {
@@ -831,6 +871,7 @@ style.textContent = `
         opacity: 0.9;
         text-shadow: 0 2px 4px rgba(0,0,0,0.3);
         transition: transform 0.2s;
+        z-index: 2;
     }
     
     .recording-card:hover .play-icon,
@@ -880,6 +921,13 @@ style.textContent = `
     .video-card:hover {
         transform: translateY(-4px);
         box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    }
+    
+    .videos-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px;
+        padding: 10px 0;
     }
 `;
 document.head.appendChild(style);
