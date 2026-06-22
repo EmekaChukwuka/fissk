@@ -398,93 +398,131 @@ switchTab(tabName) {
         `;
     }
        
-    // ===== RENDER CLASS FORUM =====
-    async renderClassForum() {
-        const container = document.getElementById('classForumContainer');
-        if (!container) return;
+  // ===== RENDER CLASS FORUM =====
+async renderClassForum() {
+    const container = document.getElementById('classForumContainer');
+    if (!container) return;
+    
+    // Check if user is enrolled
+    if (!this.isEnrolled) {
+        container.innerHTML = `
+            <div class="forum-locked">
+                <p>🔒 Enroll in this class to participate in discussions</p>
+                <button class="btn btn-primary" id="enrollFromForumBtn">Enroll Now</button>
+            </div>
+        `;
+        // Add event listener for the enroll button
+        const enrollBtn = container.querySelector('#enrollFromForumBtn');
+        if (enrollBtn) {
+            enrollBtn.addEventListener('click', () => {
+                this.handleEnrollment();
+            });
+        }
+        return;
+    }
+    
+    try {
+        // Fetch class forum topics
+        const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`);
+        const topics = await response.json();
         
-        // Check if user is enrolled
-        if (!this.isEnrolled) {
+        if (!topics || topics.length === 0) {
             container.innerHTML = `
-                <div class="forum-locked">
-                    <p>🔒 Enroll in this class to participate in discussions</p>
-                    <button class="btn btn-primary" onclick="window.classManager.handleEnrollment()">Enroll Now</button>
+                <div class="forum-empty">
+                    <p>💬 No discussions yet</p>
+                    <p class="forum-empty-sub">Be the first to start a discussion about this class!</p>
+                    <button class="btn btn-primary" id="startDiscussionBtn">Start Discussion</button>
                 </div>
             `;
+            // Add event listener for the start discussion button
+            const startBtn = container.querySelector('#startDiscussionBtn');
+            if (startBtn) {
+                startBtn.addEventListener('click', () => {
+                    this.openNewClassTopic();
+                });
+            }
             return;
         }
         
-        try {
-            // Fetch class forum topics
-            const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`);
-            const topics = await response.json();
-            
-            if (!topics || topics.length === 0) {
-                container.innerHTML = `
-                    <div class="forum-empty">
-                        <p>💬 No discussions yet</p>
-                        <p class="forum-empty-sub">Be the first to start a discussion about this class!</p>
-                        <button class="btn btn-primary" onclick="window.classManager.openNewClassTopic()">Start Discussion</button>
-                    </div>
-                `;
-                return;
-            }
-            
-            // Render topics
-            container.innerHTML = `
-                <div class="forum-header-actions">
-                    <button class="btn btn-primary" onclick="window.classManager.openNewClassTopic()">
-                        + New Discussion
-                    </button>
-                    <div class="forum-filters">
-                        <select id="forumSort" onchange="window.classManager.filterForumTopics()">
-                            <option value="latest">Latest</option>
-                            <option value="popular">Most Popular</option>
-                            <option value="unanswered">Unanswered</option>
-                        </select>
-                    </div>
+        // Render topics
+        container.innerHTML = `
+            <div class="forum-header-actions">
+                <button class="btn btn-primary" id="startDiscussionBtn">
+                    + New Discussion
+                </button>
+                <div class="forum-filters">
+                    <select id="forumSort">
+                        <option value="latest">Latest</option>
+                        <option value="popular">Most Popular</option>
+                        <option value="unanswered">Unanswered</option>
+                    </select>
                 </div>
-                <div class="forum-topics-list">
-                    ${topics.map(topic => `
-                        <div class="forum-topic-item ${topic.isPinned ? 'pinned' : ''} ${topic.solved ? 'solved' : ''}">
-                            <div class="forum-topic-left">
-                                ${topic.isPinned ? '<span class="pin-badge">📌</span>' : ''}
-                                ${topic.solved ? '<span class="solved-badge">✅ Solved</span>' : ''}
-                                <a href="#" onclick="window.classManager.viewForumTopic('${topic._id}')" class="forum-topic-title">
-                                    ${topic.title}
-                                </a>
-                                <div class="forum-topic-meta">
-                                    <span>👤 ${topic.author_name || 'Anonymous'}</span>
-                                    <span>💬 ${topic.replyCount || 0}</span>
-                                    <span>👀 ${topic.views || 0}</span>
-                                    <span>📅 ${new Date(topic.createdAt).toLocaleDateString()}</span>
-                                </div>
+            </div>
+            <div class="forum-topics-list">
+                ${topics.map(topic => `
+                    <div class="forum-topic-item ${topic.isPinned ? 'pinned' : ''} ${topic.solved ? 'solved' : ''}">
+                        <div class="forum-topic-left">
+                            ${topic.isPinned ? '<span class="pin-badge">📌</span>' : ''}
+                            ${topic.solved ? '<span class="solved-badge">✅ Solved</span>' : ''}
+                            <a href="#" data-topic-id="${topic._id}" class="forum-topic-title">
+                                ${this.escapeHtml(topic.title)}
+                            </a>
+                            <div class="forum-topic-meta">
+                                <span>👤 ${this.escapeHtml(topic.author_name || 'Anonymous')}</span>
+                                <span>💬 ${topic.replyCount || 0}</span>
+                                <span>👀 ${topic.views || 0}</span>
+                                <span>📅 ${new Date(topic.createdAt).toLocaleDateString()}</span>
                             </div>
-                            ${topic.category_name ? `<span class="topic-category">${topic.category_name}</span>` : ''}
                         </div>
-                    `).join('')}
-                </div>
-            `;
-            
-            // Add event listeners for topic clicks
-            container.querySelectorAll('.forum-topic-title').forEach(el => {
-                el.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const topicId = el.dataset.topicId || el.getAttribute('href').split('=')[1];
-                    this.viewForumTopic(topicId);
-                });
+                        ${topic.category_name ? `<span class="topic-category">${this.escapeHtml(topic.category_name)}</span>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+        // Add event listener for the start discussion button
+        const startBtn = container.querySelector('#startDiscussionBtn');
+        if (startBtn) {
+            startBtn.addEventListener('click', () => {
+                this.openNewClassTopic();
             });
-            
-        } catch (error) {
-            console.error('Render forum error:', error);
-            container.innerHTML = `
-                <div class="forum-error">
-                    <p>⚠️ Failed to load discussions</p>
-                    <button class="btn btn-outline" onclick="window.classManager.renderClassForum()">Retry</button>
-                </div>
-            `;
+        }
+        
+        // Add event listener for the sort dropdown
+        const sortSelect = container.querySelector('#forumSort');
+        if (sortSelect) {
+            sortSelect.addEventListener('change', () => {
+                this.filterForumTopics();
+            });
+        }
+        
+        // Add event listeners for topic clicks
+        container.querySelectorAll('.forum-topic-title').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.preventDefault();
+                const topicId = el.dataset.topicId;
+                if (topicId) {
+                    this.viewForumTopic(topicId);
+                }
+            });
+        });
+        
+    } catch (error) {
+        console.error('Render forum error:', error);
+        container.innerHTML = `
+            <div class="forum-error">
+                <p>⚠️ Failed to load discussions: ${error.message}</p>
+                <button class="btn btn-outline" id="retryForumBtn">Retry</button>
+            </div>
+        `;
+        const retryBtn = container.querySelector('#retryForumBtn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => {
+                this.renderClassForum();
+            });
         }
     }
+}
 
     // ===== OPEN NEW CLASS TOPIC MODAL =====
     openNewClassTopic() {
@@ -921,13 +959,31 @@ switchTab(tabName) {
         });
     }
 }
+// ===== INITIALIZE AND EXPOSE GLOBALLY =====
+let classManagerInstance = null;
+
+// Function to initialize the class manager
+function initClassManager() {
+    if (!classManagerInstance) {
+        classManagerInstance = new ClassManager();
+        // Expose globally so onclick handlers can access it
+        window.classManager = classManagerInstance;
+        console.log('✅ ClassManager initialized and exposed globally');
+    }
+    return classManagerInstance;
+}
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new ClassManager();
+    initClassManager();
 });
 
-// User dropdown and navigation
+// Also handle the case where DOM is already loaded
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    initClassManager();
+}
+
+// ===== USER DROPDOWN AND NAVIGATION =====
 const userData = localStorage.getItem('user');
 if (userData) {
     const loginBtn = document.getElementById('login-btn');
@@ -939,7 +995,7 @@ if (userData) {
     if (dashboardBtn) dashboardBtn.style.display = 'none';
 }
 
-// Mobile Navigation
+// ===== MOBILE NAVIGATION =====
 const hamburger = document.querySelector('.hamburger');
 const navMenu = document.querySelector('.nav-menu');
 
@@ -967,134 +1023,46 @@ document.querySelectorAll('.nav-link').forEach(link => {
     });
 });
 
-// Add CSS for loading states and recordings
-const style = document.createElement('style');
-style.textContent = `
-    .loading-pulse {
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: loadingPulse 1.5s infinite;
-        border-radius: 4px;
-        height: 24px;
-        width: 200px;
-    }
-    
-    @keyframes loadingPulse {
-        0% { background-position: 200% 0; }
-        100% { background-position: -200% 0; }
-    }
-    
-    .loading-skeleton {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 20px;
-    }
-    
-    .skeleton-card {
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: loadingPulse 1.5s infinite;
-        height: 200px;
-        border-radius: 8px;
-    }
-    
-    .no-data {
-        color: #666;
-        text-align: center;
-        padding: 20px;
-        font-style: italic;
-    }
-    
-    .btn.enrolled {
-        background: #48BB78;
-        cursor: default;
-    }
-    
-    .recording-card {
-        background: white;
-        border-radius: 12px;
-        overflow: hidden;
-        cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    
-    .recording-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    }
-    
-    .recordings-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 24px;
-        padding: 10px 0;
-    }
-    
-    .video-thumbnail {
-        height: 180px;
-        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        position: relative;
-    }
-    
-    .play-icon {
-        font-size: 48px;
-        color: white;
-        opacity: 0.9;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        transition: transform 0.2s;
-    }
-    
-    .recording-card:hover .play-icon,
-    .video-card:hover .play-icon {
-        transform: scale(1.1);
-    }
-    
-    .video-info {
-        padding: 16px;
-    }
-    
-    .video-info h4 {
-        margin: 0 0 8px 0;
-        font-size: 1rem;
-        color: var(--text-dark);
-    }
-    
-    .video-info p {
-        margin: 0 0 12px 0;
-        font-size: 0.85rem;
-        color: var(--text-light);
-        line-height: 1.4;
-    }
-    
-    .video-meta {
-        display: flex;
-        gap: 12px;
-        font-size: 0.75rem;
-        color: var(--text-light);
-    }
-    
-    .video-meta span {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-    }
-    
-    .video-card {
-        background: white;
-        border-radius: 12px;
-        overflow: hidden;
-        cursor: pointer;
-        transition: transform 0.2s, box-shadow 0.2s;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    
-    .video-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 20px rgba(0,0,0,0.15);
-    }
-`;
-document.head.appendChild(style);
+// ===== MAKE showToast GLOBAL =====
+// Ensure showToast is available globally for onclick handlers
+if (typeof showToast === 'undefined') {
+    window.showToast = function(msg, isError = false) {
+        const toast = document.createElement('div');
+        toast.textContent = msg;
+        toast.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: ${isError ? '#e74c3c' : '#27ae60'};
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease;
+        `;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    };
+}
+
+// Add slideIn animation if not already defined
+if (!document.getElementById('toastStyles')) {
+    const styleSheet = document.createElement('style');
+    styleSheet.id = 'toastStyles';
+    styleSheet.textContent = `
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    `;
+    document.head.appendChild(styleSheet);
+}
+
+console.log('✅ Class Manager initialized. window.classManager available:', !!window.classManager);
