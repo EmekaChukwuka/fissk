@@ -292,20 +292,24 @@ class ClassManager {
             });
         }
     }
-
-    switchTab(tabName) {
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.tab === tabName);
-        });
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.toggle('active', content.id === `${tabName}Tab`);
-        });
-        
-        // Refresh recordings tab when switched to it
-        if (tabName === 'recordings' && this.recordings.length === 0) {
-            this.loadClassRecordings().then(() => this.renderRecordings());
-        }
+switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+    });
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === `${tabName}Tab`);
+    });
+    
+    // Load forum content when forum tab is clicked
+    if (tabName === 'forum') {
+        this.renderClassForum();
     }
+    
+    // Load reviews when reviews tab is clicked
+    if (tabName === 'reviews') {
+        // this.renderClassReviews(); // We'll add this in the next feature
+    }
+}
 
     async renderClassData() {
         if (!this.classData) {
@@ -393,6 +397,214 @@ class ClassManager {
             </div>
         `;
     }
+       
+    // ===== RENDER CLASS FORUM =====
+    async renderClassForum() {
+        const container = document.getElementById('classForumContainer');
+        if (!container) return;
+        
+        // Check if user is enrolled
+        if (!this.isEnrolled) {
+            container.innerHTML = `
+                <div class="forum-locked">
+                    <p>🔒 Enroll in this class to participate in discussions</p>
+                    <button class="btn btn-primary" onclick="window.classManager.handleEnrollment()">Enroll Now</button>
+                </div>
+            `;
+            return;
+        }
+        
+        try {
+            // Fetch class forum topics
+            const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`);
+            const topics = await response.json();
+            
+            if (!topics || topics.length === 0) {
+                container.innerHTML = `
+                    <div class="forum-empty">
+                        <p>💬 No discussions yet</p>
+                        <p class="forum-empty-sub">Be the first to start a discussion about this class!</p>
+                        <button class="btn btn-primary" onclick="window.classManager.openNewClassTopic()">Start Discussion</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Render topics
+            container.innerHTML = `
+                <div class="forum-header-actions">
+                    <button class="btn btn-primary" onclick="window.classManager.openNewClassTopic()">
+                        + New Discussion
+                    </button>
+                    <div class="forum-filters">
+                        <select id="forumSort" onchange="window.classManager.filterForumTopics()">
+                            <option value="latest">Latest</option>
+                            <option value="popular">Most Popular</option>
+                            <option value="unanswered">Unanswered</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="forum-topics-list">
+                    ${topics.map(topic => `
+                        <div class="forum-topic-item ${topic.isPinned ? 'pinned' : ''} ${topic.solved ? 'solved' : ''}">
+                            <div class="forum-topic-left">
+                                ${topic.isPinned ? '<span class="pin-badge">📌</span>' : ''}
+                                ${topic.solved ? '<span class="solved-badge">✅ Solved</span>' : ''}
+                                <a href="#" onclick="window.classManager.viewForumTopic('${topic._id}')" class="forum-topic-title">
+                                    ${topic.title}
+                                </a>
+                                <div class="forum-topic-meta">
+                                    <span>👤 ${topic.author_name || 'Anonymous'}</span>
+                                    <span>💬 ${topic.replyCount || 0}</span>
+                                    <span>👀 ${topic.views || 0}</span>
+                                    <span>📅 ${new Date(topic.createdAt).toLocaleDateString()}</span>
+                                </div>
+                            </div>
+                            ${topic.category_name ? `<span class="topic-category">${topic.category_name}</span>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            // Add event listeners for topic clicks
+            container.querySelectorAll('.forum-topic-title').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const topicId = el.dataset.topicId || el.getAttribute('href').split('=')[1];
+                    this.viewForumTopic(topicId);
+                });
+            });
+            
+        } catch (error) {
+            console.error('Render forum error:', error);
+            container.innerHTML = `
+                <div class="forum-error">
+                    <p>⚠️ Failed to load discussions</p>
+                    <button class="btn btn-outline" onclick="window.classManager.renderClassForum()">Retry</button>
+                </div>
+            `;
+        }
+    }
+
+    // ===== OPEN NEW CLASS TOPIC MODAL =====
+    openNewClassTopic() {
+        const modal = document.getElementById('newClassTopicModal');
+        if (!modal) {
+            // Create modal if it doesn't exist
+            this.createNewTopicModal();
+            return;
+        }
+        
+        // Populate categories
+        this.loadClassForumCategories();
+        modal.style.display = 'flex';
+    }
+
+    // ===== CREATE NEW TOPIC MODAL =====
+    createNewTopicModal() {
+        const modalHTML = `
+            <div id="newClassTopicModal" class="modal">
+                <div class="modal-content">
+                    <span class="close-modal" onclick="document.getElementById('newClassTopicModal').style.display='none'">&times;</span>
+                    <h2>Start New Discussion</h2>
+                    <form id="newClassTopicForm">
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" id="classTopicTitle" placeholder="What's your question?" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="classTopicCategory">
+                                <option value="">General</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Content</label>
+                            <textarea id="classTopicContent" rows="6" placeholder="Describe your question or topic..." required></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Post Discussion</button>
+                            <button type="button" class="btn btn-outline" onclick="document.getElementById('newClassTopicModal').style.display='none'">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        document.getElementById('newClassTopicForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.submitClassTopic();
+        });
+    }
+
+    // ===== LOAD CLASS FORUM CATEGORIES =====
+    async loadClassForumCategories() {
+        try {
+            const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/categories`);
+            const categories = await response.json();
+            
+            const select = document.getElementById('classTopicCategory');
+            if (select) {
+                select.innerHTML = `
+                    <option value="">General</option>
+                    ${categories.map(c => `<option value="${c._id}">${c.icon || '📌'} ${c.name}</option>`).join('')}
+                `;
+            }
+        } catch (error) {
+            console.error('Load categories error:', error);
+        }
+    }
+
+    // ===== SUBMIT CLASS TOPIC =====
+    async submitClassTopic() {
+        const title = document.getElementById('classTopicTitle').value.trim();
+        const content = document.getElementById('classTopicContent').value.trim();
+        const categoryId = document.getElementById('classTopicCategory').value;
+        
+        if (!title || !content) {
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title,
+                    content,
+                    categoryId: categoryId || null,
+                    userId: this.userId
+                })
+            });
+            
+            if (response.ok) {
+                document.getElementById('newClassTopicModal').style.display = 'none';
+                this.renderClassForum();
+                showToast('Discussion posted successfully!', false);
+            } else {
+                const error = await response.json();
+                showToast(error.message || 'Failed to post discussion', true);
+            }
+        } catch (error) {
+            console.error('Submit topic error:', error);
+            showToast('Failed to post discussion', true);
+        }
+    }
+
+    // ===== VIEW FORUM TOPIC =====
+    viewForumTopic(topicId) {
+        // Navigate to topic detail page
+        window.location.href = `forum-post.html?classId=${this.classId}&topicId=${topicId}`;
+    }
+
+    // ===== FILTER FORUM TOPICS =====
+    async filterForumTopics() {
+        // Re-fetch with filter
+        await this.renderClassForum();
+    }    
 
     renderVideos() {
         const videosContainer = document.getElementById('videosContainer');

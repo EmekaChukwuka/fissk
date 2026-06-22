@@ -12,9 +12,15 @@ const ForumPostSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   title: { type: String, required: true },
   content: { type: String, required: true },
-  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'ForumCategory', required: true },
+  categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'ForumCategory' },
+  
+  // NEW: Class-specific fields
+  classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', default: null },
+  isClassForum: { type: Boolean, default: false },
+  
   views: { type: Number, default: 0 },
   isPinned: { type: Boolean, default: false },
+  isAnnouncement: { type: Boolean, default: false },
   solved: { type: Boolean, default: false },
   tags: [String],
   replies: [ReplySchema]
@@ -22,6 +28,7 @@ const ForumPostSchema = new mongoose.Schema({
 
 ForumPostSchema.index({ userId: 1 });
 ForumPostSchema.index({ categoryId: 1 });
+ForumPostSchema.index({ classId: 1 });
 ForumPostSchema.index({ createdAt: -1 });
 ForumPostSchema.index({ isPinned: -1, createdAt: -1 });
 

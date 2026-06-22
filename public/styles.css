@@ -475,6 +475,128 @@ body {
     color: var(--text-light);
 }
 
+/* Class Forum Styles */
+.forum-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.forum-filters select {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.forum-topics-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.forum-topic-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-elevated);
+    border-radius: 8px;
+    border-left: 3px solid transparent;
+    transition: background 0.2s;
+    cursor: pointer;
+}
+
+.forum-topic-item:hover {
+    background: var(--bg-hover);
+}
+
+.forum-topic-item.pinned {
+    border-left-color: var(--accent-yellow);
+    background: rgba(253,214,99,0.05);
+}
+
+.forum-topic-item.solved {
+    border-left-color: var(--accent-green);
+}
+
+.forum-topic-left {
+    flex: 1;
+}
+
+.forum-topic-title {
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 500;
+    display: inline-block;
+    margin-bottom: 4px;
+}
+
+.forum-topic-title:hover {
+    color: var(--accent-blue);
+}
+
+.forum-topic-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.pin-badge {
+    margin-right: 6px;
+}
+
+.solved-badge {
+    background: rgba(129,201,149,0.15);
+    color: var(--accent-green);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    margin-right: 6px;
+}
+
+.topic-category {
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 2px 10px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+}
+
+.forum-empty {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-secondary);
+}
+
+.forum-empty-sub {
+    margin: 8px 0 16px;
+    font-size: 14px;
+}
+
+.forum-locked {
+    text-align: center;
+    padding: 40px;
+    background: var(--bg-elevated);
+    border-radius: 12px;
+}
+
+.forum-locked p {
+    margin-bottom: 16px;
+    color: var(--text-secondary);
+}
+
+.forum-error {
+    text-align: center;
+    padding: 40px;
+    color: var(--accent-red);
+}
+
 /* Dashboard Styles */
 .dashboard {
     padding: 100px 0 50px;

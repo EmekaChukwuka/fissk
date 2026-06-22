@@ -221,17 +221,48 @@ forumRouter.post('/notifications', async (req, res) => {
   res.json(rows);
 });
 
-// Get topics with filtering
-forumRouter.get('/topics', async (req, res) => {
+
+// ===== CLASS-SPECIFIC FORUM ENDPOINTS =====
+
+// Get categories for a specific class
+forumRouter.get('/class/:classId/categories', async (req, res) => {
+  const { classId } = req.params;
+  
+  try {
+    // Get both global categories and class-specific categories
+    const categories = await ForumCategory.find({
+      $or: [
+        { classId: null, isClassCategory: false },
+        { classId: classId, isClassCategory: true }
+      ],
+      isActive: true
+    }).sort({ sortOrder: 1, name: 1 });
+    
+    res.json(categories);
+  } catch (error) {
+    console.error('Get class categories error:', error);
+    res.status(500).json({ message: 'Failed to load categories' });
+  }
+});
+
+// Get topics for a specific class
+forumRouter.get('/class/:classId/topics', async (req, res) => {
+  const { classId } = req.params;
   const { search, sort, category } = req.query;
   
   try {
-    let query = {};
+    // Check if class exists
+    const classData = await Class.findById(classId);
+    if (!classData) {
+      return res.status(404).json({ message: 'Class not found' });
+    }
+    
+    let query = { classId: classId, isClassForum: true };
     let sortOption = {};
     
     // Filter by category
     if (category) {
-      const categoryDoc = await ForumCategory.findOne({ slug: category });
+      const categoryDoc = await ForumCategory.findOne({ slug: category, classId: classId });
       if (categoryDoc) {
         query.categoryId = categoryDoc._id;
       }
@@ -244,15 +275,305 @@ forumRouter.get('/topics', async (req, res) => {
     
     // Sort options
     if (sort === "popular") {
-      // Popular by reply count (need to compute in aggregation)
-      sortOption = { "replyCount": -1 };
+      sortOption = { "repliesCount": -1 };
     } else if (sort === "unanswered") {
-      // Unanswered = 0 replies
       query.$expr = { $eq: [{ $size: "$replies" }, 0] };
       sortOption = { createdAt: -1 };
     } else {
-      // Default: newest first
+      sortOption = { isPinned: -1, createdAt: -1 };
+    }
+    
+    const topics = await ForumPost.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: "forumcategories",
+          localField: "categoryId",
+          foreignField: "_id",
+          as: "category"
+        }
+      },
+      { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "author"
+        }
+      },
+      { $unwind: { path: "$author", preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          replyCount: { $size: "$replies" },
+          category_name: "$category.name",
+          icon: "$category.icon",
+          author_name: { $concat: ["$author.firstName", " ", "$author.lastName"] }
+        }
+      },
+      { $sort: sortOption }
+    ]);
+    
+    res.json(topics);
+  } catch (err) {
+    console.error('Get class topics error:', err);
+    res.status(500).json({ message: "Failed to load topics" });
+  }
+});
+
+// Create a class-specific topic
+forumRouter.post('/class/:classId/topics', async (req, res) => {
+  const { classId } = req.params;
+  const { title, content, categoryId, userId } = req.body;
+  
+  try {
+    // Check if user is enrolled in the class
+    const enrollment = await Enrollment.findOne({ userId, classId });
+    if (!enrollment) {
+      return res.status(403).json({ message: "You must be enrolled in this class to post" });
+    }
+    
+    // Check if category exists
+    if (categoryId) {
+      const category = await ForumCategory.findById(categoryId);
+      if (!category) {
+        return res.status(400).json({ message: "Invalid category" });
+      }
+    }
+    
+    const post = new ForumPost({
+      userId,
+      title,
+      content,
+      categoryId: categoryId || null,
+      classId: classId,
+      isClassForum: true,
+      replies: []
+    });
+    
+    await post.save();
+    
+    res.json({ message: "Post created", postId: post._id });
+  } catch (err) {
+    console.error('Create class post error:', err);
+    res.status(500).json({ message: "Failed to create post" });
+  }
+});
+
+// Get single class topic with details
+forumRouter.get('/class/:classId/topics/:topicId', async (req, res) => {
+  const { classId, topicId } = req.params;
+  
+  try {
+    // Increment view count
+    await ForumPost.findByIdAndUpdate(topicId, { $inc: { views: 1 } });
+    
+    const post = await ForumPost.findOne({ _id: topicId, classId: classId })
+      .populate('userId', 'firstName lastName profilePicture')
+      .populate('categoryId', 'name slug')
+      .lean();
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    const formattedPost = {
+      ...post,
+      author_name: post.userId ? `${post.userId.firstName} ${post.userId.lastName}` : 'Unknown',
+      category_name: post.categoryId?.name,
+      category_slug: post.categoryId?.slug
+    };
+    
+    res.json(formattedPost);
+  } catch (err) {
+    console.error('Get class topic error:', err);
+    res.status(500).json({ message: "Failed to load post" });
+  }
+});
+
+// Get replies for a class topic
+forumRouter.get('/class/:classId/topics/:topicId/replies', async (req, res) => {
+  const { classId, topicId } = req.params;
+  
+  try {
+    const post = await ForumPost.findOne({ _id: topicId, classId: classId })
+      .populate('replies.userId', 'firstName lastName')
+      .lean();
+    
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    const replies = post.replies.map(reply => ({
+      ...reply,
+      author_name: reply.userId ? `${reply.userId.firstName} ${reply.userId.lastName}` : 'Unknown'
+    }));
+    
+    res.json(replies);
+  } catch (err) {
+    console.error('Get class replies error:', err);
+    res.status(500).json({ message: "Failed to load replies" });
+  }
+});
+
+// Add reply to class topic
+forumRouter.post('/class/:classId/topics/:topicId/replies', async (req, res) => {
+  const { classId, topicId } = req.params;
+  const { content, userId } = req.body;
+  
+  try {
+    // Check if user is enrolled in the class
+    const enrollment = await Enrollment.findOne({ userId, classId });
+    if (!enrollment) {
+      return res.status(403).json({ message: "You must be enrolled in this class to reply" });
+    }
+    
+    const post = await ForumPost.findOne({ _id: topicId, classId: classId });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    post.replies.push({
+      userId,
+      content,
+      createdAt: new Date(),
+      likes: 0,
+      isBestAnswer: false
+    });
+    
+    await post.save();
+    
+    res.json({ message: "Reply added" });
+  } catch (error) {
+    console.error('Add class reply error:', error);
+    res.status(500).json({ message: "Could not post reply" });
+  }
+});
+
+// Pin/unpin class topic (instructor only)
+forumRouter.post('/class/:classId/topics/:topicId/pin', async (req, res) => {
+  const { classId, topicId } = req.params;
+  const { userId } = req.body;
+  
+  try {
+    // Check if user is instructor of this class
+    const classData = await Class.findById(classId);
+    if (!classData || classData.instructorId.toString() !== userId) {
+      return res.status(403).json({ message: "Only instructors can pin topics" });
+    }
+    
+    const post = await ForumPost.findOne({ _id: topicId, classId: classId });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    post.isPinned = !post.isPinned;
+    await post.save();
+    
+    res.json({ 
+      message: post.isPinned ? "Topic pinned" : "Topic unpinned",
+      isPinned: post.isPinned 
+    });
+  } catch (error) {
+    console.error('Pin topic error:', error);
+    res.status(500).json({ message: "Failed to pin topic" });
+  }
+});
+
+// Mark class topic as solved
+forumRouter.post('/class/:classId/topics/:topicId/solve', async (req, res) => {
+  const { classId, topicId } = req.params;
+  const { userId } = req.body;
+  
+  try {
+    const post = await ForumPost.findOne({ _id: topicId, classId: classId });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    // Only author or instructor can mark as solved
+    const classData = await Class.findById(classId);
+    const isInstructor = classData && classData.instructorId.toString() === userId;
+    const isAuthor = post.userId.toString() === userId;
+    
+    if (!isAuthor && !isInstructor) {
+      return res.status(403).json({ message: "Only the author or instructor can mark as solved" });
+    }
+    
+    post.solved = !post.solved;
+    await post.save();
+    
+    res.json({ 
+      message: post.solved ? "Topic marked as solved" : "Topic unsolved",
+      solved: post.solved 
+    });
+  } catch (error) {
+    console.error('Solve topic error:', error);
+    res.status(500).json({ message: "Failed to mark topic as solved" });
+  }
+});
+
+// Delete class topic
+forumRouter.delete('/class/:classId/topics/:topicId', async (req, res) => {
+  const { classId, topicId } = req.params;
+  const { userId } = req.body;
+  
+  try {
+    const post = await ForumPost.findOne({ _id: topicId, classId: classId });
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    // Check if user is author or instructor
+    const classData = await Class.findById(classId);
+    const isInstructor = classData && classData.instructorId.toString() === userId;
+    const isAuthor = post.userId.toString() === userId;
+    
+    if (!isAuthor && !isInstructor) {
+      return res.status(403).json({ message: "Unauthorized to delete this topic" });
+    }
+    
+    await ForumPost.findByIdAndDelete(topicId);
+    res.json({ message: "Topic deleted" });
+  } catch (error) {
+    console.error('Delete class topic error:', error);
+    res.status(500).json({ message: "Failed to delete topic" });
+  }
+});
+
+// ===== EXISTING GLOBAL FORUM ENDPOINTS (Modified to exclude class posts) =====
+
+// Get topics - exclude class-specific topics
+forumRouter.get('/topics', async (req, res) => {
+  const { search, sort, category } = req.query;
+  
+  try {
+    let query = { 
+      $or: [
+        { isClassForum: { $ne: true } },
+        { isClassForum: { $exists: false } }
+      ]
+    };
+    let sortOption = {};
+    
+    if (category) {
+      const categoryDoc = await ForumCategory.findOne({ slug: category, classId: null });
+      if (categoryDoc) {
+        query.categoryId = categoryDoc._id;
+      }
+    }
+    
+    if (search) {
+      query.title = { $regex: search, $options: 'i' };
+    }
+    
+    if (sort === "popular") {
+      sortOption = { "replyCount": -1 };
+    } else if (sort === "unanswered") {
+      query.$expr = { $eq: [{ $size: "$replies" }, 0] };
       sortOption = { createdAt: -1 };
+    } else {
+      sortOption = { isPinned: -1, createdAt: -1 };
     }
     
     const topics = await ForumPost.aggregate([
@@ -283,11 +604,11 @@ forumRouter.get('/topics', async (req, res) => {
   }
 });
 
-// Get forum categories
+// Get forum categories - exclude class-specific
 forumRouter.get('/categories', async (req, res) => {
   try {
     const categories = await ForumCategory.aggregate([
-      { $match: { isActive: true } },
+      { $match: { isActive: true, classId: null, isClassCategory: { $ne: true } } },
       {
         $lookup: {
           from: "forumposts",
