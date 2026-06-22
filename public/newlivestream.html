@@ -1367,31 +1367,16 @@ async function startLivestream() {
         showToast('Requesting camera and microphone…');
         updateConnectionStatus('connecting', 'Requesting camera access...');
         
+        // ===== REQUEST MEDIA =====
         try {
-            // Get user media with audio settings
             localStream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 }
-                },
+                video: { width: { ideal: 1280 }, height: { ideal: 720 } },
                 audio: {
                     echoCancellation: true,
                     noiseSuppression: true,
-                    autoGainControl: true
+                    autoGainControl:  true,
                 }
             });
-            
-            // Check if audio track exists
-            const audioTracks = localStream.getAudioTracks();
-            if (audioTracks.length > 0) {
-                console.log('✅ Audio track found:', audioTracks[0].label);
-                console.log('✅ Audio track enabled:', audioTracks[0].enabled);
-                console.log('✅ Audio track readyState:', audioTracks[0].readyState);
-            } else {
-                console.warn('⚠️ No audio track found');
-                showWarning('No audio track found. Please check your microphone.');
-            }
-            
             showSuccess('Camera and microphone access granted');
         } catch (cameraErr) {
             if (cameraErr.name === 'NotAllowedError') {
@@ -1403,80 +1388,64 @@ async function startLivestream() {
             }
         }
 
+        // Show host preview (muted — host shouldn't hear themselves)
         hostVideo.srcObject = localStream;
+        hostVideo.muted = true;
         showHostVideo(true);
 
         updateConnectionStatus('connecting', 'Connecting to LiveKit...');
         showToast('Connecting to LiveKit…');
 
         const { token, url } = await getLiveKitToken(currentRoomName, 'Instructor', true);
-        
-        if (!token) {
-            throw new Error('Invalid token received from server');
-        }
+        if (!token) throw new Error('Invalid token received from server');
 
-        liveKitRoom = new LiveKitClient.Room();
-        
+        // ===== CREATE ROOM — let LiveKit manage its own tracks =====
+        liveKitRoom = new LiveKitClient.Room({
+            // Tell LiveKit NOT to use our getUserMedia stream —
+            // it will create its own internal tracks for publishing.
+            // This prevents the double-capture silence bug.
+            adaptiveStream: true,
+            dynacast: true,
+        });
+
         liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
             updateConnectionStatus('connected', '🔴 Live - Streaming');
             showSuccess('Connected to LiveKit! Publishing stream...');
         });
-        
         liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
             updateConnectionStatus('disconnected', 'Disconnected from LiveKit');
             showWarning('Disconnected from LiveKit. Stream may have ended.');
         });
-        
         liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
             updateConnectionStatus('connecting', 'Reconnecting to LiveKit...');
             showWarning('Connection lost. Reconnecting...');
         });
-        
         liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, (participant) => {
             showSuccess(`${participant.identity} joined the class`);
             updateViewersFromLiveKit(liveKitRoom);
         });
-        
         liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
             showToast(`${participant.identity} left`);
             updateViewersFromLiveKit(liveKitRoom);
         });
 
         await liveKitRoom.connect(url, token);
-        
-        // ===== FIX: Use the simpler setCameraEnabled/setMicrophoneEnabled method =====
-        // This avoids the TrackSource issue
+
+        // ===== PUBLISH TRACKS =====
+        // Use LiveKit's built-in track creation — this is what fixes the silence issue.
+        // setCameraEnabled/setMicrophoneEnabled let LiveKit capture fresh tracks
+        // rather than reusing the getUserMedia stream (which causes silence detection).
         await liveKitRoom.localParticipant.setCameraEnabled(true);
         await liveKitRoom.localParticipant.setMicrophoneEnabled(true);
-        
-        // Alternative: Manually publish tracks (works in newer versions)
-        // If you want to use manual publishing, uncomment this:
-        /*
-        const audioTrack = localStream.getAudioTracks()[0];
-        if (audioTrack) {
-            await liveKitRoom.localParticipant.publishTrack(audioTrack, {
-                name: 'microphone'
-            });
+
+        // Verify mic track is actually live
+        const micPub = liveKitRoom.localParticipant.getTrackPublication(LiveKitClient.Track.Source.Microphone);
+        if (micPub && micPub.track) {
+            console.log('✅ Mic track published, muted:', micPub.isMuted);
+        } else {
+            console.warn('⚠️ Mic track not found after enabling');
         }
-        const videoTrack = localStream.getVideoTracks()[0];
-        if (videoTrack) {
-            await liveKitRoom.localParticipant.publishTrack(videoTrack, {
-                name: 'camera'
-            });
-        }
-        */
-        
-        // ===== FIX: Force audio context to be active =====
-        try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume();
-            }
-            console.log('✅ Audio context state:', audioContext.state);
-        } catch (audioErr) {
-            console.log('Audio context note:', audioErr.message);
-        }
-        
+
         setupLiveKitChat(liveKitRoom);
 
         const sessionResponse = await fetch(`${BACKEND_URL}/api/livekit/start-session`, {
@@ -1500,14 +1469,45 @@ async function startLivestream() {
         updateStreamStatus(true, title);
         streamStartTime = Date.now();
 
+        // ===== RECORDING =====
+        // Build a fresh MediaStream combining LiveKit's published tracks
+        // so the recording always has both video and audio.
         recordedChunks = [];
-        mediaRecorder = new MediaRecorder(localStream, {
-            mimeType: 'video/webm',
-            videoBitsPerSecond: 1000000,
-            audioBitsPerSecond: 128000
-        });
-        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-        mediaRecorder.start(10000);
+        try {
+            const recordStream = new MediaStream();
+
+            const camPub = liveKitRoom.localParticipant.getTrackPublication(LiveKitClient.Track.Source.Camera);
+            const micPub = liveKitRoom.localParticipant.getTrackPublication(LiveKitClient.Track.Source.Microphone);
+
+            if (camPub && camPub.track && camPub.track.mediaStreamTrack) {
+                recordStream.addTrack(camPub.track.mediaStreamTrack);
+            } else if (localStream.getVideoTracks()[0]) {
+                recordStream.addTrack(localStream.getVideoTracks()[0]);
+            }
+            if (micPub && micPub.track && micPub.track.mediaStreamTrack) {
+                recordStream.addTrack(micPub.track.mediaStreamTrack);
+            } else if (localStream.getAudioTracks()[0]) {
+                recordStream.addTrack(localStream.getAudioTracks()[0]);
+            }
+
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
+                ? 'video/webm;codecs=vp9,opus'
+                : 'video/webm';
+
+            mediaRecorder = new MediaRecorder(recordStream, {
+                mimeType,
+                videoBitsPerSecond: 1000000,
+                audioBitsPerSecond: 128000,
+            });
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.start(10000);
+            console.log('✅ Recording started with audio + video');
+        } catch (recErr) {
+            console.warn('Recording setup failed, falling back to localStream:', recErr.message);
+            mediaRecorder = new MediaRecorder(localStream, { mimeType: 'video/webm' });
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+            mediaRecorder.start(10000);
+        }
 
         showSuccess('✅ Livestream started! Students can now join.');
         updateConnectionStatus('connected', '🔴 Live - Streaming');
