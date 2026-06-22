@@ -32,16 +32,12 @@ router.post('/mux/create-upload', async (req, res) => {
   try {
     const { streamName, classId, classTitle, instructorName } = req.body;
     
-    // Create a direct upload URL with proper naming
     const upload = await mux.video.uploads.create({
       cors_origin: '*',
       new_asset_settings: {
-        // Set the actual asset name (displayed in Mux dashboard)
         playback_policy: ['public'],
         max_resolution_tier: '1080p',
-        // This is the title that will appear in Mux dashboard
         asset_name: `${classTitle} - ${new Date().toLocaleDateString()}`,
-        // Store additional metadata as passthrough
         passthrough: JSON.stringify({
           streamName,
           classId,
@@ -81,7 +77,7 @@ router.get('/mux/upload-status/:uploadId', async (req, res) => {
       assetId = upload.asset_id;
       const asset = await mux.video.assets.retrieve(assetId);
       playbackId = asset.playback_ids?.[0]?.id;
-      assetName = asset.name; // Get the asset name back
+      assetName = asset.name;
     }
     
     res.json({
@@ -97,7 +93,7 @@ router.get('/mux/upload-status/:uploadId', async (req, res) => {
   }
 });
 
-// Save stream with Mux data (updated to include asset name)
+// Save stream with Mux data
 router.post('/save-stream', async (req, res) => {
   try {
     const { 
@@ -119,7 +115,6 @@ router.post('/save-stream', async (req, res) => {
       });
     }
     
-    // Create stream record in database
     const streamId = await Stream.create({
       userId,
       name: streamName,
@@ -134,7 +129,6 @@ router.post('/save-stream', async (req, res) => {
       muxPlaybackId: muxPlaybackId,
     });
     
-    // Create corresponding live session record
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -166,7 +160,7 @@ router.post('/save-stream', async (req, res) => {
   }
 });
 
-// Update Mux asset title after upload (if needed)
+// Update Mux asset title after upload
 router.post('/mux/update-asset-title/:assetId', async (req, res) => {
   try {
     const { assetId } = req.params;
@@ -176,7 +170,6 @@ router.post('/mux/update-asset-title/:assetId', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Title is required' });
     }
     
-    // Update the asset name in Mux
     const asset = await mux.video.assets.update(assetId, {
       name: title,
     });
@@ -248,21 +241,25 @@ router.get('/stream-hls/:streamId', async (req, res) => {
   }
 });
 
-// Get streams by class
+// ===== FIXED: Get streams by class using Stream.getAll() =====
 router.get('/by-class/:classId', async (req, res) => {
   try {
     const { classId } = req.params;
-    const StreamModel = (await import('../models/Stream.js')).default;
     
-    const streams = await StreamModel.find({ streamClass: classId })
-      .sort({ createdAt: -1 })
-      .lean();
+    // Use the already imported Stream model's getAll method
+    const allStreams = await Stream.getAll();
     
-    const classVideos = streams.map(stream => ({
+    // Filter streams by classId (convert both to string for comparison)
+    const classStreams = allStreams.filter(stream => {
+      if (!stream.streamClass) return false;
+      return stream.streamClass.toString() === classId;
+    });
+    
+    const classVideos = classStreams.map(stream => ({
       _id: stream._id,
       filename: stream.filename,
-      title: stream.classTitle,
-      description: stream.classDescription,
+      title: stream.classTitle || stream.name || 'Untitled',
+      description: stream.classDescription || '',
       playbackUrl: stream.muxPlaybackId ? 
         `https://stream.mux.com/${stream.muxPlaybackId}.m3u8` : null,
       thumbnailUrl: stream.muxPlaybackId ?
@@ -272,12 +269,20 @@ router.get('/by-class/:classId', async (req, res) => {
       uploadDate: stream.createdAt,
       duration: stream.duration,
       participants: stream.participants,
+      muxAssetId: stream.muxAssetId,
+      muxPlaybackId: stream.muxPlaybackId,
+      muxStatus: stream.muxStatus,
     }));
+    
+    console.log(`✅ Found ${classVideos.length} videos for class ${classId}`);
     
     res.json(classVideos);
   } catch (error) {
     console.error('Get videos by class error:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ 
+      message: 'Internal server error', 
+      error: error.message 
+    });
   }
 });
 
@@ -291,7 +296,6 @@ router.delete('/delete-stream/:streamId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Stream not found' });
     }
     
-    // Delete from Mux if asset exists
     if (stream.muxAssetId) {
       try {
         await mux.video.assets.del(stream.muxAssetId);
@@ -301,7 +305,6 @@ router.delete('/delete-stream/:streamId', async (req, res) => {
       }
     }
     
-    // Delete from database
     await Stream.delete(streamId);
     
     res.json({ success: true, message: 'Stream deleted successfully' });

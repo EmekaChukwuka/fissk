@@ -454,7 +454,10 @@ class ClassManager {
             recordingsContainer.style.display = 'grid';
             recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
                 // Get the video URL (support multiple formats)
-                const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url;
+                console.log(recording)
+               // In class.js, look for this line in renderRecordings():
+                const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url || 
+                 (recording.muxPlaybackId ? `https://stream.mux.com/${recording.muxPlaybackId}.m3u8` : null);
                 const thumbnailUrl = recording.thumbnailUrl || '';
                 const title = recording.classTitle || recording.name || recording.filename || `Recording ${index + 1}`;
                 const description = recording.classDescription || recording.description || 'Past livestream recording';

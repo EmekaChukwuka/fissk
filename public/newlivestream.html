@@ -1341,138 +1341,191 @@
         viewerCountSpan.textContent = viewerCount;
     }
 
-    // ===== HOST: START LIVESTREAM =====
-    async function startLivestream() {
-        const title       = document.getElementById('title').value;
-        const description = document.getElementById('description').value;
-        const classId     = document.getElementById('streamClass').value;
+    // ===== HOST: START LIVESTREAM (FIXED - NO TrackSource) =====
+async function startLivestream() {
+    const title       = document.getElementById('title').value;
+    const description = document.getElementById('description').value;
+    const classId     = document.getElementById('streamClass').value;
 
-        if (!classId || !title) {
-            showError('Please select a class and enter a title', null);
-            alert('Please select a class and enter a title');
-            return;
-        }
-
-        try {
-            hideError();
-            lastFailedAction = 'startStream';
-            updateConnectionStatus('connecting', 'Starting stream...');
-            
-            closeModal('createClassModal');
-            isHost = true;
-            currentStreamData = { title, description, classId };
-            currentRoomName = `class_${classId}_${Date.now()}`;
-            streamTitleSpan.textContent = title;
-
-            showToast('Requesting camera and microphone…');
-            updateConnectionStatus('connecting', 'Requesting camera access...');
-            
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-                    audio: true
-                });
-                showSuccess('Camera and microphone access granted');
-            } catch (cameraErr) {
-                if (cameraErr.name === 'NotAllowedError') {
-                    throw new Error('Camera/microphone access denied. Please allow access and try again.');
-                } else if (cameraErr.name === 'NotFoundError') {
-                    throw new Error('No camera or microphone found on this device.');
-                } else {
-                    throw new Error(`Camera error: ${cameraErr.message}`);
-                }
-            }
-
-            hostVideo.srcObject = localStream;
-            showHostVideo(true);
-
-            updateConnectionStatus('connecting', 'Connecting to LiveKit...');
-            showToast('Connecting to LiveKit…');
-
-            const { token, url } = await getLiveKitToken(currentRoomName, 'Instructor', true);
-            
-            if (!token) {
-                throw new Error('Invalid token received from server');
-            }
-
-            liveKitRoom = new LiveKitClient.Room();
-            
-            liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
-                updateConnectionStatus('connected', '🔴 Live - Streaming');
-                showSuccess('Connected to LiveKit! Publishing stream...');
-            });
-            
-            liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
-                updateConnectionStatus('disconnected', 'Disconnected from LiveKit');
-                showWarning('Disconnected from LiveKit. Stream may have ended.');
-            });
-            
-            liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
-                updateConnectionStatus('connecting', 'Reconnecting to LiveKit...');
-                showWarning('Connection lost. Reconnecting...');
-            });
-            
-            liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, (participant) => {
-                showSuccess(`${participant.identity} joined the class`);
-                updateViewersFromLiveKit(liveKitRoom);
-            });
-            
-            liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
-                showToast(`${participant.identity} left`);
-                updateViewersFromLiveKit(liveKitRoom);
-            });
-
-            await liveKitRoom.connect(url, token);
-            await liveKitRoom.localParticipant.setCameraEnabled(true);
-            await liveKitRoom.localParticipant.setMicrophoneEnabled(true);
-            setupLiveKitChat(liveKitRoom);
-
-            const sessionResponse = await fetch(`${BACKEND_URL}/api/livekit/start-session`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roomName: currentRoomName, title, description, classId, userId })
-            });
-            
-            if (!sessionResponse.ok) {
-                console.warn('Session start notification failed, but stream continues');
-                showWarning('Stream started but session notification failed');
-            }
-
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-            joinBtn.disabled = true;
-            chatInput.disabled = false;
-            sendChatBtn.disabled = false;
-            recordingBadge.classList.add('active');
-            liveBadge.classList.add('active');
-            updateStreamStatus(true, title);
-            streamStartTime = Date.now();
-
-            recordedChunks = [];
-            mediaRecorder = new MediaRecorder(localStream, {
-                mimeType: 'video/webm',
-                videoBitsPerSecond: 1000000
-            });
-            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-            mediaRecorder.start(10000);
-
-            showSuccess('✅ Livestream started! Students can now join.');
-            updateConnectionStatus('connected', '🔴 Live - Streaming');
-            lastFailedAction = null;
-
-        } catch(err) {
-            console.error('Start stream error:', err);
-            showError(`Failed to start stream: ${err.message}`, 'startStream');
-            isHost = false;
-            startBtn.disabled = false;
-            if (localStream) { 
-                localStream.getTracks().forEach(t => t.stop()); 
-                localStream = null; 
-            }
-            showHostVideo(false);
-            updateConnectionStatus('disconnected', 'Stream start failed');
-        }
+    if (!classId || !title) {
+        showError('Please select a class and enter a title', null);
+        alert('Please select a class and enter a title');
+        return;
     }
+
+    try {
+        hideError();
+        lastFailedAction = 'startStream';
+        updateConnectionStatus('connecting', 'Starting stream...');
+        
+        closeModal('createClassModal');
+        isHost = true;
+        currentStreamData = { title, description, classId };
+        currentRoomName = `class_${classId}_${Date.now()}`;
+        streamTitleSpan.textContent = title;
+
+        showToast('Requesting camera and microphone…');
+        updateConnectionStatus('connecting', 'Requesting camera access...');
+        
+        try {
+            // Get user media with audio settings
+            localStream = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 }
+                },
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
+            
+            // Check if audio track exists
+            const audioTracks = localStream.getAudioTracks();
+            if (audioTracks.length > 0) {
+                console.log('✅ Audio track found:', audioTracks[0].label);
+                console.log('✅ Audio track enabled:', audioTracks[0].enabled);
+                console.log('✅ Audio track readyState:', audioTracks[0].readyState);
+            } else {
+                console.warn('⚠️ No audio track found');
+                showWarning('No audio track found. Please check your microphone.');
+            }
+            
+            showSuccess('Camera and microphone access granted');
+        } catch (cameraErr) {
+            if (cameraErr.name === 'NotAllowedError') {
+                throw new Error('Camera/microphone access denied. Please allow access and try again.');
+            } else if (cameraErr.name === 'NotFoundError') {
+                throw new Error('No camera or microphone found on this device.');
+            } else {
+                throw new Error(`Camera error: ${cameraErr.message}`);
+            }
+        }
+
+        hostVideo.srcObject = localStream;
+        showHostVideo(true);
+
+        updateConnectionStatus('connecting', 'Connecting to LiveKit...');
+        showToast('Connecting to LiveKit…');
+
+        const { token, url } = await getLiveKitToken(currentRoomName, 'Instructor', true);
+        
+        if (!token) {
+            throw new Error('Invalid token received from server');
+        }
+
+        liveKitRoom = new LiveKitClient.Room();
+        
+        liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
+            updateConnectionStatus('connected', '🔴 Live - Streaming');
+            showSuccess('Connected to LiveKit! Publishing stream...');
+        });
+        
+        liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
+            updateConnectionStatus('disconnected', 'Disconnected from LiveKit');
+            showWarning('Disconnected from LiveKit. Stream may have ended.');
+        });
+        
+        liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
+            updateConnectionStatus('connecting', 'Reconnecting to LiveKit...');
+            showWarning('Connection lost. Reconnecting...');
+        });
+        
+        liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, (participant) => {
+            showSuccess(`${participant.identity} joined the class`);
+            updateViewersFromLiveKit(liveKitRoom);
+        });
+        
+        liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+            showToast(`${participant.identity} left`);
+            updateViewersFromLiveKit(liveKitRoom);
+        });
+
+        await liveKitRoom.connect(url, token);
+        
+        // ===== FIX: Use the simpler setCameraEnabled/setMicrophoneEnabled method =====
+        // This avoids the TrackSource issue
+        await liveKitRoom.localParticipant.setCameraEnabled(true);
+        await liveKitRoom.localParticipant.setMicrophoneEnabled(true);
+        
+        // Alternative: Manually publish tracks (works in newer versions)
+        // If you want to use manual publishing, uncomment this:
+        /*
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            await liveKitRoom.localParticipant.publishTrack(audioTrack, {
+                name: 'microphone'
+            });
+        }
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            await liveKitRoom.localParticipant.publishTrack(videoTrack, {
+                name: 'camera'
+            });
+        }
+        */
+        
+        // ===== FIX: Force audio context to be active =====
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume();
+            }
+            console.log('✅ Audio context state:', audioContext.state);
+        } catch (audioErr) {
+            console.log('Audio context note:', audioErr.message);
+        }
+        
+        setupLiveKitChat(liveKitRoom);
+
+        const sessionResponse = await fetch(`${BACKEND_URL}/api/livekit/start-session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roomName: currentRoomName, title, description, classId, userId })
+        });
+        
+        if (!sessionResponse.ok) {
+            console.warn('Session start notification failed, but stream continues');
+            showWarning('Stream started but session notification failed');
+        }
+
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        joinBtn.disabled = true;
+        chatInput.disabled = false;
+        sendChatBtn.disabled = false;
+        recordingBadge.classList.add('active');
+        liveBadge.classList.add('active');
+        updateStreamStatus(true, title);
+        streamStartTime = Date.now();
+
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(localStream, {
+            mimeType: 'video/webm',
+            videoBitsPerSecond: 1000000,
+            audioBitsPerSecond: 128000
+        });
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.start(10000);
+
+        showSuccess('✅ Livestream started! Students can now join.');
+        updateConnectionStatus('connected', '🔴 Live - Streaming');
+        lastFailedAction = null;
+
+    } catch(err) {
+        console.error('Start stream error:', err);
+        showError(`Failed to start stream: ${err.message}`, 'startStream');
+        isHost = false;
+        startBtn.disabled = false;
+        if (localStream) { 
+            localStream.getTracks().forEach(t => t.stop()); 
+            localStream = null; 
+        }
+        showHostVideo(false);
+        updateConnectionStatus('disconnected', 'Stream start failed');
+    }
+}
 
     // ===== STOP LIVESTREAM =====
     async function stopLivestream() {
@@ -1558,131 +1611,159 @@
         }
     }
 
-    // ===== JOIN STREAM (VIEWER) =====
-    async function joinLivestream() {
-        const isActive = await checkStreamStatus();
-        if (!isActive) { 
-            showError('No live stream available', null);
-            showToast('No live stream available', true); 
-            return; 
+// ===== JOIN STREAM (VIEWER) - SIMPLIFIED =====
+async function joinLivestream() {
+    const isActive = await checkStreamStatus();
+    if (!isActive) { 
+        showError('No live stream available', null);
+        showToast('No live stream available', true); 
+        return; 
+    }
+
+    try {
+        hideError();
+        lastFailedAction = 'joinStream';
+        updateConnectionStatus('connecting', 'Finding active stream...');
+        
+        const response = await fetch(`${BACKEND_URL}/api/active-stream`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
-
-        try {
-            hideError();
-            lastFailedAction = 'joinStream';
-            updateConnectionStatus('connecting', 'Finding active stream...');
-            
-            const response = await fetch(`${BACKEND_URL}/api/active-stream`);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const data = await response.json();
-            if (!data.isActive || data.streams.length === 0) {
-                throw new Error('No active stream found');
-            }
-            
-            const activeStream = data.streams[0];
-            currentRoomName = activeStream.roomName;
-            currentStreamData.title = activeStream.title;
-            streamTitleSpan.textContent = activeStream.title;
-            
-        } catch(err) {
-            console.error('Get active stream error:', err);
-            showError(`Cannot find active stream: ${err.message}`, 'joinStream');
-            updateConnectionStatus('disconnected', 'No stream found');
-            return;
+        
+        const data = await response.json();
+        if (!data.isActive || data.streams.length === 0) {
+            throw new Error('No active stream found');
         }
+        
+        const activeStream = data.streams[0];
+        currentRoomName = activeStream.roomName;
+        currentStreamData.title = activeStream.title;
+        streamTitleSpan.textContent = activeStream.title;
+        
+    } catch(err) {
+        console.error('Get active stream error:', err);
+        showError(`Cannot find active stream: ${err.message}`, 'joinStream');
+        updateConnectionStatus('disconnected', 'No stream found');
+        return;
+    }
 
-        joinBtn.disabled = true;
-        joinBtn.querySelector('.btn-icon').textContent = '⏳';
-        startBtn.disabled = true;
-        remoteEmptyText.textContent = 'Connecting…';
-        updateConnectionStatus('connecting', 'Connecting to class...');
+    joinBtn.disabled = true;
+    joinBtn.querySelector('.btn-icon').textContent = '⏳';
+    startBtn.disabled = true;
+    remoteEmptyText.textContent = 'Connecting…';
+    updateConnectionStatus('connecting', 'Connecting to class...');
 
-        try {
-            const studentName = localStorage.getItem('studentName') || prompt('Enter your name:', 'Student') || 'Student';
-            localStorage.setItem('studentName', studentName);
+    try {
+        const studentName = localStorage.getItem('studentName') || prompt('Enter your name:', 'Student') || 'Student';
+        localStorage.setItem('studentName', studentName);
 
-            const { token, url } = await getLiveKitToken(currentRoomName, studentName, false);
+        const { token, url } = await getLiveKitToken(currentRoomName, studentName, false);
+        
+        if (!token) {
+            throw new Error('Invalid token received');
+        }
+        
+        liveKitRoom = new LiveKitClient.Room();
+
+        // ===== FIX: Handle both video AND audio tracks =====
+        liveKitRoom.on(LiveKitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+            console.log(`Track subscribed: ${track.kind} from ${participant.identity}`);
             
-            if (!token) {
-                throw new Error('Invalid token received');
-            }
-            
-            liveKitRoom = new LiveKitClient.Room();
-
-            liveKitRoom.on(LiveKitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-                if (track.kind === 'video' && participant.identity === 'Instructor') {
-                    track.attach(remoteVideo);
-                    showRemoteVideo(true);
-                    remoteVideoLabel.textContent = "Instructor's Stream";
-                    updateConnectionStatus('connected', '📺 Watching class');
-                    showSuccess('Connected to class!');
-                }
-            });
-
-            liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
-                isViewer = true;
-                chatInput.disabled = false;
-                sendChatBtn.disabled = false;
+            // Handle video track
+            if (track.kind === 'video' && participant.identity === 'Instructor') {
+                track.attach(remoteVideo);
+                showRemoteVideo(true);
+                remoteVideoLabel.textContent = "Instructor's Stream";
                 updateConnectionStatus('connected', '📺 Watching class');
-                startBtn.disabled = true;
+                showSuccess('Connected to class!');
+            }
+            
+            // Handle audio track - attach to video element for audio playback
+            if (track.kind === 'audio' && participant.identity === 'Instructor') {
+                track.attach(remoteVideo);
+                console.log('✅ Audio track attached successfully');
+            }
+        });
+
+        liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
+            isViewer = true;
+            chatInput.disabled = false;
+            sendChatBtn.disabled = false;
+            updateConnectionStatus('connected', '📺 Watching class');
+            startBtn.disabled = true;
+            
+            // ===== FIX: Ensure audio unmuted =====
+            remoteVideo.muted = false;
+            remoteVideo.volume = 1.0;
+            
+            // Try to play to enable audio
+            remoteVideo.play().then(() => {
+                console.log('✅ Audio playback started');
+            }).catch(() => {
+                console.log('Auto-play prevented, click to enable audio');
+                showWarning('Click anywhere to enable audio');
+                document.addEventListener('click', function enableAudio() {
+                    remoteVideo.play().then(() => {
+                        showSuccess('Audio enabled!');
+                    }).catch(e => console.log('Audio still blocked'));
+                    document.removeEventListener('click', enableAudio);
+                }, { once: true });
             });
+        });
 
-            liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
-                updateConnectionStatus('disconnected', 'Disconnected');
-                updateStreamStatus(false);
-                showRemoteVideo(false);
-                isViewer = false;
-                const user = JSON.parse(localStorage.getItem('user'));
-                if (user && user.user_type === 'instructor') startBtn.disabled = false;
-                showWarning('Disconnected from stream');
-            });
-
-            liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
-                updateConnectionStatus('connecting', 'Reconnecting...');
-                showWarning('Connection lost. Reconnecting...');
-            });
-
-            liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
-                if (participant.identity === 'Instructor') {
-                    showError('Instructor has ended the class', null);
-                    showRemoteVideo(false);
-                    remoteEmptyText.textContent = 'Class ended';
-                    updateStreamStatus(false);
-                    isViewer = false;
-                    chatInput.disabled = true;
-                    sendChatBtn.disabled = true;
-                    joinBtn.disabled = false;
-                    joinBtn.querySelector('.btn-icon').textContent = '👤';
-                    const user = JSON.parse(localStorage.getItem('user'));
-                    if (user && user.user_type === 'instructor') startBtn.disabled = false;
-                }
-            });
-
-            liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, () => updateViewersFromLiveKit(liveKitRoom));
-            liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, () => updateViewersFromLiveKit(liveKitRoom));
-
-            await liveKitRoom.connect(url, token);
-            setupLiveKitChat(liveKitRoom);
-            updateViewersFromLiveKit(liveKitRoom);
-
-            joinBtn.querySelector('.btn-icon').textContent = '✅';
-            joinBtn.disabled = true;
-            lastFailedAction = null;
-
-        } catch(err) {
-            console.error('Join error:', err);
-            showError(`Failed to join: ${err.message}`, 'joinStream');
-            joinBtn.disabled = false;
-            joinBtn.querySelector('.btn-icon').textContent = '👤';
+        liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
+            updateConnectionStatus('disconnected', 'Disconnected');
+            updateStreamStatus(false);
+            showRemoteVideo(false);
             isViewer = false;
             const user = JSON.parse(localStorage.getItem('user'));
             if (user && user.user_type === 'instructor') startBtn.disabled = false;
-            updateConnectionStatus('disconnected', 'Connection failed');
-        }
+            showWarning('Disconnected from stream');
+        });
+
+        liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
+            updateConnectionStatus('connecting', 'Reconnecting...');
+            showWarning('Connection lost. Reconnecting...');
+        });
+
+        liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+            if (participant.identity === 'Instructor') {
+                showError('Instructor has ended the class', null);
+                showRemoteVideo(false);
+                remoteEmptyText.textContent = 'Class ended';
+                updateStreamStatus(false);
+                isViewer = false;
+                chatInput.disabled = true;
+                sendChatBtn.disabled = true;
+                joinBtn.disabled = false;
+                joinBtn.querySelector('.btn-icon').textContent = '👤';
+                const user = JSON.parse(localStorage.getItem('user'));
+                if (user && user.user_type === 'instructor') startBtn.disabled = false;
+            }
+        });
+
+        liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, () => updateViewersFromLiveKit(liveKitRoom));
+        liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, () => updateViewersFromLiveKit(liveKitRoom));
+
+        await liveKitRoom.connect(url, token);
+        setupLiveKitChat(liveKitRoom);
+        updateViewersFromLiveKit(liveKitRoom);
+
+        joinBtn.querySelector('.btn-icon').textContent = '✅';
+        joinBtn.disabled = true;
+        lastFailedAction = null;
+
+    } catch(err) {
+        console.error('Join error:', err);
+        showError(`Failed to join: ${err.message}`, 'joinStream');
+        joinBtn.disabled = false;
+        joinBtn.querySelector('.btn-icon').textContent = '👤';
+        isViewer = false;
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (user && user.user_type === 'instructor') startBtn.disabled = false;
+        updateConnectionStatus('disconnected', 'Connection failed');
     }
+}
 
     // ===== SEND CHAT =====
     async function sendChatMessage() {
