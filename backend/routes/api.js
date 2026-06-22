@@ -345,4 +345,115 @@ router.post('/add-comment', async (req, res) => {
   }
 });
 
+// ===== GET SINGLE MUX VIDEO BY ASSET ID =====
+router.get('/mux/video/:assetId', async (req, res) => {
+  try {
+    const { assetId } = req.params;
+    
+    const asset = await mux.video.assets.retrieve(assetId);
+    
+    if (!asset) {
+      return res.status(404).json({ success: false, message: 'Video not found' });
+    }
+    
+    // Parse passthrough data
+    let passthrough = {};
+    try {
+      passthrough = JSON.parse(asset.passthrough || '{}');
+    } catch (e) {}
+    
+    res.json({
+      success: true,
+      video: {
+        assetId: asset.id,
+        title: asset.name || passthrough.classTitle || 'Untitled',
+        description: passthrough.classDescription || '',
+        playbackId: asset.playback_ids?.[0]?.id,
+        playbackUrl: asset.playback_ids?.[0]?.id ? 
+          `https://stream.mux.com/${asset.playback_ids[0].id}.m3u8` : null,
+        thumbnailUrl: asset.playback_ids?.[0]?.id ?
+          `https://image.mux.com/${asset.playback_ids[0].id}/thumbnail.jpg?time=5` : null,
+        duration: asset.duration,
+        createdAt: asset.created_at,
+        status: asset.status,
+      },
+    });
+    
+  } catch (error) {
+    console.error('Get Mux video error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===== GET MUX ASSETS BY CLASS ID =====
+router.get('/mux/class-videos/:classId', async (req, res) => {
+  try {
+    const { classId } = req.params;
+    
+    // List all assets from Mux (paginated)
+    let allAssets = [];
+    let page = 1;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const assets = await mux.video.assets.list({
+        limit: 50,
+        page: page,
+      });
+      
+      allAssets = [...allAssets, ...assets];
+      
+      // Check if there are more pages
+      hasMore = assets.length === 50;
+      page++;
+    }
+    
+    // Filter assets by classId from passthrough data
+    const classVideos = allAssets.filter(asset => {
+      if (!asset.passthrough) return false;
+      
+      try {
+        const passthrough = JSON.parse(asset.passthrough);
+        return passthrough.classId === classId;
+      } catch (e) {
+        return false;
+      }
+    }).map(asset => {
+      // Parse passthrough data
+      let passthrough = {};
+      try {
+        passthrough = JSON.parse(asset.passthrough || '{}');
+      } catch (e) {}
+      
+      return {
+        assetId: asset.id,
+        title: asset.name || passthrough.classTitle || 'Untitled',
+        description: passthrough.classDescription || '',
+        playbackId: asset.playback_ids?.[0]?.id,
+        playbackUrl: asset.playback_ids?.[0]?.id ? 
+          `https://stream.mux.com/${asset.playback_ids[0].id}.m3u8` : null,
+        thumbnailUrl: asset.playback_ids?.[0]?.id ?
+          `https://image.mux.com/${asset.playback_ids[0].id}/thumbnail.jpg?time=5` : null,
+        duration: asset.duration,
+        createdAt: asset.created_at,
+        status: asset.status,
+        passthrough: passthrough,
+      };
+    });
+    
+    // Sort by creation date (newest first)
+    classVideos.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    res.json({
+      success: true,
+      videos: classVideos,
+      count: classVideos.length,
+    });
+    
+  } catch (error) {
+    console.error('Get Mux class videos error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;
