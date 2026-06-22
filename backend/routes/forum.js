@@ -5,6 +5,8 @@ const forumRouter = express.Router();
 import User from '../models/User.js';
 import ForumCategory from '../models/ForumCategory.js';
 import ForumPost from '../models/ForumPost.js';
+import Class from '../models/Class.js';
+import Enrollment from '../models/Enrollment.js';
 
 // Get single topic with details
 forumRouter.get('/topics/:id', async (req, res) => {
