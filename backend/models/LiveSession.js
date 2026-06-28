@@ -77,11 +77,9 @@ LiveSessionSchema.pre('save', function(next) {
     if (!this.livekitRoomName && this.meetingId) {
       this.livekitRoomName = generateLiveKitRoomName(this.meetingId);
     }
-    // ===== FIX: Always call next() =====
-    return next();
+    next();
   } catch (error) {
-    // ===== FIX: Pass error to next() =====
-    return next(error);
+    next(error);
   }
 });
 
