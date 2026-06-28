@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import LiveSession from '../models/LiveSession.js';
 import connectDB from '../config/db.js';
 
-export async function fixStreamStatus() {
+export default async function fixStreamStatus() {
   await connectDB();
   console.log('🔍 Fixing stream statuses...');
 
