@@ -119,7 +119,7 @@ app.get('/api/stream-status', (req, res) => {
 
 // ===== NEW: MEETING ID ENDPOINTS =====
 
-// CREATE LIVESTREAM SESSION
+// ===== CREATE LIVESTREAM SESSION =====
 app.post('/api/livekit/create-session', async (req, res) => {
   const { instructorId, classId, title, description, date, time, duration } = req.body;
   
@@ -138,19 +138,22 @@ app.post('/api/livekit/create-session', async (req, res) => {
       });
     }
     
+    // Create new session - meetingId will be auto-generated
     const session = new LiveSession({
       instructorId,
       classId,
       title,
       description,
       date: new Date(date),
-      time,
+      time: time || new Date().toLocaleTimeString(),
       duration: duration || '60 minutes',
       sessionType: 'upcoming',
       streamStatus: 'scheduled'
     });
     
     await session.save();
+    
+    console.log(`✅ Session created with meetingId: ${session.meetingId}`);
     
     res.json({
       success: true,
@@ -272,17 +275,21 @@ app.post('/api/livekit/join-stream', async (req, res) => {
   }
 });
 
-// GET SESSION BY MEETING ID
+// ===== GET SESSION BY MEETING ID (FIXED) =====
 app.get('/api/livekit/session/:meetingId', async (req, res) => {
   const { meetingId } = req.params;
   
   try {
+    // Find session by meetingId
     const session = await LiveSession.findOne({ meetingId })
       .populate('instructorId', 'firstName lastName email')
       .populate('classId', 'title description');
     
     if (!session) {
-      return res.status(404).json({ success: false, message: 'Session not found' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Session not found' 
+      });
     }
     
     res.json({
@@ -299,14 +306,15 @@ app.get('/api/livekit/session/:meetingId', async (req, res) => {
         time: session.time,
         duration: session.duration,
         streamStatus: session.streamStatus,
-        participants: session.participants,
-        hostConnected: session.hostConnected,
+        participants: session.participants || 0,
+        hostConnected: session.hostConnected || false,
         joinUrl: session.joinUrl
       }
     });
+    
   } catch (error) {
     console.error('Get session error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

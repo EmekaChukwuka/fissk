@@ -29,14 +29,11 @@ const LiveSessionSchema = new mongoose.Schema({
   participants: { type: Number, default: 0 },
   sessionType: { type: String, enum: ['upcoming', 'live', 'recorded'], default: 'upcoming' },
   
-  // ===== Meeting ID - Required with default =====
   meetingId: { 
     type: String, 
     unique: true,
     required: true,
-    default: function() {
-      return generateMeetingId();
-    }
+    default: generateMeetingId
   },
   
   livekitRoomName: { 
@@ -47,7 +44,6 @@ const LiveSessionSchema = new mongoose.Schema({
     }
   },
   
-  // Mux fields
   muxAssetId: { type: String },
   muxPlaybackId: { type: String },
   muxStatus: { type: String, enum: ['preparing', 'ready', 'errored', 'deleted'], default: 'preparing' },
@@ -71,32 +67,25 @@ const LiveSessionSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
-// ===== Pre-save hook to ensure meetingId exists =====
+// ===== Pre-save hook =====
 LiveSessionSchema.pre('save', function(next) {
-  // If meetingId is not set, generate one
   if (!this.meetingId) {
-    let meetingId = generateMeetingId();
-    // Simple uniqueness check (in case of collision, which is extremely unlikely)
-    this.meetingId = meetingId;
+    this.meetingId = generateMeetingId();
   }
-  
-  // If livekitRoomName is not set, generate from meetingId
   if (!this.livekitRoomName && this.meetingId) {
     this.livekitRoomName = generateLiveKitRoomName(this.meetingId);
   }
-  
   next();
 });
 
-// ===== Virtual for join URL =====
+// ===== Virtuals =====
 LiveSessionSchema.virtual('joinUrl').get(function() {
   if (this.meetingId) {
-    return `https://fissk.onrender.com/newlivestream.html?meetingId=${this.meetingId}`;
+    return `https://fissk-online-academy.onrender.com/newlivestream.html?meetingId=${this.meetingId}`;
   }
   return null;
 });
 
-// ===== Virtual for playback URL =====
 LiveSessionSchema.virtual('playbackUrl').get(function() {
   if (this.muxPlaybackId) {
     return `https://stream.mux.com/${this.muxPlaybackId}.m3u8`;
@@ -112,7 +101,6 @@ LiveSessionSchema.index({ classId: 1 });
 LiveSessionSchema.index({ streamStatus: 1 });
 LiveSessionSchema.index({ hostConnected: 1 });
 
-// ===== Ensure virtuals are included in JSON =====
 LiveSessionSchema.set('toJSON', { virtuals: true });
 LiveSessionSchema.set('toObject', { virtuals: true });
 

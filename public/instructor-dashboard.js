@@ -310,12 +310,12 @@ class InstructorDashboard {
     }
 }
 
-  // ===== GENERATE MEETING LINK =====
+ // ===== GENERATE MEETING LINK =====
 async generateMeetingLink(streamId, streamTitle) {
   try {
     this.showMessage('Generating meeting link...', 'success');
     
-    const response = await fetch('https://fissk-backend.onrender.com/api/livekit/session/create-meeting', {
+    const response = await fetch('https://fissk-backend.onrender.com/api/livekit/create-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

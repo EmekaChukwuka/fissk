@@ -953,62 +953,88 @@
         return urlParams.get('meetingId') || urlParams.get('id');
     }
 
-    async function loadSessionByMeetingId(meetingId) {
-        try {
-            showToast('Loading session...');
-            const response = await fetch(`${BACKEND_URL}/api/livekit/session/${meetingId}`);
-            const data = await response.json();
-
-            if (!data.success) {
-                throw new Error('Session not found');
-            }
-
-            const session = data.session;
-            currentRoomName = session.livekitRoomName || `meeting_${meetingId.replace(/-/g, '_')}`;
-            currentStreamData.title = session.title;
-            currentStreamData.classId = session.classId;
-            currentStreamData.sessionId = session.id;
-            currentStreamData.meetingId = meetingId;
-
-            streamTitleSpan.textContent = session.title;
-
-            // Build session info banner
-            const statusClass = session.streamStatus === 'live' ? 'live' : 
-                               session.streamStatus === 'scheduled' ? 'scheduled' : 'ended';
-            const statusLabel = session.streamStatus === 'live' ? '🔴 LIVE' :
-                               session.streamStatus === 'scheduled' ? '⏳ Scheduled' : '✅ Ended';
-
-            sessionInfoDiv.style.display = 'flex';
-            sessionInfoDiv.innerHTML = `
-                <span>📅 ${session.date ? new Date(session.date).toLocaleDateString() : ''} ${session.time || ''}</span>
-                <span class="meeting-id">🔑 ${session.meetingId}</span>
-                <span class="session-status ${statusClass}">${statusLabel}</span>
-                <span>👥 ${session.participants || 0} participants</span>
-                <button class="copy-btn" onclick="copyMeetingId()">📋 Copy</button>
-            `;
-
-            if (session.streamStatus === 'live' && session.hostConnected) {
-                updateStreamStatus(true, session.title);
-                joinBtn.disabled = false;
-                showToast('Session is live! Click Join to watch.');
-            } else if (session.streamStatus === 'scheduled') {
-                updateStreamStatus(false);
-                showToast(`This session is scheduled for ${new Date(session.date).toLocaleString()}`, false);
-            } else if (session.streamStatus === 'ended') {
-                updateStreamStatus(false);
-                showToast('This session has ended', true);
-            } else {
-                updateStreamStatus(false);
-                showToast('Session is not yet live', false);
-            }
-
-            return session;
-        } catch (error) {
-            console.error('Load session error:', error);
-            showError('Could not find this session. Please check the meeting ID.', null);
+async function loadSessionByMeetingId(meetingId) {
+    try {
+        showToast('Loading session...');
+        const response = await fetch(`${BACKEND_URL}/api/livekit/session/${meetingId}`);
+        
+        // Check if response is 404
+        if (response.status === 404) {
+            // Session not found - maybe it's a new meeting ID that hasn't been created yet
+            showWarning('No session found for this meeting ID. Please create a new session.');
+            // Show the create session modal instead
+            setTimeout(() => {
+                if (classesLoaded && preloadedClasses.length > 0) {
+                    showModal('createClassModal');
+                }
+            }, 1000);
             return null;
         }
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.message || 'Session not found');
+        }
+
+        const session = data.session;
+        currentRoomName = session.livekitRoomName || `meeting_${meetingId.replace(/-/g, '_')}`;
+        currentStreamData.title = session.title;
+        currentStreamData.classId = session.classId;
+        currentStreamData.sessionId = session.id;
+        currentStreamData.meetingId = meetingId;
+
+        streamTitleSpan.textContent = session.title;
+
+        // Build session info banner
+        const statusClass = session.streamStatus === 'live' ? 'live' : 
+                           session.streamStatus === 'scheduled' ? 'scheduled' : 'ended';
+        const statusLabel = session.streamStatus === 'live' ? '🔴 LIVE' :
+                           session.streamStatus === 'scheduled' ? '⏳ Scheduled' : '✅ Ended';
+
+        sessionInfoDiv.style.display = 'flex';
+        sessionInfoDiv.innerHTML = `
+            <span>📅 ${session.date ? new Date(session.date).toLocaleDateString() : ''} ${session.time || ''}</span>
+            <span class="meeting-id">🔑 ${session.meetingId}</span>
+            <span class="session-status ${statusClass}">${statusLabel}</span>
+            <span>👥 ${session.participants || 0} participants</span>
+            <button class="copy-btn" onclick="copyMeetingId()">📋 Copy</button>
+        `;
+
+        if (session.streamStatus === 'live' && session.hostConnected) {
+            updateStreamStatus(true, session.title);
+            joinBtn.disabled = false;
+            showToast('Session is live! Click Join to watch.');
+        } else if (session.streamStatus === 'scheduled') {
+            updateStreamStatus(false);
+            // Show the start button for instructors
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (user && user.user_type === 'instructor' && user.id === session.instructorId) {
+                startBtn.textContent = '🎥 Start Scheduled Stream';
+                startBtn.disabled = false;
+                showToast('You can start this scheduled session now.', false);
+            } else {
+                showToast(`This session is scheduled for ${new Date(session.date).toLocaleString()}`, false);
+            }
+        } else if (session.streamStatus === 'ended') {
+            updateStreamStatus(false);
+            showToast('This session has ended', true);
+        } else {
+            updateStreamStatus(false);
+            showToast('Session is not yet live', false);
+        }
+
+        return session;
+    } catch (error) {
+        console.error('Load session error:', error);
+        showError('Could not find this session. Please check the meeting ID or create a new session.', null);
+        return null;
     }
+}
 
     function copyMeetingId() {
         const meetingId = getMeetingIdFromURL();
