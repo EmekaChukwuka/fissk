@@ -516,7 +516,10 @@ app.post('/register/instructor/streams-with-meetings', async (req, res) => {
     // Get past streams (recorded)
     const pastStreamsData = await LiveSession.find({
       instructorId,
-      sessionType: 'recorded'
+      $or: [
+        { streamStatus: 'ended' },
+        { sessionType: 'recorded' }
+      ]
     })
       .populate('classId', 'title')
       .sort({ date: -1, time: -1 })
@@ -537,7 +540,10 @@ app.post('/register/instructor/streams-with-meetings', async (req, res) => {
     // Get scheduled streams (upcoming)
     const scheduledStreamsData = await LiveSession.find({
       instructorId,
-      sessionType: 'upcoming'
+       $or: [
+        { streamStatus: 'scheduled' },
+        { sessionType: 'upcoming' }
+      ]
     })
       .populate('classId', 'title')
       .sort({ date: 1, time: 1 })

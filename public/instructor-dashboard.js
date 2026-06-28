@@ -384,100 +384,120 @@ async generateMeetingLink(streamId, streamTitle) {
     this.showMessage('📋 Link copied to clipboard!', 'success');
   }
 
-  setupEventHandlers() {
+  // Add to the setupEventHandlers() method in instructor-dashboard.js
+
+setupEventHandlers() {
+    // ===== NAVIGATION LINKS (Both sidebar AND header) =====
+    // Handle sidebar links
     document.querySelectorAll('.sidebar-link').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        const sec = link.dataset.section;
-        this.switchSection(sec);
-      });
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const sec = link.dataset.section;
+            this.switchSection(sec);
+        });
     });
 
+    // ===== FIX: Handle header nav links =====
+    document.querySelectorAll('.nav-link[data-section]').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const sec = link.dataset.section;
+            this.switchSection(sec);
+            // Update active state in sidebar
+            document.querySelectorAll('.sidebar-link').forEach(l => {
+                l.classList.toggle('active', l.dataset.section === sec);
+            });
+            // Update active state in header
+            document.querySelectorAll('.nav-link[data-section]').forEach(l => {
+                l.classList.toggle('active', l.dataset.section === sec);
+            });
+        });
+    });
+
+    // ===== MODAL CLOSE =====
     document.querySelectorAll('.close-modal').forEach(el => {
-      el.addEventListener('click', () => el.closest('.modal').style.display = 'none');
+        el.addEventListener('click', () => el.closest('.modal').style.display = 'none');
     });
     
+    // ===== CREATE CLASS BUTTONS =====
     if (this.el.createClassBtn) {
-      this.el.createClassBtn.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
+        this.el.createClassBtn.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
     }
     if (this.el.createClassBtn2) {
-      this.el.createClassBtn2.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
+        this.el.createClassBtn2.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
     }
     if (this.el.btnNewClass) {
-      this.el.btnNewClass.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
+        this.el.btnNewClass.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
     }
     if (this.el.btnSchedule) {
-      this.el.btnSchedule.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
+        this.el.btnSchedule.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
     }
     if (this.el.startLiveBtn) {
-      this.el.startLiveBtn.addEventListener('click', () => window.location.href = 'newlivestream.html');
+        this.el.startLiveBtn.addEventListener('click', () => window.location.href = 'newlivestream.html');
     }
     if (this.el.scheduleLiveBtn) {
-      this.el.scheduleLiveBtn.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
+        this.el.scheduleLiveBtn.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
     }
     if (this.el.scheduleLiveBtn2) {
-      this.el.scheduleLiveBtn2.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
+        this.el.scheduleLiveBtn2.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
     }
 
+    // ===== CREATE CLASS FORM =====
     const createForm = document.getElementById('createClassForm');
     if (createForm) {
-      createForm.addEventListener('submit', async (ev) => {
-        ev.preventDefault();
-        const data = Object.fromEntries(new FormData(createForm).entries());
-        await this.apiCreateClass(data);
-        document.getElementById('createClassModal').style.display = 'none';
-        createForm.reset();
-        await this.loadDashboardData();
-      });
+        createForm.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const data = Object.fromEntries(new FormData(createForm).entries());
+            await this.apiCreateClass(data);
+            document.getElementById('createClassModal').style.display = 'none';
+            createForm.reset();
+            await this.loadDashboardData();
+        });
     }
 
-   // In setupEventHandlers(), update the schedule form handler:
-
-const scheduleForm = document.getElementById('scheduleStreamForm');
-if (scheduleForm) {
-    // Remove any existing listeners
-    const newScheduleForm = scheduleForm.cloneNode(true);
-    scheduleForm.parentNode.replaceChild(newScheduleForm, scheduleForm);
-    
-    newScheduleForm.addEventListener('submit', async (ev) => {
-        ev.preventDefault();
+    // ===== SCHEDULE STREAM FORM =====
+    const scheduleForm = document.getElementById('scheduleStreamForm');
+    if (scheduleForm) {
+        const newScheduleForm = scheduleForm.cloneNode(true);
+        scheduleForm.parentNode.replaceChild(newScheduleForm, scheduleForm);
         
-        // Get values directly from the form
-        const classId = document.getElementById('streamClass')?.value;
-        const title = document.getElementById('streamTitle')?.value;
-        const description = document.getElementById('streamDescription')?.value;
-        const scheduledTime = document.getElementById('streamDateTime')?.value;
-        
-        // Validate
-        if (!classId || classId === 'undefined' || classId === '') {
-            this.showMessage('Please select a class', 'error');
-            return;
-        }
-        
-        if (!title) {
-            this.showMessage('Please enter a stream title', 'error');
-            return;
-        }
-        
-        if (!scheduledTime) {
-            this.showMessage('Please select a date and time', 'error');
-            return;
-        }
-        
-        const payload = {
-            classId: classId,
-            title: title,
-            description: description || '',
-            scheduledTime: scheduledTime
-        };
-        
-        await this.apiScheduleStream(payload);
-        document.getElementById('scheduleStreamModal').style.display = 'none';
-        newScheduleForm.reset();
-        await this.loadInstructorStreams();
-    });
+        newScheduleForm.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            
+            const classId = document.getElementById('streamClass')?.value;
+            const title = document.getElementById('streamTitle')?.value;
+            const description = document.getElementById('streamDescription')?.value;
+            const scheduledTime = document.getElementById('streamDateTime')?.value;
+            
+            if (!classId || classId === 'undefined' || classId === '') {
+                this.showMessage('Please select a class', 'error');
+                return;
+            }
+            
+            if (!title) {
+                this.showMessage('Please enter a stream title', 'error');
+                return;
+            }
+            
+            if (!scheduledTime) {
+                this.showMessage('Please select a date and time', 'error');
+                return;
+            }
+            
+            const payload = {
+                classId: classId,
+                title: title,
+                description: description || '',
+                scheduledTime: scheduledTime
+            };
+            
+            await this.apiScheduleStream(payload);
+            document.getElementById('scheduleStreamModal').style.display = 'none';
+            newScheduleForm.reset();
+            await this.loadInstructorStreams();
+        });
+    }
 }
-  }
 
   // ===== SCHEDULE STREAM (FIXED) =====
 async apiScheduleStream(payload) {
@@ -579,12 +599,29 @@ async apiScheduleStream(payload) {
     }, 3000);
   }
 
-  switchSection(id) {
+ switchSection(id) {
+    // Hide all sections
     document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
+    
+    // Show target section
     const target = document.getElementById(id);
     if (target) target.classList.add('active');
-    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.section === id));
-  }
+    
+    // Update sidebar links
+    document.querySelectorAll('.sidebar-link').forEach(l => {
+        l.classList.toggle('active', l.dataset.section === id);
+    });
+    
+    // Update header nav links
+    document.querySelectorAll('.nav-link[data-section]').forEach(l => {
+        l.classList.toggle('active', l.dataset.section === id);
+    });
+    
+    // Update URL hash without scrolling
+    if (history.pushState) {
+        history.pushState(null, null, `#${id}`);
+    }
+}
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -613,21 +650,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
   link.addEventListener('click', () => {
     hamburger.classList.remove('active');
     navMenu.classList.remove('active');
-    navMenu.style.display = 'none';
     document.body.style.overflow = 'auto';
-  });
-});
-
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-  anchor.addEventListener('click', function(e) {
-    e.preventDefault();
-    const target = document.querySelector(this.getAttribute('href'));
-    if (target) {
-      target.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      });
-    }
   });
 });
 

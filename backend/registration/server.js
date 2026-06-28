@@ -1173,7 +1173,10 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
     // ===== FIX: Past streams - check BOTH streamStatus AND sessionType =====
     const pastStreamsData = await LiveSession.find({
       instructorId,
-      sessionType: 'recorded'
+      $or: [
+        { streamStatus: 'ended' },
+        { sessionType: 'recorded' }
+      ]
     })
       .populate('classId', 'title')
       .sort({ date: -1, time: -1 })
@@ -1194,7 +1197,10 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
     // ===== FIX: Scheduled streams - check BOTH streamStatus AND sessionType =====
     const scheduledStreamsData = await LiveSession.find({
       instructorId,
-      sessionType: 'upcoming'
+       $or: [
+        { streamStatus: 'scheduled' },
+        { sessionType: 'upcoming' }
+      ]
     })
       .populate('classId', 'title')
       .sort({ date: 1, time: 1 })
