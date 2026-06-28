@@ -206,7 +206,7 @@ app.post('/api/livekit/start-stream', async (req, res) => {
   }
 });
 
-// END LIVESTREAM
+// END LIVESTREAM 
 app.post('/api/livekit/end-stream', async (req, res) => {
   const { meetingId } = req.body;
   
@@ -216,14 +216,20 @@ app.post('/api/livekit/end-stream', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Session not found' });
     }
     
+    // ===== FIX: Update both streamStatus and sessionType =====
     session.streamStatus = 'ended';
+    session.sessionType = 'recorded';   // ← THIS WAS MISSING
     session.hostConnected = false;
+    session.recordingEndedAt = new Date();
+    
     await session.save();
+    
+    console.log(`✅ Stream ended: ${meetingId}, sessionType set to recorded`);
     
     res.json({ success: true });
   } catch (error) {
     console.error('End stream error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

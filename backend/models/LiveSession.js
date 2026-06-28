@@ -67,15 +67,16 @@ const LiveSessionSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
-// ===== Pre-save hook =====
+// ===== Pre-save hook (FIXED - use regular function, not arrow) =====
 LiveSessionSchema.pre('save', function(next) {
+  // Use regular function so 'this' refers to the document
   if (!this.meetingId) {
     this.meetingId = generateMeetingId();
   }
   if (!this.livekitRoomName && this.meetingId) {
     this.livekitRoomName = generateLiveKitRoomName(this.meetingId);
   }
-  next();
+  next();  // IMPORTANT: Call next() to continue the save operation
 });
 
 // ===== Virtuals =====
