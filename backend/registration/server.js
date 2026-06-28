@@ -1165,15 +1165,18 @@ Regisrouter.post('/instructor/schedule-stream', async (req, res) => {
   }
 });
 
-// Get instructor's streams (both past and scheduled)
+// ===== GET INSTRUCTOR STREAMS (FIXED - Handles both fields) =====
 Regisrouter.post('/instructor/streams', async (req, res) => {
   const instructorId = req.body.id;
   
   try {
-    // Get past streams (recorded)
+    // ===== FIX: Past streams - check BOTH streamStatus AND sessionType =====
     const pastStreamsData = await LiveSession.find({
       instructorId,
-      streamStatus: 'ended'
+      $or: [
+        { streamStatus: 'ended' },
+        { sessionType: 'recorded' }
+      ]
     })
       .populate('classId', 'title')
       .sort({ date: -1, time: -1 })
@@ -1186,14 +1189,18 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
       class_title: r.classId?.title || 'Unknown',
       duration: r.duration,
       participants: r.participants,
-      recorded_at: `${r.date} ${r.time}`,
-      class_id: r.classId?._id
+      recorded_at: `${r.date || ''} ${r.time || ''}`,
+      class_id: r.classId?._id,
+      recorded_at_full: r.createdAt
     }));
     
-    // Get scheduled streams (upcoming)
+    // ===== FIX: Scheduled streams - check BOTH streamStatus AND sessionType =====
     const scheduledStreamsData = await LiveSession.find({
       instructorId,
-      sessionType: 'upcoming'
+      $or: [
+        { streamStatus: 'scheduled' },
+        { sessionType: 'upcoming' }
+      ]
     })
       .populate('classId', 'title')
       .sort({ date: 1, time: 1 })
@@ -1203,13 +1210,41 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
       id: s._id,
       title: s.title,
       description: s.description,
-      scheduled_time: `${s.date} ${s.time}`
+      scheduled_time: `${s.date || ''} ${s.time || ''}`,
+      meetingId: s.meetingId || null,
+      joinUrl: s.joinUrl || null,
+      classId: s.classId?._id || null,
+      participants: s.participants || 0
+    }));
+    
+    // ===== FIX: Live streams (currently active) =====
+    const liveStreamsData = await LiveSession.find({
+      instructorId,
+      $or: [
+        { streamStatus: 'live' },
+        { sessionType: 'live' }
+      ],
+      hostConnected: true
+    })
+      .populate('classId', 'title')
+      .lean();
+    
+    const liveStreams = liveStreamsData.map(s => ({
+      id: s._id,
+      title: s.title,
+      description: s.description,
+      meetingId: s.meetingId || null,
+      joinUrl: s.joinUrl || null,
+      classId: s.classId?._id || null,
+      participants: s.participants || 0
     }));
     
     res.json({
       past: pastStreams,
-      scheduled: scheduledStreams
+      scheduled: scheduledStreams,
+      live: liveStreams
     });
+    
   } catch (error) {
     console.error('Get streams error:', error);
     res.status(500).json({ message: "Failed to load streams" });

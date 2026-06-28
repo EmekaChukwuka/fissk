@@ -190,6 +190,7 @@ app.post('/api/livekit/start-stream', async (req, res) => {
     
     // Update session status
     session.streamStatus = 'live';
+    session.sessionType = 'live';
     session.hostConnected = true;
     session.hostConnectionTime = new Date();
     await session.save();
