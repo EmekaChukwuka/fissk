@@ -42,7 +42,6 @@
             flex-direction: column;
         }
 
-        /* ── TOP BAR ── */
         .topbar {
             display: flex;
             align-items: center;
@@ -106,7 +105,6 @@
             white-space: nowrap;
         }
 
-        /* ── CONNECTION STATUS PILL ── */
         .conn-pill {
             font-size: 12px;
             padding: 4px 12px;
@@ -118,7 +116,6 @@
         .conn-pill.connecting   { background: rgba(253,214,99,0.12); color: var(--accent-yellow); }
         .conn-pill.disconnected { background: rgba(242,139,130,0.12); color: var(--accent-red); }
 
-        /* ── MAIN LAYOUT ── */
         .main {
             flex: 1;
             display: flex;
@@ -127,7 +124,6 @@
             height: calc(100vh - 57px);
         }
 
-        /* ── VIDEO AREA ── */
         .video-area {
             flex: 1;
             display: flex;
@@ -213,7 +209,6 @@
             animation: pulse 1s infinite;
         }
 
-        /* ── CONTROL BAR ── */
         .control-bar {
             display: flex;
             align-items: center;
@@ -276,7 +271,6 @@
             color: var(--text-secondary);
         }
 
-        /* ── SIDE PANEL ── */
         .side-panel {
             width: 320px;
             background: var(--bg-secondary);
@@ -317,7 +311,6 @@
         }
         .panel-section.active { display: flex; }
 
-        /* People panel */
         .people-header {
             padding: 16px;
             font-size: 13px;
@@ -353,7 +346,6 @@
         }
         .viewer-name { font-size: 13px; color: var(--text-primary); }
 
-        /* Chat panel */
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -417,7 +409,6 @@
         #sendChatBtn:hover:not(:disabled) { background: #1557b0; }
         #sendChatBtn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-        /* ── STREAM INFO BANNER ── */
         .stream-banner {
             display: flex;
             align-items: center;
@@ -437,7 +428,6 @@
             color: var(--text-muted);
         }
 
-        /* ── MODAL ── */
         .modal {
             display: none;
             position: fixed; inset: 0;
@@ -553,7 +543,6 @@
         }
         .upload-status.active { display: block; }
 
-        /* ── TOAST ── */
         .toast {
             position: fixed;
             bottom: 24px; left: 50%;
@@ -578,7 +567,6 @@
             to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
 
-        /* Error message banner */
         .error-banner {
             display: none;
             background: rgba(242,139,130,0.12);
@@ -592,15 +580,9 @@
             gap: 10px;
             flex-shrink: 0;
         }
-        .error-banner.show {
-            display: flex;
-        }
-        .error-banner .error-icon {
-            font-size: 18px;
-        }
-        .error-banner .error-text {
-            flex: 1;
-        }
+        .error-banner.show { display: flex; }
+        .error-banner .error-icon { font-size: 18px; }
+        .error-banner .error-text { flex: 1; }
         .error-banner .error-retry {
             background: rgba(242,139,130,0.2);
             border: none;
@@ -611,11 +593,8 @@
             font-size: 12px;
             font-family: inherit;
         }
-        .error-banner .error-retry:hover {
-            background: rgba(242,139,130,0.3);
-        }
+        .error-banner .error-retry:hover { background: rgba(242,139,130,0.3); }
 
-        /* Warning banner */
         .warning-banner {
             display: none;
             background: rgba(253,214,99,0.12);
@@ -629,11 +608,8 @@
             gap: 10px;
             flex-shrink: 0;
         }
-        .warning-banner.show {
-            display: flex;
-        }
+        .warning-banner.show { display: flex; }
 
-        /* Success banner */
         .success-banner {
             display: none;
             background: rgba(129,201,149,0.12);
@@ -647,16 +623,58 @@
             gap: 10px;
             flex-shrink: 0;
         }
-        .success-banner.show {
-            display: flex;
-        }
+        .success-banner.show { display: flex; }
 
-        /* scrollbar global */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--bg-elevated); border-radius: 4px; }
 
-        /* ===== RESPONSIVE BREAKPOINTS ===== */
+        /* Session Info Banner */
+        #sessionInfo {
+            background: var(--bg-elevated);
+            padding: 10px 16px;
+            border-radius: var(--radius-sm);
+            margin: 0 16px 12px 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        #sessionInfo .meeting-id {
+            font-family: monospace;
+            background: var(--bg-primary);
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: var(--accent-blue);
+            letter-spacing: 0.5px;
+        }
+        #sessionInfo .session-status {
+            font-weight: 500;
+        }
+        #sessionInfo .session-status.live { color: var(--accent-red); }
+        #sessionInfo .session-status.scheduled { color: var(--accent-yellow); }
+        #sessionInfo .session-status.ended { color: var(--text-muted); }
+
+        /* Copy button */
+        .copy-btn {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 2px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: inherit;
+            transition: background 0.15s;
+        }
+        .copy-btn:hover {
+            background: var(--bg-hover);
+        }
+
         @media (max-width: 1024px) {
             .side-panel { width: 280px; }
             .ctrl-btn { padding: 10px 16px; min-width: 80px; }
@@ -675,6 +693,7 @@
             .ctrl-btn { padding: 8px 12px; min-width: 70px; font-size: 11px; }
             .ctrl-btn .btn-icon { font-size: 16px; }
             .stream-banner { margin: 0 12px; font-size: 12px; padding: 6px 12px; }
+            #sessionInfo { margin: 0 12px 8px 12px; font-size: 12px; flex-direction: column; align-items: stretch; text-align: center; }
             .tile-empty-icon { width: 48px; height: 48px; font-size: 20px; }
             .tile-empty p { font-size: 12px; }
         }
@@ -711,7 +730,6 @@
             .stream-banner { font-size: 11px; padding: 5px 10px; }
         }
 
-        /* Loading spinner for class preloader */
         .class-loading {
             text-align: center;
             padding: 20px;
@@ -750,7 +768,7 @@
     </div>
 </header>
 
-<!-- ERROR/WARNING BANNERS -->
+<!-- BANNERS -->
 <div id="errorBanner" class="error-banner">
     <span class="error-icon">⚠️</span>
     <span class="error-text" id="errorText">Something went wrong</span>
@@ -769,16 +787,13 @@
 
 <!-- MAIN -->
 <div class="main">
-
-    <!-- VIDEO + CONTROLS -->
     <div class="video-area">
-
-        <!-- Stream info banner -->
         <div class="stream-banner inactive" id="streamInfo">📭 No active livestream at the moment.</div>
 
-        <!-- Videos -->
+        <!-- Session Info (dynamically added) -->
+        <div id="sessionInfo" style="display:none;"></div>
+
         <div class="video-grid">
-            <!-- Host tile -->
             <div class="video-tile" id="hostTile">
                 <div class="tile-empty" id="hostEmpty">
                     <div class="tile-empty-icon">🎥</div>
@@ -791,7 +806,6 @@
                 </div>
             </div>
 
-            <!-- Remote tile -->
             <div class="video-tile" id="remoteTile">
                 <div class="tile-empty" id="remoteEmpty">
                     <div class="tile-empty-icon">📺</div>
@@ -802,7 +816,6 @@
             </div>
         </div>
 
-        <!-- Control bar -->
         <div class="control-bar">
             <button class="ctrl-btn btn-go-live" id="startStreamBtn">
                 <span class="btn-icon">🎙️</span>
@@ -821,7 +834,6 @@
                 Refresh
             </button>
         </div>
-
     </div>
 
     <!-- SIDE PANEL -->
@@ -831,13 +843,11 @@
             <button class="panel-tab" onclick="switchTab('chat')">💬 Chat</button>
         </div>
 
-        <!-- People -->
         <div class="panel-section active" id="peopleSection">
             <div class="people-header">Students in this session</div>
             <ul class="people-list" id="viewers"></ul>
         </div>
 
-        <!-- Chat -->
         <div class="panel-section" id="chatSection">
             <div class="chat-messages" id="chatMessages"></div>
             <div class="chat-input-area">
@@ -846,10 +856,9 @@
             </div>
         </div>
     </div>
-
 </div>
 
-<!-- CREATE STREAM MODAL -->
+<!-- MODAL -->
 <div id="createClassModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -900,12 +909,12 @@
     let userName = '';
     let totalUniqueViewers = new Set();
     let streamStartTime = null;
-    let currentStreamData = { title: '', description: '', classId: '' };
+    let currentStreamData = { title: '', description: '', classId: '', meetingId: '', sessionId: '' };
     let currentRoomName = null;
     let statusCheckInterval = null;
     let preloadedClasses = [];
     let classesLoaded = false;
-    let lastFailedAction = null; // Track last failed action for retry
+    let lastFailedAction = null;
 
     // ===== DOM ELEMENTS =====
     const startBtn         = document.getElementById('startStreamBtn');
@@ -936,14 +945,94 @@
     const warningText      = document.getElementById('warningText');
     const successBanner    = document.getElementById('successBanner');
     const successText      = document.getElementById('successText');
+    const sessionInfoDiv   = document.getElementById('sessionInfo');
+
+    // ===== MEETING ID FUNCTIONS =====
+    function getMeetingIdFromURL() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('meetingId') || urlParams.get('id');
+    }
+
+    async function loadSessionByMeetingId(meetingId) {
+        try {
+            showToast('Loading session...');
+            const response = await fetch(`${BACKEND_URL}/api/livekit/session/${meetingId}`);
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error('Session not found');
+            }
+
+            const session = data.session;
+            currentRoomName = session.livekitRoomName || `meeting_${meetingId.replace(/-/g, '_')}`;
+            currentStreamData.title = session.title;
+            currentStreamData.classId = session.classId;
+            currentStreamData.sessionId = session.id;
+            currentStreamData.meetingId = meetingId;
+
+            streamTitleSpan.textContent = session.title;
+
+            // Build session info banner
+            const statusClass = session.streamStatus === 'live' ? 'live' : 
+                               session.streamStatus === 'scheduled' ? 'scheduled' : 'ended';
+            const statusLabel = session.streamStatus === 'live' ? '🔴 LIVE' :
+                               session.streamStatus === 'scheduled' ? '⏳ Scheduled' : '✅ Ended';
+
+            sessionInfoDiv.style.display = 'flex';
+            sessionInfoDiv.innerHTML = `
+                <span>📅 ${session.date ? new Date(session.date).toLocaleDateString() : ''} ${session.time || ''}</span>
+                <span class="meeting-id">🔑 ${session.meetingId}</span>
+                <span class="session-status ${statusClass}">${statusLabel}</span>
+                <span>👥 ${session.participants || 0} participants</span>
+                <button class="copy-btn" onclick="copyMeetingId()">📋 Copy</button>
+            `;
+
+            if (session.streamStatus === 'live' && session.hostConnected) {
+                updateStreamStatus(true, session.title);
+                joinBtn.disabled = false;
+                showToast('Session is live! Click Join to watch.');
+            } else if (session.streamStatus === 'scheduled') {
+                updateStreamStatus(false);
+                showToast(`This session is scheduled for ${new Date(session.date).toLocaleString()}`, false);
+            } else if (session.streamStatus === 'ended') {
+                updateStreamStatus(false);
+                showToast('This session has ended', true);
+            } else {
+                updateStreamStatus(false);
+                showToast('Session is not yet live', false);
+            }
+
+            return session;
+        } catch (error) {
+            console.error('Load session error:', error);
+            showError('Could not find this session. Please check the meeting ID.', null);
+            return null;
+        }
+    }
+
+    function copyMeetingId() {
+        const meetingId = getMeetingIdFromURL();
+        if (meetingId) {
+            navigator.clipboard.writeText(meetingId).then(() => {
+                showToast('Meeting ID copied to clipboard!');
+            }).catch(() => {
+                // Fallback
+                const input = document.createElement('input');
+                input.value = meetingId;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showToast('Meeting ID copied!');
+            });
+        }
+    }
 
     // ===== HELPER FUNCTIONS =====
     function showError(message, action = null) {
         errorText.textContent = message;
         errorBanner.classList.add('show');
         if (action) lastFailedAction = action;
-        
-        // Auto-hide after 8 seconds
         setTimeout(() => {
             errorBanner.classList.remove('show');
         }, 8000);
@@ -979,6 +1068,8 @@
             preloadInstructorClasses();
         } else if (lastFailedAction === 'checkStatus') {
             checkStreamStatus();
+        } else if (lastFailedAction === 'startSession') {
+            startSession();
         }
     }
 
@@ -1013,7 +1104,7 @@
             document.getElementById(id).style.display = 'flex';
         }
     }
-    
+
     function closeModal(id) { 
         document.getElementById(id).style.display = 'none';
         hideError();
@@ -1030,8 +1121,6 @@
     function updateConnectionStatus(status, msg) {
         connectionStatusDiv.className = 'conn-pill ' + status;
         connectionStatusDiv.textContent = msg;
-        
-        // Also show in console for debugging
         console.log(`[Connection] ${status}: ${msg}`);
     }
 
@@ -1055,7 +1144,6 @@
             streamInfoDiv.className = 'stream-banner';
             streamInfoDiv.innerHTML = '🎬 A livestream is currently active! Click "Join Stream" to watch.';
             if (title) streamTitleSpan.textContent = title;
-
             if (!isHost && !isViewer) {
                 joinBtn.disabled = false;
             }
@@ -1065,7 +1153,6 @@
             streamInfoDiv.innerHTML = '📭 No active livestream at the moment.';
             streamTitleSpan.textContent = '';
             joinBtn.disabled = true;
-
             if (!isHost) {
                 showRemoteVideo(false);
                 remoteEmptyText.textContent = 'Waiting for stream…';
@@ -1073,28 +1160,113 @@
         }
     }
 
-    async function checkStreamStatus() {
+    // ===== SESSION FUNCTIONS =====
+    async function startSession() {
+        const meetingId = getMeetingIdFromURL();
+        if (!meetingId) {
+            showError('No meeting ID provided', null);
+            return;
+        }
+
         try {
-            updateConnectionStatus('connecting', 'Checking server status...');
-            const response = await fetch(`${BACKEND_URL}/api/stream-status`);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
+            const response = await fetch(`${BACKEND_URL}/api/livekit/start-stream`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meetingId, userId })
+            });
+
             const data = await response.json();
-            updateStreamStatus(data.active === true);
-            updateConnectionStatus('connected', 'Connected to server');
-            return data.active;
-        } catch (err) {
-            console.error('Status check failed:', err);
-            updateConnectionStatus('disconnected', 'Cannot connect to server');
-            showError(`Cannot connect to server: ${err.message}`, 'checkStatus');
-            return false;
+            if (!data.success) {
+                throw new Error(data.message);
+            }
+
+            currentRoomName = data.livekitRoomName;
+            showSuccess('Session started! You can now go live.');
+            await startLivestream();
+
+        } catch (error) {
+            console.error('Start session error:', error);
+            showError(`Failed to start session: ${error.message}`, 'startSession');
         }
     }
 
-    // ===== PRELOAD CLASSES FUNCTION =====
+    async function joinSession() {
+        const meetingId = getMeetingIdFromURL();
+        if (!meetingId) {
+            showError('No meeting ID provided', null);
+            return;
+        }
+
+        try {
+            const studentName = localStorage.getItem('studentName') || prompt('Enter your name:', 'Student') || 'Student';
+            localStorage.setItem('studentName', studentName);
+
+            const response = await fetch(`${BACKEND_URL}/api/livekit/join-stream`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    meetingId, 
+                    userId: userId,
+                    userName: studentName
+                })
+            });
+
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.message);
+            }
+
+            currentRoomName = data.livekitRoomName;
+            await joinLivestream();
+
+        } catch (error) {
+            console.error('Join session error:', error);
+            showError(`Failed to join session: ${error.message}`, 'joinStream');
+        }
+    }
+
+    async function createNewSession() {
+        const title = document.getElementById('title').value;
+        const description = document.getElementById('description').value;
+        const classId = document.getElementById('streamClass').value;
+
+        if (!classId || !title) {
+            alert('Please select a class and enter a title');
+            return;
+        }
+
+        try {
+            showToast('Creating session...');
+            const response = await fetch(`${BACKEND_URL}/api/livekit/create-session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    instructorId: userId,
+                    classId,
+                    title,
+                    description,
+                    date: new Date(),
+                    time: new Date().toLocaleTimeString(),
+                    duration: '60 minutes'
+                })
+            });
+
+            const data = await response.json();
+            if (!data.success) {
+                throw new Error(data.message);
+            }
+
+            const meetingId = data.session.meetingId;
+            showToast(`✅ Session created! Meeting ID: ${meetingId}`);
+            window.location.href = `newlivestream.html?meetingId=${meetingId}`;
+
+        } catch (error) {
+            console.error('Create session error:', error);
+            showError(`Failed to create session: ${error.message}`, null);
+        }
+    }
+
+    // ===== PRELOAD CLASSES =====
     async function preloadInstructorClasses() {
         try {
             const user = JSON.parse(localStorage.getItem('user'));
@@ -1103,23 +1275,23 @@
                 classesLoaded = true;
                 return;
             }
-            
+
             console.log('Preloading instructor classes...');
             updateConnectionStatus('connecting', 'Loading your classes...');
-            
+
             const res = await fetch(`${BACKEND_URL}/register/instructor/classes`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: user.id })
             });
-            
+
             if (!res.ok) {
                 throw new Error(`HTTP ${res.status}: Failed to load classes`);
             }
-            
+
             const json = await res.json();
             preloadedClasses = json.classes || [];
-            
+
             if (preloadedClasses.length > 0) {
                 streamClassSelect.innerHTML = '<option value="">Choose a class…</option>' +
                     preloadedClasses.map(c => `<option value="${c._id || c.id}">${escapeHtml(c.title)}</option>`).join('');
@@ -1141,129 +1313,140 @@
         }
     }
 
-    async function loadInstructorClasses() {
-        if (classesLoaded && preloadedClasses.length > 0) {
-            return preloadedClasses;
+    // ===== MUX UPLOAD =====
+    async function uploadToMux(blob, streamName, classId, classTitle) {
+        const uploadStatus = document.getElementById('uploadStatus');
+        uploadStatus.classList.add('active');
+        uploadStatus.innerHTML = '<p>📤 Getting upload URL from Mux…</p>';
+
+        try {
+            const user = JSON.parse(localStorage.getItem('user'));
+            const instructorName = user?.name || 'Instructor';
+
+            const uploadResponse = await fetch(`${BACKEND_URL}/api/mux/create-upload`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    streamName: streamName,
+                    classId: classId,
+                    classTitle: classTitle,
+                    instructorName: instructorName,
+                }),
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error(`Mux API error: ${uploadResponse.status}`);
+            }
+
+            const { success, uploadUrl, uploadId } = await uploadResponse.json();
+
+            if (!success) {
+                throw new Error('Failed to get upload URL from Mux');
+            }
+
+            uploadStatus.innerHTML = '<p>📤 Uploading to Mux… (this may take a few minutes)</p>';
+
+            const response = await fetch(uploadUrl, {
+                method: 'PUT',
+                body: blob,
+                headers: {
+                    'Content-Type': 'video/webm',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Upload to Mux failed: ${response.status}`);
+            }
+
+            uploadStatus.innerHTML = '<p>⏳ Processing upload… Mux is creating your asset</p>';
+
+            let assetId = null;
+            let playbackId = null;
+            let attempts = 0;
+            const maxAttempts = 60;
+
+            while (attempts < maxAttempts) {
+                await new Promise(r => setTimeout(r, 5000));
+
+                const statusResponse = await fetch(`${BACKEND_URL}/api/mux/upload-status/${uploadId}`);
+                const statusData = await statusResponse.json();
+
+                if (statusData.status === 'asset_created' || statusData.status === 'ready') {
+                    assetId = statusData.assetId;
+                    playbackId = statusData.playbackId;
+                    console.log(`✅ Mux asset ready: ${assetId}, title: ${classTitle}`);
+                    break;
+                } else if (statusData.status === 'errored') {
+                    throw new Error('Mux processing failed');
+                }
+
+                attempts++;
+                uploadStatus.innerHTML = `<p>⏳ Processing upload… (${Math.floor(attempts * 5)} seconds)</p>`;
+            }
+
+            if (!assetId || !playbackId) {
+                throw new Error('Upload timed out - asset not ready');
+            }
+
+            uploadStatus.innerHTML = '<p>✅ Upload complete! Saving to database…</p>';
+
+            const duration = Math.floor((Date.now() - streamStartTime) / 1000);
+            const minutes = Math.floor(duration / 60);
+
+            const saveResponse = await fetch(`${BACKEND_URL}/api/save-stream`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user?.id,
+                    streamName: streamName,
+                    streamClass: currentStreamData.classId,
+                    classTitle: currentStreamData.title,
+                    classDescription: currentStreamData.description,
+                    participants: totalUniqueViewers.size,
+                    duration: `${minutes} min, ${duration % 60} sec`,
+                    muxAssetId: assetId,
+                    muxPlaybackId: playbackId,
+                }),
+            });
+
+            if (!saveResponse.ok) {
+                console.warn('Metadata save failed, but video was uploaded');
+                showWarning('Video saved to Mux, but metadata save failed. Contact support.');
+            }
+
+            uploadStatus.classList.remove('active');
+            showSuccess(`✅ Recording "${classTitle}" saved to Mux successfully!`);
+            return { assetId, playbackId, playbackUrl: `https://stream.mux.com/${playbackId}.m3u8` };
+
+        } catch (err) {
+            uploadStatus.classList.remove('active');
+            console.error('Mux upload error:', err);
+            showError(`Mux upload failed: ${err.message}`, null);
+            throw err;
         }
-        return await preloadInstructorClasses();
     }
 
-    // ===== MUX UPLOAD FUNCTIONS =====
-    async function uploadToMux(blob, streamName, classId, classTitle) {
-    const uploadStatus = document.getElementById('uploadStatus');
-    uploadStatus.classList.add('active');
-    uploadStatus.innerHTML = '<p>📤 Getting upload URL from Mux…</p>';
-    
-    try {
-        const user = JSON.parse(localStorage.getItem('user'));
-        const instructorName = user?.name || 'Instructor';
-        
-        // 1. Get a direct upload URL from Mux with title
-        const uploadResponse = await fetch(`${BACKEND_URL}/api/mux/create-upload`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                streamName: streamName,
-                classId: classId,
-                classTitle: classTitle,
-                instructorName: instructorName,
-            }),
-        });
-        
-        if (!uploadResponse.ok) {
-            throw new Error(`Mux API error: ${uploadResponse.status}`);
-        }
-        
-        const { success, uploadUrl, uploadId } = await uploadResponse.json();
-        
-        if (!success) {
-            throw new Error('Failed to get upload URL from Mux');
-        }
-        
-        uploadStatus.innerHTML = '<p>📤 Uploading to Mux… (this may take a few minutes)</p>';
-        
-        // 2. Upload the blob directly to Mux
-        const response = await fetch(uploadUrl, {
-            method: 'PUT',
-            body: blob,
-            headers: {
-                'Content-Type': 'video/webm',
-            },
-        });
-        
-        if (!response.ok) {
-            throw new Error(`Upload to Mux failed: ${response.status}`);
-        }
-        
-        uploadStatus.innerHTML = '<p>⏳ Processing upload… Mux is creating your asset</p>';
-        
-        // 3. Poll for upload completion
-        let assetId = null;
-        let playbackId = null;
-        let attempts = 0;
-        const maxAttempts = 60;
-        
-        while (attempts < maxAttempts) {
-            await new Promise(r => setTimeout(r, 5000));
-            
-            const statusResponse = await fetch(`${BACKEND_URL}/api/mux/upload-status/${uploadId}`);
-            const statusData = await statusResponse.json();
-            
-            if (statusData.status === 'asset_created' || statusData.status === 'ready') {
-                assetId = statusData.assetId;
-                playbackId = statusData.playbackId;
-                console.log(`✅ Mux asset ready: ${assetId}, title: ${classTitle}`);
-                break;
-            } else if (statusData.status === 'errored') {
-                throw new Error('Mux processing failed');
+    // ===== CHECK STREAM STATUS =====
+    async function checkStreamStatus() {
+        try {
+            updateConnectionStatus('connecting', 'Checking server status...');
+            const response = await fetch(`${BACKEND_URL}/api/stream-status`);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
-            attempts++;
-            uploadStatus.innerHTML = `<p>⏳ Processing upload… (${Math.floor(attempts * 5)} seconds)</p>`;
+
+            const data = await response.json();
+            updateStreamStatus(data.active === true);
+            updateConnectionStatus('connected', 'Connected to server');
+            return data.active;
+        } catch (err) {
+            console.error('Status check failed:', err);
+            updateConnectionStatus('disconnected', 'Cannot connect to server');
+            showError(`Cannot connect to server: ${err.message}`, 'checkStatus');
+            return false;
         }
-        
-        if (!assetId || !playbackId) {
-            throw new Error('Upload timed out - asset not ready');
-        }
-        
-        uploadStatus.innerHTML = '<p>✅ Upload complete! Saving to database…</p>';
-        
-        const duration = Math.floor((Date.now() - streamStartTime) / 1000);
-        const minutes = Math.floor(duration / 60);
-        
-        // 4. Save metadata to your backend
-        const saveResponse = await fetch(`${BACKEND_URL}/api/save-stream`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: user?.id,
-                streamName: streamName,
-                streamClass: currentStreamData.classId,
-                classTitle: currentStreamData.title,
-                classDescription: currentStreamData.description,
-                participants: totalUniqueViewers.size,
-                duration: `${minutes} min, ${duration % 60} sec`,
-                muxAssetId: assetId,
-                muxPlaybackId: playbackId,
-            }),
-        });
-        
-        if (!saveResponse.ok) {
-            console.warn('Metadata save failed, but video was uploaded');
-            showWarning('Video saved to Mux, but metadata save failed. Contact support.');
-        }
-        
-        uploadStatus.classList.remove('active');
-        showSuccess(`✅ Recording "${classTitle}" saved to Mux successfully!`);
-        return { assetId, playbackId, playbackUrl: `https://stream.mux.com/${playbackId}.m3u8` };
-        
-    } catch (err) {
-        uploadStatus.classList.remove('active');
-        console.error('Mux upload error:', err);
-        showError(`Mux upload failed: ${err.message}`, null);
-        throw err;
     }
-}
 
     // ===== LIVEKIT FUNCTIONS =====
     async function getLiveKitToken(roomName, participantName, isHostUser) {
@@ -1273,11 +1456,11 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomName, participantName, isHost: isHostUser })
             });
-            
+
             if (!response.ok) {
                 throw new Error(`Token request failed: ${response.status}`);
             }
-            
+
             return await response.json();
         } catch (err) {
             console.error('Token fetch error:', err);
@@ -1341,228 +1524,232 @@
         viewerCountSpan.textContent = viewerCount;
     }
 
-    // ===== HOST: START LIVESTREAM (FIXED - NO TrackSource) =====
-async function startLivestream() {
-    const title       = document.getElementById('title').value;
-    const description = document.getElementById('description').value;
-    const classId     = document.getElementById('streamClass').value;
+    // ===== HOST: START LIVESTREAM =====
+    async function startLivestream() {
+        // Check if meeting ID exists - if yes, use session title
+        const meetingId = getMeetingIdFromURL();
+        let title = document.getElementById('title')?.value || currentStreamData.title || 'Live Class';
+        const description = document.getElementById('description')?.value || currentStreamData.description || '';
+        const classId = document.getElementById('streamClass')?.value || currentStreamData.classId;
 
-    if (!classId || !title) {
-        showError('Please select a class and enter a title', null);
-        alert('Please select a class and enter a title');
-        return;
-    }
+        if (!classId || !title) {
+            showError('Please select a class and enter a title', null);
+            alert('Please select a class and enter a title');
+            return;
+        }
 
-    try {
-        hideError();
-        lastFailedAction = 'startStream';
-        updateConnectionStatus('connecting', 'Starting stream...');
-        
-        closeModal('createClassModal');
-        isHost = true;
-        currentStreamData = { title, description, classId };
-        currentRoomName = `class_${classId}_${Date.now()}`;
-        streamTitleSpan.textContent = title;
-
-        showToast('Requesting camera and microphone…');
-        updateConnectionStatus('connecting', 'Requesting camera access...');
-        
-        // ===== REQUEST MEDIA =====
         try {
-            localStream = await navigator.mediaDevices.getUserMedia({
-                video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl:  true,
-                }
-            });
-            showSuccess('Camera and microphone access granted');
-        } catch (cameraErr) {
-            if (cameraErr.name === 'NotAllowedError') {
-                throw new Error('Camera/microphone access denied. Please allow access and try again.');
-            } else if (cameraErr.name === 'NotFoundError') {
-                throw new Error('No camera or microphone found on this device.');
+            hideError();
+            lastFailedAction = 'startStream';
+            updateConnectionStatus('connecting', 'Starting stream...');
+
+            closeModal('createClassModal');
+            isHost = true;
+
+            // If no meeting ID, create one
+            if (!meetingId) {
+                currentStreamData = { title, description, classId };
+                currentRoomName = `class_${classId}_${Date.now()}`;
+                streamTitleSpan.textContent = title;
             } else {
-                throw new Error(`Camera error: ${cameraErr.message}`);
-            }
-        }
-
-        // Show host preview (muted — host shouldn't hear themselves)
-        hostVideo.srcObject = localStream;
-        hostVideo.muted = true;
-        showHostVideo(true);
-
-        updateConnectionStatus('connecting', 'Connecting to LiveKit...');
-        showToast('Connecting to LiveKit…');
-
-        const { token, url } = await getLiveKitToken(currentRoomName, 'Instructor', true);
-        if (!token) throw new Error('Invalid token received from server');
-
-        // ===== CREATE ROOM — let LiveKit manage its own tracks =====
-        liveKitRoom = new LiveKitClient.Room({
-            // Tell LiveKit NOT to use our getUserMedia stream —
-            // it will create its own internal tracks for publishing.
-            // This prevents the double-capture silence bug.
-            adaptiveStream: true,
-            dynacast: true,
-        });
-
-        liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
-            updateConnectionStatus('connected', '🔴 Live - Streaming');
-            showSuccess('Connected to LiveKit! Publishing stream...');
-        });
-        liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
-            updateConnectionStatus('disconnected', 'Disconnected from LiveKit');
-            showWarning('Disconnected from LiveKit. Stream may have ended.');
-        });
-        liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
-            updateConnectionStatus('connecting', 'Reconnecting to LiveKit...');
-            showWarning('Connection lost. Reconnecting...');
-        });
-        liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, (participant) => {
-            showSuccess(`${participant.identity} joined the class`);
-            updateViewersFromLiveKit(liveKitRoom);
-        });
-        liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
-            showToast(`${participant.identity} left`);
-            updateViewersFromLiveKit(liveKitRoom);
-        });
-
-        await liveKitRoom.connect(url, token);
-
-        // ===== PUBLISH TRACKS =====
-        // Use LiveKit's built-in track creation — this is what fixes the silence issue.
-        // setCameraEnabled/setMicrophoneEnabled let LiveKit capture fresh tracks
-        // rather than reusing the getUserMedia stream (which causes silence detection).
-        await liveKitRoom.localParticipant.setCameraEnabled(true);
-        await liveKitRoom.localParticipant.setMicrophoneEnabled(true);
-
-        // Verify mic track is actually live
-        const micPub = liveKitRoom.localParticipant.getTrackPublication(LiveKitClient.Track.Source.Microphone);
-        if (micPub && micPub.track) {
-            console.log('✅ Mic track published, muted:', micPub.isMuted);
-        } else {
-            console.warn('⚠️ Mic track not found after enabling');
-        }
-
-        setupLiveKitChat(liveKitRoom);
-
-        const sessionResponse = await fetch(`${BACKEND_URL}/api/livekit/start-session`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roomName: currentRoomName, title, description, classId, userId })
-        });
-        
-        if (!sessionResponse.ok) {
-            console.warn('Session start notification failed, but stream continues');
-            showWarning('Stream started but session notification failed');
-        }
-
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-        joinBtn.disabled = true;
-        chatInput.disabled = false;
-        sendChatBtn.disabled = false;
-        recordingBadge.classList.add('active');
-        liveBadge.classList.add('active');
-        updateStreamStatus(true, title);
-        streamStartTime = Date.now();
-
-        // ===== RECORDING =====
-        // Build a fresh MediaStream combining LiveKit's published tracks
-        // so the recording always has both video and audio.
-        recordedChunks = [];
-        try {
-            const recordStream = new MediaStream();
-
-            const camPub = liveKitRoom.localParticipant.getTrackPublication(LiveKitClient.Track.Source.Camera);
-            const micPub = liveKitRoom.localParticipant.getTrackPublication(LiveKitClient.Track.Source.Microphone);
-
-            if (camPub && camPub.track && camPub.track.mediaStreamTrack) {
-                recordStream.addTrack(camPub.track.mediaStreamTrack);
-            } else if (localStream.getVideoTracks()[0]) {
-                recordStream.addTrack(localStream.getVideoTracks()[0]);
-            }
-            if (micPub && micPub.track && micPub.track.mediaStreamTrack) {
-                recordStream.addTrack(micPub.track.mediaStreamTrack);
-            } else if (localStream.getAudioTracks()[0]) {
-                recordStream.addTrack(localStream.getAudioTracks()[0]);
+                currentRoomName = `meeting_${meetingId.replace(/-/g, '_')}`;
             }
 
-            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-                ? 'video/webm;codecs=vp9,opus'
-                : 'video/webm';
+            // ===== STEP 1: Get camera AND microphone =====
+            showToast('Requesting camera and microphone…');
+            updateConnectionStatus('connecting', 'Accessing camera & microphone...');
 
-            mediaRecorder = new MediaRecorder(recordStream, {
-                mimeType,
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    },
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: 48000,
+                        channelCount: 1,
+                        latency: 0.01
+                    }
+                });
+                showSuccess('Camera and microphone access granted');
+            } catch (cameraErr) {
+                if (cameraErr.name === 'NotAllowedError') {
+                    throw new Error('Camera/microphone access denied. Please allow access and try again.');
+                } else if (cameraErr.name === 'NotFoundError') {
+                    throw new Error('No camera or microphone found on this device.');
+                } else {
+                    throw new Error(`Camera error: ${cameraErr.message}`);
+                }
+            }
+
+            hostVideo.srcObject = localStream;
+            hostVideo.muted = true;
+            showHostVideo(true);
+            videoLabel.textContent = '🎥 Your Camera';
+
+            showToast('Connecting to LiveKit…');
+            updateConnectionStatus('connecting', 'Connecting to LiveKit...');
+
+            const { token, url } = await getLiveKitToken(currentRoomName, 'Instructor', true);
+
+            if (!token) {
+                throw new Error('Invalid token received from server');
+            }
+
+            liveKitRoom = new LiveKitClient.Room({
+                adaptiveStream: true,
+                dynacast: true,
+            });
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
+                updateConnectionStatus('connected', '🔴 Live - Streaming');
+                showSuccess('Connected to LiveKit! Publishing stream...');
+            });
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
+                updateConnectionStatus('disconnected', 'Disconnected from LiveKit');
+                showWarning('Disconnected from LiveKit. Stream may have ended.');
+            });
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
+                updateConnectionStatus('connecting', 'Reconnecting to LiveKit...');
+                showWarning('Connection lost. Reconnecting...');
+            });
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, (participant) => {
+                showSuccess(`${participant.identity} joined the class`);
+                updateViewersFromLiveKit(liveKitRoom);
+            });
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+                showToast(`${participant.identity} left`);
+                updateViewersFromLiveKit(liveKitRoom);
+            });
+
+            await liveKitRoom.connect(url, token);
+
+            const videoTrack = localStream.getVideoTracks()[0];
+            const audioTrack = localStream.getAudioTracks()[0];
+
+            if (videoTrack) {
+                await liveKitRoom.localParticipant.publishTrack(videoTrack, {
+                    name: 'camera',
+                    simulcast: true,
+                    source: LiveKitClient.Track.Source.Camera
+                });
+                console.log('✅ Video track published');
+            }
+
+            if (audioTrack) {
+                await liveKitRoom.localParticipant.publishTrack(audioTrack, {
+                    name: 'microphone',
+                    simulcast: false,
+                    source: LiveKitClient.Track.Source.Microphone
+                });
+                console.log('✅ Audio track published');
+            }
+
+            setupLiveKitChat(liveKitRoom);
+
+            // Notify backend
+            const sessionResponse = await fetch(`${BACKEND_URL}/api/livekit/start-session`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomName: currentRoomName, title, description, classId, userId })
+            });
+
+            if (!sessionResponse.ok) {
+                console.warn('Session start notification failed, but stream continues');
+                showWarning('Stream started but session notification failed');
+            }
+
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            joinBtn.disabled = true;
+            chatInput.disabled = false;
+            sendChatBtn.disabled = false;
+            recordingBadge.classList.add('active');
+            liveBadge.classList.add('active');
+            updateStreamStatus(true, title);
+            streamStartTime = Date.now();
+
+            recordedChunks = [];
+            mediaRecorder = new MediaRecorder(localStream, {
+                mimeType: 'video/webm',
                 videoBitsPerSecond: 1000000,
-                audioBitsPerSecond: 128000,
+                audioBitsPerSecond: 128000
             });
             mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
             mediaRecorder.start(10000);
-            console.log('✅ Recording started with audio + video');
-        } catch (recErr) {
-            console.warn('Recording setup failed, falling back to localStream:', recErr.message);
-            mediaRecorder = new MediaRecorder(localStream, { mimeType: 'video/webm' });
-            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
-            mediaRecorder.start(10000);
-        }
+            console.log('✅ Recording started');
 
-        showSuccess('✅ Livestream started! Students can now join.');
-        updateConnectionStatus('connected', '🔴 Live - Streaming');
-        lastFailedAction = null;
+            showSuccess('✅ Livestream started! Students can now join.');
+            updateConnectionStatus('connected', '🔴 Live - Streaming');
+            lastFailedAction = null;
 
-    } catch(err) {
-        console.error('Start stream error:', err);
-        showError(`Failed to start stream: ${err.message}`, 'startStream');
-        isHost = false;
-        startBtn.disabled = false;
-        if (localStream) { 
-            localStream.getTracks().forEach(t => t.stop()); 
-            localStream = null; 
+        } catch(err) {
+            console.error('Start stream error:', err);
+            showError(`Failed to start stream: ${err.message}`, 'startStream');
+            isHost = false;
+            startBtn.disabled = false;
+
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+                localStream = null;
+            }
+
+            if (liveKitRoom) {
+                try {
+                    await liveKitRoom.disconnect();
+                } catch(e) {}
+                liveKitRoom = null;
+            }
+
+            showHostVideo(false);
+            updateConnectionStatus('disconnected', 'Stream start failed');
         }
-        showHostVideo(false);
-        updateConnectionStatus('disconnected', 'Stream start failed');
     }
-}
 
     // ===== STOP LIVESTREAM =====
     async function stopLivestream() {
         if (!confirm('End stream and save recording?')) return;
-        
+
         try {
             hideError();
             recordingBadge.classList.remove('active');
             updateConnectionStatus('connecting', 'Ending stream...');
             showToast('Processing recording…');
-            
+
             let recordingBlob = null;
-            
+
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 await new Promise(r => { mediaRecorder.onstop = r; mediaRecorder.stop(); });
-                
+
                 if (recordedChunks.length > 0) {
                     recordingBlob = new Blob(recordedChunks, { type: 'video/webm' });
                     console.log(`Recording size: ${(recordingBlob.size / 1024 / 1024).toFixed(2)} MB`);
                 }
             }
-            
+
             if (liveKitRoom) {
                 await liveKitRoom.disconnect();
                 liveKitRoom = null;
             }
-            
+
             if (localStream) {
                 localStream.getTracks().forEach(t => t.stop());
                 localStream = null;
             }
             hostVideo.srcObject = null;
             showHostVideo(false);
-            
+
             if (recordingBlob && recordingBlob.size > 0) {
                 const streamName = `${currentStreamData.title.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}`;
-                
+
                 try {
                     updateConnectionStatus('connecting', 'Uploading to Mux...');
                     showToast('📤 Uploading recording to Mux…');
@@ -1583,13 +1770,23 @@ async function startLivestream() {
             } else {
                 showWarning('No recording data to save');
             }
-            
+
+            // End the meeting session if meeting ID exists
+            const meetingId = getMeetingIdFromURL();
+            if (meetingId) {
+                await fetch(`${BACKEND_URL}/api/livekit/end-stream`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meetingId })
+                }).catch(e => console.warn('End session notification failed:', e));
+            }
+
             await fetch(`${BACKEND_URL}/api/livekit/end-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomName: currentRoomName })
             }).catch(e => console.warn('Session end notification failed:', e));
-            
+
             startBtn.disabled = false;
             stopBtn.disabled = true;
             chatInput.disabled = true;
@@ -1601,9 +1798,9 @@ async function startLivestream() {
             streamTitleSpan.textContent = '';
             updateConnectionStatus('disconnected', 'Stream ended');
             liveBadge.classList.remove('active');
-            
+
             showSuccess('Stream ended successfully');
-            
+
         } catch(err) {
             console.error('Stop stream error:', err);
             showError(`Error ending stream: ${err.message}`, null);
@@ -1611,159 +1808,154 @@ async function startLivestream() {
         }
     }
 
-// ===== JOIN STREAM (VIEWER) - SIMPLIFIED =====
-async function joinLivestream() {
-    const isActive = await checkStreamStatus();
-    if (!isActive) { 
-        showError('No live stream available', null);
-        showToast('No live stream available', true); 
-        return; 
-    }
-
-    try {
-        hideError();
-        lastFailedAction = 'joinStream';
-        updateConnectionStatus('connecting', 'Finding active stream...');
-        
-        const response = await fetch(`${BACKEND_URL}/api/active-stream`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+    // ===== JOIN STREAM (VIEWER) =====
+    async function joinLivestream() {
+        const isActive = await checkStreamStatus();
+        if (!isActive) {
+            showError('No live stream available', null);
+            showToast('No live stream available', true);
+            return;
         }
-        
-        const data = await response.json();
-        if (!data.isActive || data.streams.length === 0) {
-            throw new Error('No active stream found');
-        }
-        
-        const activeStream = data.streams[0];
-        currentRoomName = activeStream.roomName;
-        currentStreamData.title = activeStream.title;
-        streamTitleSpan.textContent = activeStream.title;
-        
-    } catch(err) {
-        console.error('Get active stream error:', err);
-        showError(`Cannot find active stream: ${err.message}`, 'joinStream');
-        updateConnectionStatus('disconnected', 'No stream found');
-        return;
-    }
 
-    joinBtn.disabled = true;
-    joinBtn.querySelector('.btn-icon').textContent = '⏳';
-    startBtn.disabled = true;
-    remoteEmptyText.textContent = 'Connecting…';
-    updateConnectionStatus('connecting', 'Connecting to class...');
+        try {
+            hideError();
+            lastFailedAction = 'joinStream';
+            updateConnectionStatus('connecting', 'Finding active stream...');
 
-    try {
-        const studentName = localStorage.getItem('studentName') || prompt('Enter your name:', 'Student') || 'Student';
-        localStorage.setItem('studentName', studentName);
-
-        const { token, url } = await getLiveKitToken(currentRoomName, studentName, false);
-        
-        if (!token) {
-            throw new Error('Invalid token received');
-        }
-        
-        liveKitRoom = new LiveKitClient.Room();
-
-        // ===== FIX: Handle both video AND audio tracks =====
-        liveKitRoom.on(LiveKitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-            console.log(`Track subscribed: ${track.kind} from ${participant.identity}`);
-            
-            // Handle video track
-            if (track.kind === 'video' && participant.identity === 'Instructor') {
-                track.attach(remoteVideo);
-                showRemoteVideo(true);
-                remoteVideoLabel.textContent = "Instructor's Stream";
-                updateConnectionStatus('connected', '📺 Watching class');
-                showSuccess('Connected to class!');
+            const response = await fetch(`${BACKEND_URL}/api/active-stream`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
             }
-            
-            // Handle audio track - attach to video element for audio playback
-            if (track.kind === 'audio' && participant.identity === 'Instructor') {
-                track.attach(remoteVideo);
-                console.log('✅ Audio track attached successfully');
-            }
-        });
 
-        liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
-            isViewer = true;
-            chatInput.disabled = false;
-            sendChatBtn.disabled = false;
-            updateConnectionStatus('connected', '📺 Watching class');
-            startBtn.disabled = true;
-            
-            // ===== FIX: Ensure audio unmuted =====
-            remoteVideo.muted = false;
-            remoteVideo.volume = 1.0;
-            
-            // Try to play to enable audio
-            remoteVideo.play().then(() => {
-                console.log('✅ Audio playback started');
-            }).catch(() => {
-                console.log('Auto-play prevented, click to enable audio');
-                showWarning('Click anywhere to enable audio');
-                document.addEventListener('click', function enableAudio() {
-                    remoteVideo.play().then(() => {
-                        showSuccess('Audio enabled!');
-                    }).catch(e => console.log('Audio still blocked'));
-                    document.removeEventListener('click', enableAudio);
-                }, { once: true });
+            const data = await response.json();
+            if (!data.isActive || data.streams.length === 0) {
+                throw new Error('No active stream found');
+            }
+
+            const activeStream = data.streams[0];
+            currentRoomName = activeStream.roomName;
+            currentStreamData.title = activeStream.title;
+            streamTitleSpan.textContent = activeStream.title;
+
+        } catch(err) {
+            console.error('Get active stream error:', err);
+            showError(`Cannot find active stream: ${err.message}`, 'joinStream');
+            updateConnectionStatus('disconnected', 'No stream found');
+            return;
+        }
+
+        joinBtn.disabled = true;
+        joinBtn.querySelector('.btn-icon').textContent = '⏳';
+        startBtn.disabled = true;
+        remoteEmptyText.textContent = 'Connecting…';
+        updateConnectionStatus('connecting', 'Connecting to class...');
+
+        try {
+            const studentName = localStorage.getItem('studentName') || prompt('Enter your name:', 'Student') || 'Student';
+            localStorage.setItem('studentName', studentName);
+
+            const { token, url } = await getLiveKitToken(currentRoomName, studentName, false);
+
+            if (!token) {
+                throw new Error('Invalid token received');
+            }
+
+            liveKitRoom = new LiveKitClient.Room();
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+                console.log(`Track subscribed: ${track.kind} from ${participant.identity}`);
+
+                if (track.kind === 'video' && participant.identity === 'Instructor') {
+                    track.attach(remoteVideo);
+                    showRemoteVideo(true);
+                    remoteVideoLabel.textContent = "Instructor's Stream";
+                    updateConnectionStatus('connected', '📺 Watching class');
+                    showSuccess('Connected to class!');
+                }
+
+                if (track.kind === 'audio' && participant.identity === 'Instructor') {
+                    track.attach(remoteVideo);
+                    console.log('✅ Audio track attached successfully');
+                }
             });
-        });
 
-        liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
-            updateConnectionStatus('disconnected', 'Disconnected');
-            updateStreamStatus(false);
-            showRemoteVideo(false);
+            liveKitRoom.on(LiveKitClient.RoomEvent.Connected, () => {
+                isViewer = true;
+                chatInput.disabled = false;
+                sendChatBtn.disabled = false;
+                updateConnectionStatus('connected', '📺 Watching class');
+                startBtn.disabled = true;
+
+                remoteVideo.muted = false;
+                remoteVideo.volume = 1.0;
+
+                remoteVideo.play().then(() => {
+                    console.log('✅ Audio playback started');
+                }).catch(() => {
+                    console.log('Auto-play prevented, click to enable audio');
+                    showWarning('Click anywhere to enable audio');
+                    document.addEventListener('click', function enableAudio() {
+                        remoteVideo.play().then(() => {
+                            showSuccess('Audio enabled!');
+                        }).catch(e => console.log('Audio still blocked'));
+                        document.removeEventListener('click', enableAudio);
+                    }, { once: true });
+                });
+            });
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.Disconnected, () => {
+                updateConnectionStatus('disconnected', 'Disconnected');
+                updateStreamStatus(false);
+                showRemoteVideo(false);
+                isViewer = false;
+                const user = JSON.parse(localStorage.getItem('user'));
+                if (user && user.user_type === 'instructor') startBtn.disabled = false;
+                showWarning('Disconnected from stream');
+            });
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
+                updateConnectionStatus('connecting', 'Reconnecting...');
+                showWarning('Connection lost. Reconnecting...');
+            });
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
+                if (participant.identity === 'Instructor') {
+                    showError('Instructor has ended the class', null);
+                    showRemoteVideo(false);
+                    remoteEmptyText.textContent = 'Class ended';
+                    updateStreamStatus(false);
+                    isViewer = false;
+                    chatInput.disabled = true;
+                    sendChatBtn.disabled = true;
+                    joinBtn.disabled = false;
+                    joinBtn.querySelector('.btn-icon').textContent = '👤';
+                    const user = JSON.parse(localStorage.getItem('user'));
+                    if (user && user.user_type === 'instructor') startBtn.disabled = false;
+                }
+            });
+
+            liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, () => updateViewersFromLiveKit(liveKitRoom));
+            liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, () => updateViewersFromLiveKit(liveKitRoom));
+
+            await liveKitRoom.connect(url, token);
+            setupLiveKitChat(liveKitRoom);
+            updateViewersFromLiveKit(liveKitRoom);
+
+            joinBtn.querySelector('.btn-icon').textContent = '✅';
+            joinBtn.disabled = true;
+            lastFailedAction = null;
+
+        } catch(err) {
+            console.error('Join error:', err);
+            showError(`Failed to join: ${err.message}`, 'joinStream');
+            joinBtn.disabled = false;
+            joinBtn.querySelector('.btn-icon').textContent = '👤';
             isViewer = false;
             const user = JSON.parse(localStorage.getItem('user'));
             if (user && user.user_type === 'instructor') startBtn.disabled = false;
-            showWarning('Disconnected from stream');
-        });
-
-        liveKitRoom.on(LiveKitClient.RoomEvent.Reconnecting, () => {
-            updateConnectionStatus('connecting', 'Reconnecting...');
-            showWarning('Connection lost. Reconnecting...');
-        });
-
-        liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, (participant) => {
-            if (participant.identity === 'Instructor') {
-                showError('Instructor has ended the class', null);
-                showRemoteVideo(false);
-                remoteEmptyText.textContent = 'Class ended';
-                updateStreamStatus(false);
-                isViewer = false;
-                chatInput.disabled = true;
-                sendChatBtn.disabled = true;
-                joinBtn.disabled = false;
-                joinBtn.querySelector('.btn-icon').textContent = '👤';
-                const user = JSON.parse(localStorage.getItem('user'));
-                if (user && user.user_type === 'instructor') startBtn.disabled = false;
-            }
-        });
-
-        liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantConnected, () => updateViewersFromLiveKit(liveKitRoom));
-        liveKitRoom.on(LiveKitClient.RoomEvent.ParticipantDisconnected, () => updateViewersFromLiveKit(liveKitRoom));
-
-        await liveKitRoom.connect(url, token);
-        setupLiveKitChat(liveKitRoom);
-        updateViewersFromLiveKit(liveKitRoom);
-
-        joinBtn.querySelector('.btn-icon').textContent = '✅';
-        joinBtn.disabled = true;
-        lastFailedAction = null;
-
-    } catch(err) {
-        console.error('Join error:', err);
-        showError(`Failed to join: ${err.message}`, 'joinStream');
-        joinBtn.disabled = false;
-        joinBtn.querySelector('.btn-icon').textContent = '👤';
-        isViewer = false;
-        const user = JSON.parse(localStorage.getItem('user'));
-        if (user && user.user_type === 'instructor') startBtn.disabled = false;
-        updateConnectionStatus('disconnected', 'Connection failed');
+            updateConnectionStatus('disconnected', 'Connection failed');
+        }
     }
-}
 
     // ===== SEND CHAT =====
     async function sendChatMessage() {
@@ -1779,7 +1971,7 @@ async function joinLivestream() {
     }
 
     // ===== EVENT LISTENERS =====
-    document.getElementById('confirmStartBtn').addEventListener('click', startLivestream);
+    document.getElementById('confirmStartBtn').addEventListener('click', createNewSession);
 
     startBtn.addEventListener('click', async () => {
         const user = JSON.parse(localStorage.getItem('user'));
@@ -1788,24 +1980,46 @@ async function joinLivestream() {
             alert('Only instructors can start livestreams');
             return;
         }
+
         userName = user.name || user.email || 'Instructor';
         userId = user.id || userId;
-        
-        if (classesLoaded && preloadedClasses.length > 0) {
-            showModal('createClassModal');
+
+        const meetingId = getMeetingIdFromURL();
+        if (meetingId) {
+            await startSession();
         } else {
-            showToast('Loading your classes...');
-            await preloadInstructorClasses();
-            showModal('createClassModal');
+            if (classesLoaded && preloadedClasses.length > 0) {
+                showModal('createClassModal');
+            } else {
+                showToast('Loading your classes...');
+                await preloadInstructorClasses();
+                showModal('createClassModal');
+            }
         }
     });
 
     stopBtn.addEventListener('click', stopLivestream);
-    joinBtn.addEventListener('click', joinLivestream);
+
+    joinBtn.addEventListener('click', async () => {
+        const meetingId = getMeetingIdFromURL();
+        if (meetingId) {
+            await joinSession();
+        } else {
+            const isActive = await checkStreamStatus();
+            if (!isActive) {
+                showError('No live stream available', null);
+                showToast('No live stream available', true);
+                return;
+            }
+            await joinLivestream();
+        }
+    });
+
     refreshStatusBtn.addEventListener('click', async () => {
         showToast('Checking stream status…');
         await checkStreamStatus();
     });
+
     sendChatBtn.addEventListener('click', sendChatMessage);
     chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChatMessage(); });
 
@@ -1825,6 +2039,15 @@ async function joinLivestream() {
     isHost = false;
     isViewer = false;
 
+    // Check if there's a meeting ID in the URL
+    const meetingId = getMeetingIdFromURL();
+    if (meetingId) {
+        loadSessionByMeetingId(meetingId);
+        console.log(`✅ Session loaded: ${meetingId}`);
+    } else {
+        console.log('📌 No meeting ID found, using legacy mode');
+    }
+
     if (storedUser && storedUser.user_type === 'instructor') {
         console.log('Instructor detected, preloading classes...');
         preloadInstructorClasses();
@@ -1835,13 +2058,12 @@ async function joinLivestream() {
 
     statusCheckInterval = setInterval(() => {
         if (!isHost && !liveKitRoom) checkStreamStatus();
-    }, 15000); // Check every 15 seconds
+    }, 15000);
 
     checkStreamStatus();
     updateConnectionStatus('connecting', 'Initializing...');
     console.log('App initialized. User:', userId, userName);
-    
-    // Expose retry function globally
+
     window.retryLastAction = retryLastAction;
 </script>
 </body>

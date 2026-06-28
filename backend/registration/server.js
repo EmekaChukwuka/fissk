@@ -966,6 +966,62 @@ Regisrouter.post('/instructor/stats', async (req, res) => {
   }
 });
 
+// ===== GET INSTRUCTOR STREAMS (UPDATED WITH MEETING IDS) =====
+Regisrouter.post('/instructor/streams', async (req, res) => {
+  const instructorId = req.body.id;
+  
+  try {
+    // Get past streams (recorded)
+    const pastStreamsData = await LiveSession.find({
+      instructorId,
+      streamStatus: 'ended'
+    })
+      .populate('classId', 'title')
+      .sort({ date: -1, time: -1 })
+      .lean();
+    
+    const pastStreams = pastStreamsData.map(r => ({
+      id: r._id,
+      title: r.title,
+      description: r.description,
+      class_title: r.classId?.title || 'Unknown',
+      duration: r.duration,
+      participants: r.participants,
+      recorded_at: `${r.date || ''} ${r.time || ''}`,
+      class_id: r.classId?._id
+    }));
+    
+    // Get scheduled streams (upcoming) with meeting IDs
+    const scheduledStreamsData = await LiveSession.find({
+      instructorId,
+      streamStatus: 'scheduled'
+    })
+      .populate('classId', 'title')
+      .sort({ date: 1, time: 1 })
+      .lean();
+    
+    const scheduledStreams = scheduledStreamsData.map(s => ({
+      id: s._id,
+      title: s.title,
+      description: s.description,
+      scheduled_time: `${s.date || ''} ${s.time || ''}`,
+      meetingId: s.meetingId || null,
+      joinUrl: s.joinUrl || null,
+      classId: s.classId?._id || null,
+      participants: s.participants || 0
+    }));
+    
+    res.json({
+      past: pastStreams,
+      scheduled: scheduledStreams
+    });
+    
+  } catch (error) {
+    console.error('Get streams error:', error);
+    res.status(500).json({ message: "Failed to load streams" });
+  }
+});
+
 // Update user progress
 Regisrouter.post('/progress/update', async (req, res) => {
   const { classId, userId, progress } = req.body;

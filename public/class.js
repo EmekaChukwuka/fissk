@@ -292,6 +292,7 @@ class ClassManager {
             });
         }
     }
+    
 switchTab(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tabName);

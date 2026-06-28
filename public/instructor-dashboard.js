@@ -1,5 +1,5 @@
 // instructor-dashboard
- class InstructorDashboard {
+class InstructorDashboard {
   constructor() {
     this.currentUser = JSON.parse(localStorage.getItem('user'));
     this.init();
@@ -7,13 +7,12 @@
 
   async init() {
     this.bindUI();
-    await this.loadUserData();       // loads current user (from /register/user)
-    await this.loadDashboardData();  // classes, stats, streams
+    await this.loadUserData();
+    await this.loadDashboardData();
     this.setupEventHandlers();
   }
 
   bindUI() {
-    // quick DOM refs
     this.el = {
       totalClasses: document.getElementById('totalClasses'),
       totalStudents: document.getElementById('totalStudents'),
@@ -37,21 +36,19 @@
   }
 
   async loadUserData() {
-      if (this.currentUser) {
-        document.getElementById('user-dropdown').innerHTML = `
-                        <img src="https://ui-avatars.com/api/?name=${this.currentUser.firstname}+${this.currentUser.lastname}&background=8B5FBF&color=fff" alt="User" class="user-avatar" id="user-avatar">
-                        <span id="instructorName"></span>
-                        <div class="dropdown-content">
-                            <a href="profile.html">Profile</a>
-                            <a href="settings.html">Settings</a>
-                            <a href="#" class="logout" onclick="logout()">Logout</a>
-                        </div>`;
-      //  console.log(this.currentUser.firstname)
-        document.getElementById('instructorName').textContent = (this.currentUser.firstname  );
-      } else {
-        // redirect to login if needed
-        window.location.href = 'login.html';
-      }
+    if (this.currentUser) {
+      document.getElementById('user-dropdown').innerHTML = `
+        <img src="https://ui-avatars.com/api/?name=${this.currentUser.firstname}+${this.currentUser.lastname}&background=8B5FBF&color=fff" alt="User" class="user-avatar" id="user-avatar">
+        <span id="instructorName"></span>
+        <div class="dropdown-content">
+          <a href="profile.html">Profile</a>
+          <a href="settings.html">Settings</a>
+          <a href="#" class="logout" onclick="logout()">Logout</a>
+        </div>`;
+      document.getElementById('instructorName').textContent = this.currentUser.firstname;
+    } else {
+      window.location.href = 'login.html';
+    }
   }
 
   async loadDashboardData() {
@@ -63,13 +60,13 @@
     ]);
   }
 
-  // fetch classes (uses session-based auth on backend)
   async loadInstructorClasses() {
     try {
       const res = await fetch('https://fissk-backend.onrender.com/register/instructor/classes', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id : this.currentUser.id })
-                });
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: this.currentUser.id })
+      });
       const json = await res.json();
       const classes = Array.isArray(json?.classes) ? json.classes : [];
       this.renderClasses(classes);
@@ -108,9 +105,6 @@
       </div>
     `).join('');
 
-   // this.el.recentActivities.style.display = "none";
-
-    // attach actions
     this.el.classesList.querySelectorAll('.manage-class').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const id = e.currentTarget.dataset.id;
@@ -122,7 +116,6 @@
       btn.addEventListener('click', (e) => {
         const id = e.currentTarget.dataset.id;
         this.loadEnrollments(id);
-        // show students section
         this.switchSection('students');
         if (this.el.classFilter) this.el.classFilter.value = id;
       });
@@ -130,12 +123,13 @@
   }
 
   populateClassSelects(classes) {
-    // streamClass and classFilter
     if (this.el.streamClass) {
-      this.el.streamClass.innerHTML = `<option value="">Choose a class...</option>` + classes.map(c => `<option value="${c.id}">${this.escapeHtml(c.title)}</option>`).join('');
+      this.el.streamClass.innerHTML = `<option value="">Choose a class...</option>` + 
+        classes.map(c => `<option value="${c.id}">${this.escapeHtml(c.title)}</option>`).join('');
     }
     if (this.el.classFilter) {
-      this.el.classFilter.innerHTML = `<option value="">All Classes</option>` + classes.map(c => `<option value="${c.id}">${this.escapeHtml(c.title)}</option>`).join('');
+      this.el.classFilter.innerHTML = `<option value="">All Classes</option>` + 
+        classes.map(c => `<option value="${c.id}">${this.escapeHtml(c.title)}</option>`).join('');
       this.el.classFilter.addEventListener('change', () => {
         const v = this.el.classFilter.value;
         this.loadEnrollments(v || '');
@@ -147,12 +141,11 @@
     try {
       const id = this.currentUser.id;
       const res = await fetch('https://fissk-backend.onrender.com/register/instructor/stats', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id })
-                });
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
       const json = await res.json();
-    //  console.log(json)
       if (json) {
         const s = json;
         if (this.el.totalClasses) this.el.totalClasses.textContent = s.totalClasses || 0;
@@ -160,7 +153,6 @@
         if (this.el.totalVideos) this.el.totalVideos.textContent = s.totalVideos || 0;
         if (this.el.avgRating) this.el.avgRating.textContent = (s.avgRating || 0).toFixed(1);
       }
-      // recent activities
       if (json.recent && this.el.recentActivities) {
         this.el.recentActivities.innerHTML = json.recent.map(r => `<div class="activity">${this.escapeHtml(r)}</div>`).join('');
       }
@@ -171,16 +163,14 @@
 
   async loadEnrollments(classId = '') {
     try {
-      const url = `https://fissk-backend.onrender.com/register/instructor/enrollments`;
       const res = await fetch(`https://fissk-backend.onrender.com/register/instructor/enrollments`, {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ instructorId: this.currentUser.id })
-                });
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instructorId: this.currentUser.id })
+      });
       const json = await res.json();
-      console.log(json)
       const enrollments = Array.isArray(json?.enrollments) ? json.enrollments : [];
-      this.renderEnrollments(json);
+      this.renderEnrollments(enrollments);
     } catch (err) {
       console.error('loadEnrollments error', err);
     }
@@ -193,7 +183,7 @@
       container.innerHTML = `<div class="no-content"><p>No students enrolled yet.</p></div>`;
       return;
     }
-console.log(items)
+
     container.innerHTML = `
       <table class="enrollments-table">
         <thead>
@@ -218,18 +208,36 @@ console.log(items)
     `;
   }
 
-  // streams
+  // ===== STREAMS WITH MEETING URL =====
   async loadInstructorStreams() {
     try {
       const res = await fetch('https://fissk-backend.onrender.com/register/instructor/streams', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id : this.currentUser.id })
-                });
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: this.currentUser.id })
+      });
       const json = await res.json();
-      console.log(json)
+      console.log('Streams data:', json);
+      
       const scheduled = Array.isArray(json?.scheduled) ? json.scheduled : [];
       const past = Array.isArray(json?.past) ? json.past : [];
-      this.renderStreams(scheduled, past);
+      
+      // Fetch meeting IDs for scheduled streams
+      const scheduledWithMeetingIds = await Promise.all(scheduled.map(async (s) => {
+        try {
+          // Try to get meeting ID from backend
+          const meetingRes = await fetch(`https://fissk-backend.onrender.com/api/livekit/session/meeting/${s.id}`);
+          const meetingData = await meetingRes.json();
+          if (meetingData.success && meetingData.meetingId) {
+            return { ...s, meetingId: meetingData.meetingId };
+          }
+          return { ...s, meetingId: null };
+        } catch (err) {
+          return { ...s, meetingId: null };
+        }
+      }));
+      
+      this.renderStreams(scheduledWithMeetingIds, past);
     } catch (err) {
       console.error('loadInstructorStreams error', err);
     }
@@ -237,37 +245,156 @@ console.log(items)
 
   renderStreams(scheduled, past) {
     if (this.el.scheduledStreams) {
-      this.el.scheduledStreams.innerHTML = scheduled.length ? scheduled.map(s => `
-        <div class="enrolled-class-card">
-          <h4>${this.escapeHtml(s.title)}</h4>
-          <p>${this.escapeHtml(s.description || '')}</p>
-          <small>${s.scheduled_time}</small><br><br>
-          <div><button class="btn btn-primary start-stream" data-id="${s.id}">Start</button></div>
-        </div>
-        <br>
-      `).join('') : `<p>No scheduled streams</p>`;
+      if (scheduled.length) {
+        this.el.scheduledStreams.innerHTML = scheduled.map(s => `
+          <div class="enrolled-class-card scheduled-stream">
+            <div class="stream-header">
+              <h4>${this.escapeHtml(s.title)}</h4>
+              <span class="stream-status scheduled">⏳ Scheduled</span>
+            </div>
+            <p>${this.escapeHtml(s.description || '')}</p>
+            <div class="stream-details">
+              <span>📅 ${s.scheduled_time || 'TBD'}</span>
+            </div>
+            ${s.meetingId ? `
+              <div class="meeting-link-container">
+                <div class="meeting-link">
+                  <span class="meeting-id-label">🔑 Meeting ID:</span>
+                  <code class="meeting-id-code">${s.meetingId}</code>
+                </div>
+                <div class="meeting-url">
+                  <input type="text" class="meeting-url-input" value="https://fissk.onrender.com/newlivestream.html?meetingId=${s.meetingId}" readonly>
+                  <button class="btn btn-sm btn-copy" onclick="window.instructorDashboard.copyToClipboard('https://fissk.onrender.com/newlivestream.html?meetingId=${s.meetingId}')">📋 Copy</button>
+                  <a href="newlivestream.html?meetingId=${s.meetingId}" class="btn btn-sm btn-primary" target="_blank">🎥 Join</a>
+                </div>
+              </div>
+            ` : `
+              <div class="meeting-link-container">
+                <button class="btn btn-sm btn-primary" onclick="window.instructorDashboard.generateMeetingLink('${s.id}', '${this.escapeHtml(s.title)}')">
+                  🔗 Generate Shareable Link
+                </button>
+              </div>
+            `}
+            <div class="stream-actions">
+              <button class="btn btn-primary start-stream" data-id="${s.id}">▶ Start Stream</button>
+            </div>
+          </div>
+          <br>
+        `).join('');
+      } else {
+        this.el.scheduledStreams.innerHTML = `<p class="no-data">No scheduled streams</p>`;
+      }
     }
 
     if (this.el.pastStreams) {
-      this.el.pastStreams.innerHTML = past.length ? past.map(s => `
-        <div class="enrolled-class-card">
-          <h4>${this.escapeHtml(s.title)}</h4>
-          <p>${this.escapeHtml(s.description || '')}</p>
-          <small>${s.recorded_at}</small><br><br>
-          <div><a href="/class-details.html?id=${s.class_id}" class="btn btn-outline">View</a></div>
-        </div><br>
-      `).join('') : `<p>No past streams</p>`;
+      if (past.length) {
+        this.el.pastStreams.innerHTML = past.map(s => `
+          <div class="enrolled-class-card past-stream">
+            <div class="stream-header">
+              <h4>${this.escapeHtml(s.title)}</h4>
+              <span class="stream-status ended">✅ Ended</span>
+            </div>
+            <p>${this.escapeHtml(s.description || '')}</p>
+            <div class="stream-details">
+              <span>📅 ${s.recorded_at || 'Unknown'}</span>
+              <span>👥 ${s.participants || 0} participants</span>
+            </div>
+            <div class="stream-actions">
+              <a href="/class-details.html?id=${s.class_id}" class="btn btn-outline">📹 View Recording</a>
+            </div>
+          </div>
+          <br>
+        `).join('');
+      } else {
+        this.el.pastStreams.innerHTML = `<p class="no-data">No past streams</p>`;
+      }
     }
 
-    // attach start handlers
-    (this.el.scheduledStreams || document).querySelectorAll?.('.start-stream').forEach(b => b.addEventListener('click', e => {
-      const id = e.currentTarget.dataset.id;
-      window.location.href = `newlivestream.html?streamId=${id}`;
-    }));
+    // Attach start handlers
+    (this.el.scheduledStreams || document).querySelectorAll?.('.start-stream').forEach(b => {
+      b.addEventListener('click', (e) => {
+        const id = e.currentTarget.dataset.id;
+        // Find the stream data to get meetingId
+        const streamCard = e.currentTarget.closest('.scheduled-stream');
+        const meetingIdInput = streamCard?.querySelector('.meeting-url-input');
+        if (meetingIdInput) {
+          const url = meetingIdInput.value;
+          const match = url.match(/meetingId=([^&]+)/);
+          if (match) {
+            window.location.href = `newlivestream.html?meetingId=${match[1]}`;
+            return;
+          }
+        }
+        window.location.href = `newlivestream.html?streamId=${id}`;
+      });
+    });
+  }
+
+  // ===== GENERATE MEETING LINK =====
+async generateMeetingLink(streamId, streamTitle) {
+  try {
+    this.showMessage('Generating meeting link...', 'success');
+    
+    const response = await fetch('https://fissk-backend.onrender.com/api/livekit/session/create-meeting', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instructorId: this.currentUser.id,
+        classId: streamId,
+        title: streamTitle || 'Live Class',
+        description: 'Scheduled live session',
+        date: new Date(),
+        time: new Date().toLocaleTimeString(),
+        duration: '60 minutes'
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to generate meeting link');
+    }
+    
+    const meetingId = data.session.meetingId;
+    const meetingUrl = `https://fissk.onrender.com/newlivestream.html?meetingId=${meetingId}`;
+    
+    // Copy to clipboard
+    this.copyToClipboard(meetingUrl);
+    this.showMessage(`✅ Meeting link generated and copied to clipboard!`, 'success');
+    
+    // Refresh the streams list to show the new link
+    await this.loadInstructorStreams();
+    
+  } catch (err) {
+    console.error('Generate meeting link error:', err);
+    this.showMessage(`Failed to generate meeting link: ${err.message}`, 'error');
+  }
+}
+
+  // ===== COPY TO CLIPBOARD =====
+  copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        this.showMessage('📋 Link copied to clipboard!', 'success');
+      }).catch(() => {
+        this.fallbackCopy(text);
+      });
+    } else {
+      this.fallbackCopy(text);
+    }
+  }
+
+  fallbackCopy(text) {
+    const input = document.createElement('input');
+    input.value = text;
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    document.body.removeChild(input);
+    this.showMessage('📋 Link copied to clipboard!', 'success');
   }
 
   setupEventHandlers() {
-    // sidebar links (delegated)
     document.querySelectorAll('.sidebar-link').forEach(link => {
       link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -276,48 +403,64 @@ console.log(items)
       });
     });
 
-    // modals and forms
-    document.querySelectorAll('.close-modal').forEach(el => el.addEventListener('click', () => el.closest('.modal').style.display = 'none'));
-    if (this.el.createClassBtn) this.el.createClassBtn.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
-     if (this.el.createClassBtn2) this.el.createClassBtn2.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
-    if (this.el.btnNewClass) this.el.btnNewClass.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
-    if (this.el.btnSchedule) this.el.btnSchedule.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
-    if (this.el.startLiveBtn) this.el.startLiveBtn.addEventListener('click', () => window.location.href = 'newlivestream.html');
-    if (this.el.scheduleLiveBtn) this.el.scheduleLiveBtn.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
-  if (this.el.scheduleLiveBtn2) this.el.scheduleLiveBtn2.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
+    document.querySelectorAll('.close-modal').forEach(el => {
+      el.addEventListener('click', () => el.closest('.modal').style.display = 'none');
+    });
+    
+    if (this.el.createClassBtn) {
+      this.el.createClassBtn.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
+    }
+    if (this.el.createClassBtn2) {
+      this.el.createClassBtn2.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
+    }
+    if (this.el.btnNewClass) {
+      this.el.btnNewClass.addEventListener('click', () => document.getElementById('createClassModal').style.display = 'flex');
+    }
+    if (this.el.btnSchedule) {
+      this.el.btnSchedule.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
+    }
+    if (this.el.startLiveBtn) {
+      this.el.startLiveBtn.addEventListener('click', () => window.location.href = 'newlivestream.html');
+    }
+    if (this.el.scheduleLiveBtn) {
+      this.el.scheduleLiveBtn.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
+    }
+    if (this.el.scheduleLiveBtn2) {
+      this.el.scheduleLiveBtn2.addEventListener('click', () => document.getElementById('scheduleStreamModal').style.display = 'flex');
+    }
 
-    // create class form
     const createForm = document.getElementById('createClassForm');
-    if (createForm) createForm.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const data = Object.fromEntries(new FormData(createForm).entries());
-      await this.apiCreateClass(data);
-      document.getElementById('createClassModal').style.display = 'none';
-      createForm.reset();
-      await this.loadDashboardData();
-    });
+    if (createForm) {
+      createForm.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const data = Object.fromEntries(new FormData(createForm).entries());
+        await this.apiCreateClass(data);
+        document.getElementById('createClassModal').style.display = 'none';
+        createForm.reset();
+        await this.loadDashboardData();
+      });
+    }
 
-    // schedule stream form
     const scheduleForm = document.getElementById('scheduleStreamForm');
-    if (scheduleForm) scheduleForm.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const data = Object.fromEntries(new FormData(scheduleForm).entries());
-      await this.apiScheduleStream(data);
-      document.getElementById('scheduleStreamModal').style.display = 'none';
-      scheduleForm.reset();
-      await this.loadInstructorStreams();
-    });
+    if (scheduleForm) {
+      scheduleForm.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const data = Object.fromEntries(new FormData(scheduleForm).entries());
+        await this.apiScheduleStream(data);
+        document.getElementById('scheduleStreamModal').style.display = 'none';
+        scheduleForm.reset();
+        await this.loadInstructorStreams();
+      });
+    }
   }
 
-  // create class
   async apiCreateClass(payload) {
-   console.log(payload)
     const email = this.currentUser.email;
     try {
       const res = await fetch('https://fissk-backend.onrender.com/register/create-class', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({payload, email})
+        body: JSON.stringify({ payload, email })
       });
       const j = await res.json();
       if (!j.success) throw new Error(j.message || 'Failed to create class');
@@ -327,57 +470,77 @@ console.log(items)
     }
   }
 
-  // schedule stream
   async apiScheduleStream(payload) {
     try {
-      // normalize scheduledTime -> scheduled_at
       if (payload.scheduledTime) payload.scheduled_at = payload.scheduledTime;
-      console.log(payload)
       const id = this.currentUser.id;
+      
+      // Step 1: Schedule the stream
       const res = await fetch('https://fissk-backend.onrender.com/register/instructor/schedule-stream', {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({payload, id})
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload, id })
       });
       const j = await res.json();
       if (!j.success) throw new Error(j.message || 'Failed to schedule stream');
-      this.showMessage('Stream scheduled', 'success');
+      
+      this.showMessage('Stream scheduled successfully!', 'success');
+      
+      // Step 2: Generate meeting link for the scheduled stream
+      // Get the stream ID from the response or fetch again
+      setTimeout(async () => {
+        await this.loadInstructorStreams();
+        // Find the newly created stream and generate meeting link
+        const scheduledStreams = this.el.scheduledStreams;
+        if (scheduledStreams) {
+          const cards = scheduledStreams.querySelectorAll('.scheduled-stream');
+          if (cards.length > 0) {
+            const lastCard = cards[cards.length - 1];
+            const titleEl = lastCard.querySelector('h4');
+            if (titleEl) {
+              await this.generateMeetingLink(payload.classId, titleEl.textContent);
+            }
+          }
+        }
+      }, 1000);
+      
     } catch (err) {
+      console.error('Schedule stream error:', err);
       this.showMessage(err.message, 'error');
     }
   }
 
-  // utilities
-  escapeHtml(s) { if (!s) return ''; return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[ch]); }
+  escapeHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[ch]);
+  }
 
-   showMessage(message, type) {
-        const messageEl = document.createElement('div');
-        messageEl.className = `message message-${type}`;
-        messageEl.textContent = message;
-        messageEl.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 10px;
-            color: white;
-            background: ${type === 'success' ?  '#48BB78' :'#F56565'};
-            z-index: 10000;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-        `;
-
-        document.body.appendChild(messageEl);
-
-        setTimeout(() => {
-            messageEl.remove();
-        }, 3000);
-    }
+  showMessage(message, type) {
+    const messageEl = document.createElement('div');
+    messageEl.className = `message message-${type}`;
+    messageEl.textContent = message;
+    messageEl.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      border-radius: 10px;
+      color: white;
+      background: ${type === 'success' ? '#48BB78' : '#F56565'};
+      z-index: 10000;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    `;
+    document.body.appendChild(messageEl);
+    setTimeout(() => {
+      messageEl.remove();
+    }, 3000);
+  }
 
   switchSection(id) {
     document.querySelectorAll('.dashboard-section').forEach(s => s.classList.remove('active'));
     const target = document.getElementById(id);
     if (target) target.classList.add('active');
-    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.section===id));
+    document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.section === id));
   }
 }
 
@@ -385,55 +548,47 @@ window.addEventListener('DOMContentLoaded', () => {
   window.instructorDashboard = new InstructorDashboard();
 });
 
-// Mobile Navigation
+// ===== MOBILE NAVIGATION =====
 const hamburger = document.querySelector('.hamburger');
 const navMenu = document.querySelector('.nav-menu');
 
-
 if (hamburger) {
-    hamburger.addEventListener('click', () => {
-        hamburger.classList.toggle('active');
-        navMenu.classList.toggle('active');
-        
-        // Add mobile menu styles
-        if (navMenu.classList.contains('active')) {
-            navMenu.style.display = 'flex';
-            document.body.style.overflow = 'hidden';
-        } else {
-            navMenu.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }
-    });
+  hamburger.addEventListener('click', () => {
+    hamburger.classList.toggle('active');
+    navMenu.classList.toggle('active');
+    if (navMenu.classList.contains('active')) {
+      navMenu.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    } else {
+      navMenu.style.display = 'none';
+      document.body.style.overflow = 'auto';
+    }
+  });
 }
 
-// Close mobile menu when clicking on links
 document.querySelectorAll('.nav-link').forEach(link => {
-    link.addEventListener('click', () => {
-        hamburger.classList.remove('active');
-        navMenu.classList.remove('active');
-        navMenu.style.display = 'none';
-        document.body.style.overflow = 'auto';
-    });
+  link.addEventListener('click', () => {
+    hamburger.classList.remove('active');
+    navMenu.classList.remove('active');
+    navMenu.style.display = 'none';
+    document.body.style.overflow = 'auto';
+  });
 });
 
-
-
-// Smooth scrolling for anchor links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-            target.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start'
-            });
-        }
-    });
+  anchor.addEventListener('click', function(e) {
+    e.preventDefault();
+    const target = document.querySelector(this.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  });
 });
 
-
-        async function logout() {
-            localStorage.removeItem('user');
-            window.location.href = "/";
-        }
+async function logout() {
+  localStorage.removeItem('user');
+  window.location.href = '/';
+}

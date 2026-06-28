@@ -15,6 +15,156 @@
     top: 100px;
 }
 
+/* Meeting Link Styles */
+.meeting-link-container {
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+}
+
+.meeting-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.meeting-id-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.meeting-id-code {
+  font-family: monospace;
+  background: var(--bg-primary);
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--accent-blue);
+  letter-spacing: 0.5px;
+}
+
+.meeting-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meeting-url-input {
+  flex: 1;
+  min-width: 200px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: monospace;
+  outline: none;
+}
+
+.meeting-url-input:focus {
+  border-color: var(--accent-blue);
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 11px;
+  min-width: auto;
+}
+
+.btn-copy {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.btn-copy:hover {
+  background: var(--bg-hover);
+}
+
+.stream-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.stream-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.stream-status.scheduled {
+  background: rgba(253,214,99,0.15);
+  color: var(--accent-yellow);
+}
+
+.stream-status.ended {
+  background: rgba(129,201,149,0.15);
+  color: var(--accent-green);
+}
+
+.stream-status.live {
+  background: rgba(242,139,130,0.15);
+  color: var(--accent-red);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.stream-details {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 6px 0;
+  flex-wrap: wrap;
+}
+
+.stream-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.scheduled-stream {
+  padding: 12px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border-left: 3px solid var(--accent-yellow);
+  margin-bottom: 12px;
+}
+
+.past-stream {
+  padding: 12px;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  border-left: 3px solid var(--accent-green);
+  margin-bottom: 12px;
+}
+
+.no-data {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 16px;
+  font-style: italic;
+}
+
 .sidebar-header {
     padding: 25px 25px 15px;
     border-bottom: 1px solid var(--border);
