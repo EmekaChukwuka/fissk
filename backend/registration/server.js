@@ -974,7 +974,8 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
     // Get past streams (recorded)
     const pastStreamsData = await LiveSession.find({
       instructorId,
-      sessionType: 'recorded'
+      sessionType: 'recorded',
+      streamStatus: 'ended' || 'recorded'
     })
       .populate('classId', 'title')
       .sort({ date: -1, time: -1 })
