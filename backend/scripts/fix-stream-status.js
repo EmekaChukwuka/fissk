@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import LiveSession from '../models/LiveSession.js';
 import connectDB from '../config/db.js';
 
-async function fixStreamStatus() {
+export async function fixStreamStatus() {
   await connectDB();
   console.log('🔍 Fixing stream statuses...');
 
@@ -111,5 +111,3 @@ async function fixStreamStatus() {
     process.exit(1);
   }
 }
-
-fixStreamStatus();
