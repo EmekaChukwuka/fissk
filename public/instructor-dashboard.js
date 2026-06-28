@@ -123,19 +123,29 @@ class InstructorDashboard {
   }
 
   populateClassSelects(classes) {
+    // streamClass dropdown for scheduling
     if (this.el.streamClass) {
-      this.el.streamClass.innerHTML = `<option value="">Choose a class...</option>` + 
-        classes.map(c => `<option value="${c.id}">${this.escapeHtml(c.title)}</option>`).join('');
+        this.el.streamClass.innerHTML = `<option value="">Choose a class...</option>` + 
+            classes.map(c => {
+                // Use _id or id depending on your data structure
+                const classId = c._id || c.id;
+                return `<option value="${classId}">${this.escapeHtml(c.title)}</option>`;
+            }).join('');
     }
+    
+    // classFilter dropdown for filtering
     if (this.el.classFilter) {
-      this.el.classFilter.innerHTML = `<option value="">All Classes</option>` + 
-        classes.map(c => `<option value="${c.id}">${this.escapeHtml(c.title)}</option>`).join('');
-      this.el.classFilter.addEventListener('change', () => {
-        const v = this.el.classFilter.value;
-        this.loadEnrollments(v || '');
-      });
+        this.el.classFilter.innerHTML = `<option value="">All Classes</option>` + 
+            classes.map(c => {
+                const classId = c._id || c.id;
+                return `<option value="${classId}">${this.escapeHtml(c.title)}</option>`;
+            }).join('');
+        this.el.classFilter.addEventListener('change', () => {
+            const v = this.el.classFilter.value;
+            this.loadEnrollments(v || '');
+        });
     }
-  }
+}
 
   async loadInstructorStats() {
     try {
@@ -421,79 +431,125 @@ async generateMeetingLink(streamId, streamTitle) {
       });
     }
 
-    const scheduleForm = document.getElementById('scheduleStreamForm');
-    if (scheduleForm) {
-      scheduleForm.addEventListener('submit', async (ev) => {
+   // In setupEventHandlers(), update the schedule form handler:
+
+const scheduleForm = document.getElementById('scheduleStreamForm');
+if (scheduleForm) {
+    // Remove any existing listeners
+    const newScheduleForm = scheduleForm.cloneNode(true);
+    scheduleForm.parentNode.replaceChild(newScheduleForm, scheduleForm);
+    
+    newScheduleForm.addEventListener('submit', async (ev) => {
         ev.preventDefault();
-        const data = Object.fromEntries(new FormData(scheduleForm).entries());
-        await this.apiScheduleStream(data);
-        document.getElementById('scheduleStreamModal').style.display = 'none';
-        scheduleForm.reset();
-        await this.loadInstructorStreams();
-      });
-    }
-  }
-
-  async apiCreateClass(payload) {
-    const email = this.currentUser.email;
-    try {
-      const res = await fetch('https://fissk-backend.onrender.com/register/create-class', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payload, email })
-      });
-      const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Failed to create class');
-      this.showMessage('Class created', 'success');
-    } catch (err) {
-      this.showMessage(err.message, 'error');
-    }
-  }
-
-  async apiScheduleStream(payload) {
-    try {
-        if (payload.scheduledTime) payload.scheduled_at = payload.scheduledTime;
-        const id = this.currentUser.id;
         
-        // ===== FIX: Validate classId before sending =====
-        if (!payload.classId || payload.classId === 'undefined' || payload.classId === '') {
+        // Get values directly from the form
+        const classId = document.getElementById('streamClass')?.value;
+        const title = document.getElementById('streamTitle')?.value;
+        const description = document.getElementById('streamDescription')?.value;
+        const scheduledTime = document.getElementById('streamDateTime')?.value;
+        
+        // Validate
+        if (!classId || classId === 'undefined' || classId === '') {
+            this.showMessage('Please select a class', 'error');
+            return;
+        }
+        
+        if (!title) {
+            this.showMessage('Please enter a stream title', 'error');
+            return;
+        }
+        
+        if (!scheduledTime) {
+            this.showMessage('Please select a date and time', 'error');
+            return;
+        }
+        
+        const payload = {
+            classId: classId,
+            title: title,
+            description: description || '',
+            scheduledTime: scheduledTime
+        };
+        
+        await this.apiScheduleStream(payload);
+        document.getElementById('scheduleStreamModal').style.display = 'none';
+        newScheduleForm.reset();
+        await this.loadInstructorStreams();
+    });
+}
+  }
+
+  // ===== SCHEDULE STREAM (FIXED) =====
+async apiScheduleStream(payload) {
+    try {
+        // ===== FIX: Ensure we have valid data =====
+        if (!payload) {
+            this.showMessage('No payload provided', 'error');
+            return;
+        }
+        
+        // Get the classId from the form - use the correct field name
+        const classId = document.getElementById('streamClass')?.value;
+        const title = document.getElementById('streamTitle')?.value;
+        const description = document.getElementById('streamDescription')?.value;
+        const scheduledTime = document.getElementById('streamDateTime')?.value;
+        
+        // ===== FIX: Validate fields =====
+        if (!classId || classId === 'undefined' || classId === '') {
             this.showMessage('Please select a valid class', 'error');
             return;
         }
         
-        console.log('Scheduling stream with payload:', payload);
+        if (!title) {
+            this.showMessage('Please enter a stream title', 'error');
+            return;
+        }
+        
+        if (!scheduledTime) {
+            this.showMessage('Please select a date and time', 'error');
+            return;
+        }
+        
+        // Build payload with proper values
+        const payloadData = {
+            classId: classId,
+            title: title,
+            description: description || '',
+            scheduledTime: scheduledTime
+        };
+        
+        console.log('Scheduling stream with payload:', payloadData);
+        
+        const id = this.currentUser.id;
         
         // Step 1: Schedule the stream
         const res = await fetch('https://fissk-backend.onrender.com/register/instructor/schedule-stream', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ payload, id })
+            body: JSON.stringify({ payload: payloadData, id })
         });
+        
         const j = await res.json();
-        if (!j.success) throw new Error(j.message || 'Failed to schedule stream');
+        if (!j.success) {
+            throw new Error(j.message || 'Failed to schedule stream');
+        }
         
         this.showMessage('Stream scheduled successfully!', 'success');
         
         // Step 2: Generate meeting link for the scheduled stream
         setTimeout(async () => {
             await this.loadInstructorStreams();
-            // Find the newly created stream and generate meeting link
-            const scheduledStreams = this.el.scheduledStreams;
-            if (scheduledStreams) {
-                const cards = scheduledStreams.querySelectorAll('.scheduled-stream');
-                if (cards.length > 0) {
-                    const lastCard = cards[cards.length - 1];
-                    const titleEl = lastCard.querySelector('h4');
-                    if (titleEl && payload.classId) {
-                        await this.generateMeetingLink(payload.classId, titleEl.textContent);
-                    }
-                }
+            // Auto-generate meeting link for the newly created stream
+            if (j.meetingId) {
+                const meetingUrl = `https://fissk-online-academy.onrender.com/newlivestream.html?meetingId=${j.meetingId}`;
+                this.copyToClipboard(meetingUrl);
+                this.showMessage(`✅ Meeting link generated and copied to clipboard!`, 'success');
             }
         }, 1000);
         
     } catch (err) {
         console.error('Schedule stream error:', err);
-        this.showMessage(err.message, 'error');
+        this.showMessage(err.message || 'Failed to schedule stream', 'error');
     }
 }
 
