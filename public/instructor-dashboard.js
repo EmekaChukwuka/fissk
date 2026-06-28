@@ -261,7 +261,7 @@ class InstructorDashboard {
                     ${s.meetingId ? `
                         <div class="meeting-link-container">
                             <div class="meeting-url">
-                                <input type="text" class="meeting-url-input" value="https://fissk.onrender.com/newlivestream.html?meetingId=${s.meetingId}" readonly>
+                                <input type="text" class="meeting-url-input" value="https://fissk-online-academy.onrender.com/newlivestream.html?meetingId=${s.meetingId}" readonly>
                                 <button class="btn btn-sm btn-copy" onclick="window.instructorDashboard.copyToClipboard('https://fissk.onrender.com/newlivestream.html?meetingId=${s.meetingId}')">📋 Copy</button>
                                 <a href="newlivestream.html?meetingId=${s.meetingId}" class="btn btn-sm btn-primary" target="_blank">🎥 Join</a>
                             </div>
@@ -336,7 +336,7 @@ async generateMeetingLink(streamId, streamTitle) {
     }
     
     const meetingId = data.session.meetingId;
-    const meetingUrl = `https://fissk.onrender.com/newlivestream.html?meetingId=${meetingId}`;
+    const meetingUrl = `https://fissk-online-academy.onrender.com/newlivestream.html?meetingId=${meetingId}`;
     
     // Copy to clipboard
     this.copyToClipboard(meetingUrl);
@@ -452,43 +452,50 @@ async generateMeetingLink(streamId, streamTitle) {
 
   async apiScheduleStream(payload) {
     try {
-      if (payload.scheduledTime) payload.scheduled_at = payload.scheduledTime;
-      const id = this.currentUser.id;
-      
-      // Step 1: Schedule the stream
-      const res = await fetch('https://fissk-backend.onrender.com/register/instructor/schedule-stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ payload, id })
-      });
-      const j = await res.json();
-      if (!j.success) throw new Error(j.message || 'Failed to schedule stream');
-      
-      this.showMessage('Stream scheduled successfully!', 'success');
-      
-      // Step 2: Generate meeting link for the scheduled stream
-      // Get the stream ID from the response or fetch again
-      setTimeout(async () => {
-        await this.loadInstructorStreams();
-        // Find the newly created stream and generate meeting link
-        const scheduledStreams = this.el.scheduledStreams;
-        if (scheduledStreams) {
-          const cards = scheduledStreams.querySelectorAll('.scheduled-stream');
-          if (cards.length > 0) {
-            const lastCard = cards[cards.length - 1];
-            const titleEl = lastCard.querySelector('h4');
-            if (titleEl) {
-              await this.generateMeetingLink(payload.classId, titleEl.textContent);
-            }
-          }
+        if (payload.scheduledTime) payload.scheduled_at = payload.scheduledTime;
+        const id = this.currentUser.id;
+        
+        // ===== FIX: Validate classId before sending =====
+        if (!payload.classId || payload.classId === 'undefined' || payload.classId === '') {
+            this.showMessage('Please select a valid class', 'error');
+            return;
         }
-      }, 1000);
-      
+        
+        console.log('Scheduling stream with payload:', payload);
+        
+        // Step 1: Schedule the stream
+        const res = await fetch('https://fissk-backend.onrender.com/register/instructor/schedule-stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ payload, id })
+        });
+        const j = await res.json();
+        if (!j.success) throw new Error(j.message || 'Failed to schedule stream');
+        
+        this.showMessage('Stream scheduled successfully!', 'success');
+        
+        // Step 2: Generate meeting link for the scheduled stream
+        setTimeout(async () => {
+            await this.loadInstructorStreams();
+            // Find the newly created stream and generate meeting link
+            const scheduledStreams = this.el.scheduledStreams;
+            if (scheduledStreams) {
+                const cards = scheduledStreams.querySelectorAll('.scheduled-stream');
+                if (cards.length > 0) {
+                    const lastCard = cards[cards.length - 1];
+                    const titleEl = lastCard.querySelector('h4');
+                    if (titleEl && payload.classId) {
+                        await this.generateMeetingLink(payload.classId, titleEl.textContent);
+                    }
+                }
+            }
+        }, 1000);
+        
     } catch (err) {
-      console.error('Schedule stream error:', err);
-      this.showMessage(err.message, 'error');
+        console.error('Schedule stream error:', err);
+        this.showMessage(err.message, 'error');
     }
-  }
+}
 
   escapeHtml(s) {
     if (!s) return '';

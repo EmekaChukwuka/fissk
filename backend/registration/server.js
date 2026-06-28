@@ -1076,8 +1076,25 @@ Regisrouter.post('/instructor/scheduled-sessions', async (req, res) => {
 Regisrouter.post('/instructor/schedule-stream', async (req, res) => {
   const { payload, id } = req.body;
   
+  console.log('Schedule stream payload:', payload);
+  
+  // ===== FIX: Validate payload fields =====
+  if (!payload) {
+    return res.status(400).json({ message: "Payload is required" });
+  }
+  
   if (!payload.scheduledTime) {
     return res.status(400).json({ message: "scheduledTime is required" });
+  }
+  
+  if (!payload.classId || payload.classId === 'undefined' || payload.classId === '') {
+    return res.status(400).json({ message: "classId is required and must be a valid class" });
+  }
+  
+  // ===== FIX: Validate classId is a valid ObjectId =====
+  const mongoose = await import('mongoose');
+  if (!mongoose.Types.ObjectId.isValid(payload.classId)) {
+    return res.status(400).json({ message: "Invalid classId format" });
   }
 
   const [date, time] = payload.scheduledTime.split("T");
@@ -1113,6 +1130,7 @@ Regisrouter.post('/instructor/schedule-stream', async (req, res) => {
     console.log(`✅ Stream scheduled: ${liveSession.meetingId} - ${payload.title}`);
     
     res.json({ 
+      success: true,
       message: "Live stream scheduled successfully",
       meetingId: liveSession.meetingId,
       sessionId: liveSession._id
