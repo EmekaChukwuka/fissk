@@ -574,9 +574,6 @@ app.get('/live/chat-history', (req, res) => {
     res.json({ messages: [] });
 });
 
-import fixStreamStatus from './scripts/fix-stream-status.js';
-fixStreamStatus();
-
 // ===== START SERVER =====
 const PORT = process.env.PORT || 3000;
 connectDB();
