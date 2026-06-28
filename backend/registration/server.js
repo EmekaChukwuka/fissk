@@ -1194,10 +1194,7 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
     // ===== FIX: Scheduled streams - check BOTH streamStatus AND sessionType =====
     const scheduledStreamsData = await LiveSession.find({
       instructorId,
-      $or: [
-        { streamStatus: 'scheduled' },
-        { sessionType: 'upcoming' }
-      ]
+      sessionType: 'upcoming'
     })
       .populate('classId', 'title')
       .sort({ date: 1, time: 1 })
