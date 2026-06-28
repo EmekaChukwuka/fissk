@@ -68,18 +68,12 @@ const LiveSessionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // ===== Pre-save hook (FIXED - proper function syntax) =====
-LiveSessionSchema.pre('save', function(next) {
-  // Use regular function so 'this' refers to the document
-  try {
-    if (!this.meetingId) {
-      this.meetingId = generateMeetingId();
-    }
-    if (!this.livekitRoomName && this.meetingId) {
-      this.livekitRoomName = generateLiveKitRoomName(this.meetingId);
-    }
-    next();
-  } catch (error) {
-    next(error);
+LiveSessionSchema.pre('save', function() {
+  if (!this.meetingId) {
+    this.meetingId = generateMeetingId();
+  }
+  if (!this.livekitRoomName && this.meetingId) {
+    this.livekitRoomName = generateLiveKitRoomName(this.meetingId);
   }
 });
 
