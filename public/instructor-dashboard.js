@@ -243,92 +243,72 @@ class InstructorDashboard {
     }
   }
 
-  renderStreams(scheduled, past) {
+ renderStreams(scheduled, past) {
+    // Scheduled Streams
     if (this.el.scheduledStreams) {
-      if (scheduled.length) {
-        this.el.scheduledStreams.innerHTML = scheduled.map(s => `
-          <div class="enrolled-class-card scheduled-stream">
-            <div class="stream-header">
-              <h4>${this.escapeHtml(s.title)}</h4>
-              <span class="stream-status scheduled">⏳ Scheduled</span>
-            </div>
-            <p>${this.escapeHtml(s.description || '')}</p>
-            <div class="stream-details">
-              <span>📅 ${s.scheduled_time || 'TBD'}</span>
-            </div>
-            ${s.meetingId ? `
-              <div class="meeting-link-container">
-                <div class="meeting-link">
-                  <span class="meeting-id-label">🔑 Meeting ID:</span>
-                  <code class="meeting-id-code">${s.meetingId}</code>
+        if (scheduled && scheduled.length > 0) {
+            this.el.scheduledStreams.innerHTML = scheduled.map(s => `
+                <div class="enrolled-class-card scheduled-stream">
+                    <div class="stream-header">
+                        <h4>${this.escapeHtml(s.title)}</h4>
+                        <span class="stream-status scheduled">⏳ Scheduled</span>
+                    </div>
+                    <p>${this.escapeHtml(s.description || '')}</p>
+                    <div class="stream-details">
+                        <span>📅 ${s.scheduled_time || 'TBD'}</span>
+                        ${s.meetingId ? `<span>🔑 ${s.meetingId}</span>` : ''}
+                    </div>
+                    ${s.meetingId ? `
+                        <div class="meeting-link-container">
+                            <div class="meeting-url">
+                                <input type="text" class="meeting-url-input" value="https://fissk.onrender.com/newlivestream.html?meetingId=${s.meetingId}" readonly>
+                                <button class="btn btn-sm btn-copy" onclick="window.instructorDashboard.copyToClipboard('https://fissk.onrender.com/newlivestream.html?meetingId=${s.meetingId}')">📋 Copy</button>
+                                <a href="newlivestream.html?meetingId=${s.meetingId}" class="btn btn-sm btn-primary" target="_blank">🎥 Join</a>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="meeting-link-container">
+                            <button class="btn btn-sm btn-primary" onclick="window.instructorDashboard.generateMeetingLink('${s.id}', '${this.escapeHtml(s.title)}')">
+                                🔗 Generate Shareable Link
+                            </button>
+                        </div>
+                    `}
+                    <div class="stream-actions">
+                        <button class="btn btn-primary start-stream" data-id="${s.id}">▶ Start Stream</button>
+                    </div>
                 </div>
-                <div class="meeting-url">
-                  <input type="text" class="meeting-url-input" value="https://fissk.onrender.com/newlivestream.html?meetingId=${s.meetingId}" readonly>
-                  <button class="btn btn-sm btn-copy" onclick="window.instructorDashboard.copyToClipboard('https://fissk.onrender.com/newlivestream.html?meetingId=${s.meetingId}')">📋 Copy</button>
-                  <a href="newlivestream.html?meetingId=${s.meetingId}" class="btn btn-sm btn-primary" target="_blank">🎥 Join</a>
-                </div>
-              </div>
-            ` : `
-              <div class="meeting-link-container">
-                <button class="btn btn-sm btn-primary" onclick="window.instructorDashboard.generateMeetingLink('${s.id}', '${this.escapeHtml(s.title)}')">
-                  🔗 Generate Shareable Link
-                </button>
-              </div>
-            `}
-            <div class="stream-actions">
-              <button class="btn btn-primary start-stream" data-id="${s.id}">▶ Start Stream</button>
-            </div>
-          </div>
-          <br>
-        `).join('');
-      } else {
-        this.el.scheduledStreams.innerHTML = `<p class="no-data">No scheduled streams</p>`;
-      }
-    }
-
-    if (this.el.pastStreams) {
-      if (past.length) {
-        this.el.pastStreams.innerHTML = past.map(s => `
-          <div class="enrolled-class-card past-stream">
-            <div class="stream-header">
-              <h4>${this.escapeHtml(s.title)}</h4>
-              <span class="stream-status ended">✅ Ended</span>
-            </div>
-            <p>${this.escapeHtml(s.description || '')}</p>
-            <div class="stream-details">
-              <span>📅 ${s.recorded_at || 'Unknown'}</span>
-              <span>👥 ${s.participants || 0} participants</span>
-            </div>
-            <div class="stream-actions">
-              <a href="/class-details.html?id=${s.class_id}" class="btn btn-outline">📹 View Recording</a>
-            </div>
-          </div>
-          <br>
-        `).join('');
-      } else {
-        this.el.pastStreams.innerHTML = `<p class="no-data">No past streams</p>`;
-      }
-    }
-
-    // Attach start handlers
-    (this.el.scheduledStreams || document).querySelectorAll?.('.start-stream').forEach(b => {
-      b.addEventListener('click', (e) => {
-        const id = e.currentTarget.dataset.id;
-        // Find the stream data to get meetingId
-        const streamCard = e.currentTarget.closest('.scheduled-stream');
-        const meetingIdInput = streamCard?.querySelector('.meeting-url-input');
-        if (meetingIdInput) {
-          const url = meetingIdInput.value;
-          const match = url.match(/meetingId=([^&]+)/);
-          if (match) {
-            window.location.href = `newlivestream.html?meetingId=${match[1]}`;
-            return;
-          }
+            `).join('');
+        } else {
+            this.el.scheduledStreams.innerHTML = `<p class="no-data">No scheduled streams</p>`;
         }
-        window.location.href = `newlivestream.html?streamId=${id}`;
-      });
-    });
-  }
+    }
+
+    // ===== PAST STREAMS (FIXED) =====
+    if (this.el.pastStreams) {
+        if (past && past.length > 0) {
+            this.el.pastStreams.innerHTML = past.map(s => `
+                <div class="enrolled-class-card past-stream">
+                    <div class="stream-header">
+                        <h4>📹 ${this.escapeHtml(s.title)}</h4>
+                        <span class="stream-status ended">✅ Ended</span>
+                    </div>
+                    <p>${this.escapeHtml(s.description || 'No description')}</p>
+                    <div class="stream-details">
+                        <span>📅 ${s.recorded_at || 'Unknown date'}</span>
+                        <span>👥 ${s.participants || 0} participants</span>
+                        <span>⏱️ ${s.duration || 'Unknown'}</span>
+                    </div>
+                    <div class="stream-actions">
+                        <a href="/class-details.html?id=${s.class_id}" class="btn btn-outline">📹 View Recording</a>
+                        ${s.id ? `<a href="newlivestream.html?streamId=${s.id}" class="btn btn-outline">🔗 Replay</a>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            this.el.pastStreams.innerHTML = `<p class="no-data">No past streams</p>`;
+        }
+    }
+}
 
   // ===== GENERATE MEETING LINK =====
 async generateMeetingLink(streamId, streamTitle) {

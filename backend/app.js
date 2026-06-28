@@ -346,7 +346,7 @@ app.get('/api/livekit/session/meeting/:streamId', async (req, res) => {
   const { streamId } = req.params;
   
   try {
-    // Check if this stream already has a meeting session
+    // First try to find by classId (since streamId might be classId)
     const session = await LiveSession.findOne({ 
       classId: streamId,
       streamStatus: 'scheduled'
@@ -358,11 +358,24 @@ app.get('/api/livekit/session/meeting/:streamId', async (req, res) => {
         meetingId: session.meetingId,
         title: session.title,
         date: session.date,
-        time: session.time
+        time: session.time,
+        joinUrl: session.joinUrl
       });
     }
     
-    // No meeting found for this stream
+    // If not found by classId, try by _id
+    const sessionById = await LiveSession.findById(streamId);
+    if (sessionById && sessionById.meetingId) {
+      return res.json({
+        success: true,
+        meetingId: sessionById.meetingId,
+        title: sessionById.title,
+        date: sessionById.date,
+        time: sessionById.time,
+        joinUrl: sessionById.joinUrl
+      });
+    }
+    
     res.json({
       success: false,
       message: 'No meeting found for this stream'
@@ -374,7 +387,7 @@ app.get('/api/livekit/session/meeting/:streamId', async (req, res) => {
   }
 });
 
-// Create meeting for a scheduled stream
+// ===== CREATE MEETING FOR A STREAM =====
 app.post('/api/livekit/session/create-meeting', async (req, res) => {
   const { instructorId, classId, title, description, date, time, duration } = req.body;
   
@@ -400,7 +413,7 @@ app.post('/api/livekit/session/create-meeting', async (req, res) => {
       });
     }
     
-    // Create new meeting session
+    // Create new meeting session - meetingId will be auto-generated
     const session = new LiveSession({
       instructorId,
       classId,
@@ -414,6 +427,8 @@ app.post('/api/livekit/session/create-meeting', async (req, res) => {
     });
     
     await session.save();
+    
+    console.log(`✅ Meeting created: ${session.meetingId} for class ${classId}`);
     
     res.json({
       success: true,
