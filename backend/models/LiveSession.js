@@ -67,16 +67,22 @@ const LiveSessionSchema = new mongoose.Schema({
   }]
 }, { timestamps: true });
 
-// ===== Pre-save hook (FIXED - use regular function, not arrow) =====
+// ===== Pre-save hook (FIXED - proper function syntax) =====
 LiveSessionSchema.pre('save', function(next) {
   // Use regular function so 'this' refers to the document
-  if (!this.meetingId) {
-    this.meetingId = generateMeetingId();
+  try {
+    if (!this.meetingId) {
+      this.meetingId = generateMeetingId();
+    }
+    if (!this.livekitRoomName && this.meetingId) {
+      this.livekitRoomName = generateLiveKitRoomName(this.meetingId);
+    }
+    // ===== FIX: Always call next() =====
+    return next();
+  } catch (error) {
+    // ===== FIX: Pass error to next() =====
+    return next(error);
   }
-  if (!this.livekitRoomName && this.meetingId) {
-    this.livekitRoomName = generateLiveKitRoomName(this.meetingId);
-  }
-  next();  // IMPORTANT: Call next() to continue the save operation
 });
 
 // ===== Virtuals =====
