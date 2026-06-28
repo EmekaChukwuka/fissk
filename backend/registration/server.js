@@ -1173,7 +1173,7 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
     // ===== FIX: Past streams - check BOTH streamStatus AND sessionType =====
     const pastStreamsData = await LiveSession.find({
       instructorId,
-      streamStatus: 'ended'
+      sessionType: 'recorded'
     })
       .populate('classId', 'title')
       .sort({ date: -1, time: -1 })
