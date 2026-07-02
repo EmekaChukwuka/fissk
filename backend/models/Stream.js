@@ -1,3 +1,4 @@
+// models/Stream.js - FIXED
 import mongoose from "mongoose";
 
 const CommentSchema = new mongoose.Schema({
@@ -11,7 +12,7 @@ const StreamSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true },
   filename: { type: String, required: true },
-  size: { type: Number, required: true },
+  size: { type: Number, default: 0 }, // ← CHANGED: made optional with default
   comments: [CommentSchema],
   streamClass: { type: mongoose.Schema.Types.ObjectId, ref: 'Class' },
   classTitle: String,
@@ -21,9 +22,10 @@ const StreamSchema = new mongoose.Schema({
   sessionType: { type: String, enum: ['live', 'recorded'], default: 'recorded' },
   
   // Mux fields
-  muxAssetId: { type: String },
-  muxPlaybackId: { type: String },
-  muxStatus: { type: String, enum: ['preparing', 'ready', 'errored', 'deleted'], default: 'preparing' },
+  muxAssetId: { type: String, index: true },
+  muxPlaybackId: { type: String, index: true },
+  muxUploadId: { type: String }, // ← ADDED: track the upload ID
+  muxStatus: { type: String, enum: ['preparing', 'ready', 'errored', 'deleted', 'uploading'], default: 'preparing' },
   muxDuration: { type: Number },
   
   viewCount: { type: Number, default: 0 }
@@ -48,25 +50,32 @@ const StreamModel = mongoose.model('Stream', StreamSchema);
 
 // Wrapper class
 class Stream {
-  static async create({ userId, name, filename, size, streamClass, classTitle, classDescription, participants, duration, muxAssetId, muxPlaybackId }) {
+  static async create({ userId, name, filename, size, streamClass, classTitle, classDescription, participants, duration, muxAssetId, muxPlaybackId, muxUploadId }) {
     try {
+      // Validate required fields
+      if (!userId) throw new Error('userId is required');
+      if (!name) throw new Error('name is required');
+      if (!filename) throw new Error('filename is required');
+      
       const stream = await StreamModel.create({
         userId,
         name,
         filename,
         size: size || 0,
         streamClass,
-        classTitle,
-        classDescription,
+        classTitle: classTitle || name,
+        classDescription: classDescription || '',
         participants: participants || 0,
-        duration,
+        duration: duration || '0:00',
         sessionType: 'recorded',
-        muxAssetId,
-        muxPlaybackId,
+        muxAssetId: muxAssetId || null,
+        muxPlaybackId: muxPlaybackId || null,
+        muxUploadId: muxUploadId || null,
         muxStatus: muxAssetId ? 'preparing' : null,
         comments: []
       });
 
+      console.log(`✅ Stream created: ${stream._id}, title: ${classTitle || name}`);
       return stream._id.toString();
     } catch (error) {
       console.error('Error creating stream:', error);
@@ -96,6 +105,26 @@ class Stream {
         .lean();
     } catch (error) {
       console.error('Error fetching stream:', error);
+      throw error;
+    }
+  }
+
+  static async getByMuxAssetId(assetId) {
+    try {
+      return await StreamModel.findOne({ muxAssetId: assetId }).lean();
+    } catch (error) {
+      console.error('Error fetching stream by Mux asset:', error);
+      throw error;
+    }
+  }
+
+  static async getByClass(classId) {
+    try {
+      return await StreamModel.find({ streamClass: classId })
+        .sort({ createdAt: -1 })
+        .lean();
+    } catch (error) {
+      console.error('Error fetching streams by class:', error);
       throw error;
     }
   }
@@ -176,6 +205,41 @@ class Stream {
       );
     } catch (error) {
       console.error('Error updating Mux status:', error);
+      throw error;
+    }
+  }
+
+  // NEW: Get all streams for a class with Mux data
+  static async getClassVideos(classId) {
+    try {
+      const streams = await StreamModel.find({ 
+        streamClass: classId,
+        $or: [
+          { muxAssetId: { $exists: true, $ne: null } },
+          { muxPlaybackId: { $exists: true, $ne: null } }
+        ]
+      })
+        .sort({ createdAt: -1 })
+        .lean();
+      
+      return streams.map(stream => ({
+        _id: stream._id,
+        title: stream.classTitle || stream.name,
+        description: stream.classDescription || '',
+        filename: stream.filename,
+        duration: stream.duration,
+        participants: stream.participants,
+        uploadDate: stream.createdAt,
+        muxAssetId: stream.muxAssetId,
+        muxPlaybackId: stream.muxPlaybackId,
+        playbackUrl: stream.muxPlaybackId ? 
+          `https://stream.mux.com/${stream.muxPlaybackId}.m3u8` : null,
+        thumbnailUrl: stream.muxPlaybackId ?
+          `https://image.mux.com/${stream.muxPlaybackId}/thumbnail.jpg?time=5` : null,
+        muxStatus: stream.muxStatus,
+      }));
+    } catch (error) {
+      console.error('Error getting class videos:', error);
       throw error;
     }
   }
