@@ -400,10 +400,13 @@ switchTab(tabName) {
         `;
     }
        
-// ===== RENDER CLASS FORUM (FIXED) =====
+// ===== RENDER CLASS FORUM (FIXED WITH BETTER DEBUGGING) =====
 async renderClassForum() {
     const container = document.getElementById('classForumContainer');
-    if (!container) return;
+    if (!container) {
+        console.error('Forum container not found!');
+        return;
+    }
     
     // Check if user is enrolled
     if (!this.isEnrolled) {
@@ -425,15 +428,22 @@ async renderClassForum() {
     container.innerHTML = '<div class="forum-loading">Loading discussions...</div>';
     
     try {
-        // Fetch class forum topics
-        const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`);
+        const url = `https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`;
+        console.log('Fetching forum topics from:', url);
+        
+        const response = await fetch(url);
+        
+        console.log('Response status:', response.status);
         
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const topics = await response.json();
-        console.log('Forum topics loaded:', topics);
+        console.log('Forum topics received:', topics);
+        console.log('Number of topics:', topics ? topics.length : 0);
         
         if (!topics || topics.length === 0) {
             container.innerHTML = `
@@ -468,7 +478,7 @@ async renderClassForum() {
             </div>
             <div class="forum-topics-list">
                 ${topics.map(topic => {
-                    const authorName = topic.author_name || 'Anonymous';
+                    const authorName = topic.author_name || topic.userId?.firstName ? `${topic.userId.firstName} ${topic.userId.lastName || ''}`.trim() : 'Anonymous';
                     const replyCount = topic.replyCount || topic.replies?.length || 0;
                     const views = topic.views || 0;
                     const isPinned = topic.isPinned || false;

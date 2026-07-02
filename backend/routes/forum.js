@@ -247,7 +247,7 @@ forumRouter.get('/class/:classId/categories', async (req, res) => {
   }
 });
 
-// ===== GET TOPICS FOR A SPECIFIC CLASS (FIXED) =====
+// ===== GET TOPICS FOR A SPECIFIC CLASS (COMPLETELY REWRITTEN) =====
 forumRouter.get('/class/:classId/topics', async (req, res) => {
   const { classId } = req.params;
   const { search, sort, category } = req.query;
@@ -259,8 +259,11 @@ forumRouter.get('/class/:classId/topics', async (req, res) => {
       return res.status(404).json({ message: 'Class not found' });
     }
     
-    let query = { classId: classId, isClassForum: true };
-    let sortOption = {};
+    // Build query - IMPORTANT: Make sure we're using the right field names
+    let query = { 
+      classId: classId,
+      isClassForum: true
+    };
     
     // Filter by category
     if (category) {
@@ -276,55 +279,43 @@ forumRouter.get('/class/:classId/topics', async (req, res) => {
     }
     
     // Sort options
+    let sortOption = { isPinned: -1, createdAt: -1 };
     if (sort === "popular") {
       sortOption = { replyCount: -1 };
     } else if (sort === "unanswered") {
       query.$expr = { $eq: [{ $size: "$replies" }, 0] };
       sortOption = { createdAt: -1 };
-    } else {
-      sortOption = { isPinned: -1, createdAt: -1 };
     }
     
-    // Use aggregation with proper population
-    const topics = await ForumPost.aggregate([
-      { $match: query },
-      {
-        $lookup: {
-          from: "users",
-          localField: "userId",
-          foreignField: "_id",
-          as: "author"
-        }
-      },
-      { $unwind: { path: "$author", preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: "forumcategories",
-          localField: "categoryId",
-          foreignField: "_id",
-          as: "category"
-        }
-      },
-      { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
-      {
-        $addFields: {
-          replyCount: { $size: "$replies" },
-          category_name: "$category.name",
-          category_icon: "$category.icon",
-          author_name: {
-            $cond: {
-              if: { $and: ["$author", "$author.firstName"] },
-              then: { $concat: ["$author.firstName", " ", "$author.lastName"] },
-              else: "Anonymous"
-            }
-          },
-          author_id: "$author._id"
-        }
-      },
-      { $sort: sortOption }
-    ]);
+    console.log('Fetching topics with query:', JSON.stringify(query));
     
-    res.json(topics);
+    // Get topics directly without aggregation first (simpler)
+    let topics = await ForumPost.find(query)
+      .populate('userId', 'firstName lastName')
+      .populate('categoryId', 'name icon')
+      .sort(sortOption)
+      .lean();
+    
+    console.log(`Found ${topics.length} topics for class ${classId}`);
+    
+    // Format the topics for frontend
+    const formattedTopics = topics.map(topic => ({
+      _id: topic._id,
+      title: topic.title,
+      content: topic.content,
+      createdAt: topic.createdAt,
+      views: topic.views || 0,
+      isPinned: topic.isPinned || false,
+      solved: topic.solved || false,
+      replyCount: topic.replies ? topic.replies.length : 0,
+      replies: topic.replies || [],
+      category_name: topic.categoryId ? topic.categoryId.name : null,
+      category_icon: topic.categoryId ? topic.categoryId.icon : null,
+      author_name: topic.userId ? `${topic.userId.firstName || ''} ${topic.userId.lastName || ''}`.trim() : 'Anonymous',
+      author_id: topic.userId ? topic.userId._id : null
+    }));
+    
+    res.json(formattedTopics);
   } catch (err) {
     console.error('Get class topics error:', err);
     res.status(500).json({ message: "Failed to load topics", error: err.message });
