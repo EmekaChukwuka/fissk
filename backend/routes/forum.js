@@ -247,7 +247,7 @@ forumRouter.get('/class/:classId/categories', async (req, res) => {
   }
 });
 
-// Get topics for a specific class
+// ===== GET TOPICS FOR A SPECIFIC CLASS (FIXED) =====
 forumRouter.get('/class/:classId/topics', async (req, res) => {
   const { classId } = req.params;
   const { search, sort, category } = req.query;
@@ -277,7 +277,7 @@ forumRouter.get('/class/:classId/topics', async (req, res) => {
     
     // Sort options
     if (sort === "popular") {
-      sortOption = { "repliesCount": -1 };
+      sortOption = { replyCount: -1 };
     } else if (sort === "unanswered") {
       query.$expr = { $eq: [{ $size: "$replies" }, 0] };
       sortOption = { createdAt: -1 };
@@ -285,17 +285,9 @@ forumRouter.get('/class/:classId/topics', async (req, res) => {
       sortOption = { isPinned: -1, createdAt: -1 };
     }
     
+    // Use aggregation with proper population
     const topics = await ForumPost.aggregate([
       { $match: query },
-      {
-        $lookup: {
-          from: "forumcategories",
-          localField: "categoryId",
-          foreignField: "_id",
-          as: "category"
-        }
-      },
-      { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
           from: "users",
@@ -306,11 +298,27 @@ forumRouter.get('/class/:classId/topics', async (req, res) => {
       },
       { $unwind: { path: "$author", preserveNullAndEmptyArrays: true } },
       {
+        $lookup: {
+          from: "forumcategories",
+          localField: "categoryId",
+          foreignField: "_id",
+          as: "category"
+        }
+      },
+      { $unwind: { path: "$category", preserveNullAndEmptyArrays: true } },
+      {
         $addFields: {
           replyCount: { $size: "$replies" },
           category_name: "$category.name",
-          icon: "$category.icon",
-          author_name: { $concat: ["$author.firstName", " ", "$author.lastName"] }
+          category_icon: "$category.icon",
+          author_name: {
+            $cond: {
+              if: { $and: ["$author", "$author.firstName"] },
+              then: { $concat: ["$author.firstName", " ", "$author.lastName"] },
+              else: "Anonymous"
+            }
+          },
+          author_id: "$author._id"
         }
       },
       { $sort: sortOption }
@@ -319,7 +327,7 @@ forumRouter.get('/class/:classId/topics', async (req, res) => {
     res.json(topics);
   } catch (err) {
     console.error('Get class topics error:', err);
-    res.status(500).json({ message: "Failed to load topics" });
+    res.status(500).json({ message: "Failed to load topics", error: err.message });
   }
 });
 

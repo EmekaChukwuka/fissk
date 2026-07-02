@@ -400,7 +400,7 @@ switchTab(tabName) {
         `;
     }
        
-  // ===== RENDER CLASS FORUM =====
+// ===== RENDER CLASS FORUM (FIXED) =====
 async renderClassForum() {
     const container = document.getElementById('classForumContainer');
     if (!container) return;
@@ -413,7 +413,6 @@ async renderClassForum() {
                 <button class="btn btn-primary" id="enrollFromForumBtn">Enroll Now</button>
             </div>
         `;
-        // Add event listener for the enroll button
         const enrollBtn = container.querySelector('#enrollFromForumBtn');
         if (enrollBtn) {
             enrollBtn.addEventListener('click', () => {
@@ -423,10 +422,18 @@ async renderClassForum() {
         return;
     }
     
+    container.innerHTML = '<div class="forum-loading">Loading discussions...</div>';
+    
     try {
         // Fetch class forum topics
         const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
         const topics = await response.json();
+        console.log('Forum topics loaded:', topics);
         
         if (!topics || topics.length === 0) {
             container.innerHTML = `
@@ -436,7 +443,6 @@ async renderClassForum() {
                     <button class="btn btn-primary" id="startDiscussionBtn">Start Discussion</button>
                 </div>
             `;
-            // Add event listener for the start discussion button
             const startBtn = container.querySelector('#startDiscussionBtn');
             if (startBtn) {
                 startBtn.addEventListener('click', () => {
@@ -461,24 +467,33 @@ async renderClassForum() {
                 </div>
             </div>
             <div class="forum-topics-list">
-                ${topics.map(topic => `
-                    <div class="forum-topic-item ${topic.isPinned ? 'pinned' : ''} ${topic.solved ? 'solved' : ''}">
-                        <div class="forum-topic-left">
-                            ${topic.isPinned ? '<span class="pin-badge">📌</span>' : ''}
-                            ${topic.solved ? '<span class="solved-badge">✅ Solved</span>' : ''}
-                            <a href="#" data-topic-id="${topic._id}" class="forum-topic-title">
-                                ${this.escapeHtml(topic.title)}
-                            </a>
-                            <div class="forum-topic-meta">
-                                <span>👤 ${this.escapeHtml(topic.author_name || 'Anonymous')}</span>
-                                <span>💬 ${topic.replyCount || 0}</span>
-                                <span>👀 ${topic.views || 0}</span>
-                                <span>📅 ${new Date(topic.createdAt).toLocaleDateString()}</span>
+                ${topics.map(topic => {
+                    const authorName = topic.author_name || 'Anonymous';
+                    const replyCount = topic.replyCount || topic.replies?.length || 0;
+                    const views = topic.views || 0;
+                    const isPinned = topic.isPinned || false;
+                    const isSolved = topic.solved || false;
+                    const createdAt = topic.createdAt ? new Date(topic.createdAt).toLocaleDateString() : 'Unknown';
+                    
+                    return `
+                        <div class="forum-topic-item ${isPinned ? 'pinned' : ''} ${isSolved ? 'solved' : ''}">
+                            <div class="forum-topic-left">
+                                ${isPinned ? '<span class="pin-badge">📌</span>' : ''}
+                                ${isSolved ? '<span class="solved-badge">✅ Solved</span>' : ''}
+                                <a href="#" data-topic-id="${topic._id}" class="forum-topic-title">
+                                    ${this.escapeHtml(topic.title)}
+                                </a>
+                                <div class="forum-topic-meta">
+                                    <span>👤 ${this.escapeHtml(authorName)}</span>
+                                    <span>💬 ${replyCount}</span>
+                                    <span>👀 ${views}</span>
+                                    <span>📅 ${createdAt}</span>
+                                </div>
                             </div>
+                            ${topic.category_name ? `<span class="topic-category">${topic.category_icon || '📌'} ${this.escapeHtml(topic.category_name)}</span>` : ''}
                         </div>
-                        ${topic.category_name ? `<span class="topic-category">${this.escapeHtml(topic.category_name)}</span>` : ''}
-                    </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
         `;
         
@@ -597,41 +612,59 @@ async renderClassForum() {
         }
     }
 
-    // ===== SUBMIT CLASS TOPIC =====
-    async submitClassTopic() {
-        const title = document.getElementById('classTopicTitle').value.trim();
-        const content = document.getElementById('classTopicContent').value.trim();
-        const categoryId = document.getElementById('classTopicCategory').value;
+    // ===== SUBMIT CLASS TOPIC (FIXED) =====
+async submitClassTopic() {
+    const title = document.getElementById('classTopicTitle').value.trim();
+    const content = document.getElementById('classTopicContent').value.trim();
+    const categoryId = document.getElementById('classTopicCategory').value;
+    
+    if (!title || !content) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    // Disable submit button to prevent double submission
+    const submitBtn = document.querySelector('#newClassTopicForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Posting...';
+    }
+    
+    try {
+        console.log('Submitting topic:', { title, content, categoryId, userId: this.userId, classId: this.classId });
         
-        if (!title || !content) {
-            alert('Please fill in all required fields');
-            return;
-        }
+        const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title,
+                content,
+                categoryId: categoryId || null,
+                userId: this.userId
+            })
+        });
         
-        try {
-            const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title,
-                    content,
-                    categoryId: categoryId || null,
-                    userId: this.userId
-                })
-            });
-            
-            if (response.ok) {
-                document.getElementById('newClassTopicModal').style.display = 'none';
-                this.renderClassForum();
-                showToast('Discussion posted successfully!', false);
-            } else {
-                const error = await response.json();
-                showToast(error.message || 'Failed to post discussion', true);
-            }
-        } catch (error) {
-            console.error('Submit topic error:', error);
-            showToast('Failed to post discussion', true);
+        const data = await response.json();
+        console.log('Submit response:', data);
+        
+        if (response.ok) {
+            document.getElementById('newClassTopicModal').style.display = 'none';
+            window.showToast('Discussion posted successfully!', false);
+            // Refresh the forum
+            await this.renderClassForum();
+        } else {
+            window.showToast(data.message || 'Failed to post discussion', true);
         }
+    } catch (error) {
+        console.error('Submit topic error:', error);
+        window.showToast('Failed to post discussion: ' + error.message, true);
+    } finally {
+        // Re-enable submit button
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Post Discussion';
+        }
+    }
     }
 
     // ===== VIEW FORUM TOPIC =====
