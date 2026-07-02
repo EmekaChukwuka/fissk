@@ -1158,46 +1158,49 @@ async reportReview(reviewId) {
     }
 }
 
-    renderVideos() {
-        const videosContainer = document.getElementById('videosContainer');
-        const noVideos = document.getElementById('noVideos');
+    // ===== RENDER VIDEOS (FIXED) =====
+renderVideos() {
+    const videosContainer = document.getElementById('videosContainer');
+    const noVideos = document.getElementById('noVideos');
 
-        if (!this.videos || this.videos.length === 0) {
-            if (videosContainer) videosContainer.style.display = 'none';
-            if (noVideos) {
-                noVideos.style.display = 'block';
-                noVideos.innerHTML = '<p>No videos available for this class yet.</p>';
-            }
-            return;
+    if (!this.videos || this.videos.length === 0) {
+        if (videosContainer) videosContainer.style.display = 'none';
+        if (noVideos) {
+            noVideos.style.display = 'block';
+            noVideos.innerHTML = '<p>No videos available for this class yet.</p>';
         }
-        
-        if (noVideos) noVideos.style.display = 'none';
-        if (videosContainer) {
-            videosContainer.style.display = 'grid';
-            videosContainer.innerHTML = this.videos.map((video, index) => `
-                <div class="video-card" data-video-index="${index}" data-video-id="${video._id || video.id}">
-                    <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);">
-                        <span class="play-icon">▶</span>
-                    </div>
-                    <div class="video-info">
-                        <h4>${this.escapeHtml(video.videoDetails?.title || video.title || 'Untitled')}</h4>
-                        <p>${this.escapeHtml(video.videoDetails?.description || video.description || 'No description')}</p>
-                        <div class="video-meta">
-                            <span>⏱️ ${video.videoDetails?.duration || 'Unknown'}</span>
-                        </div>
+        return;
+    }
+    
+    if (noVideos) noVideos.style.display = 'none';
+    if (videosContainer) {
+        videosContainer.style.display = 'grid';
+        videosContainer.innerHTML = this.videos.map((video, index) => `
+            <div class="video-card" data-video-index="${index}" data-video-id="${video._id || video.id}">
+                <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);">
+                    <span class="play-icon">▶</span>
+                    ${video.thumbnailUrl ? `<img src="${video.thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;">` : ''}
+                </div>
+                <div class="video-info">
+                    <h4>${this.escapeHtml(video.videoDetails?.title || video.title || 'Untitled')}</h4>
+                    <p>${this.escapeHtml(video.videoDetails?.description || video.description || 'No description')}</p>
+                    <div class="video-meta">
+                        <span>⏱️ ${video.videoDetails?.duration || video.duration || 'Unknown'}</span>
                     </div>
                 </div>
-            `).join('');
+            </div>
+        `).join('');
 
-            // Add click event to video cards
-            videosContainer.querySelectorAll('.video-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    const videoIndex = parseInt(card.dataset.videoIndex);
-                    this.playVideo(videoIndex);
-                });
+        // Add click event to video cards - USING ARROW FUNCTION TO PRESERVE THIS
+        videosContainer.querySelectorAll('.video-card').forEach((card) => {
+            card.addEventListener('click', (e) => {
+                const videoIndex = parseInt(card.dataset.videoIndex);
+                console.log('Video card clicked, index:', videoIndex);
+                this.playVideo(videoIndex);
             });
-        }
+        });
     }
+}
 
 // ===== RENDER RECORDINGS (FIXED) =====
 renderRecordings() {
@@ -1229,7 +1232,6 @@ renderRecordings() {
             const isReady = muxStatus === 'ready';
             const isPreparing = muxStatus === 'preparing' || muxStatus === 'uploading';
             
-            // Show a badge for processing videos
             const statusBadge = isPreparing 
                 ? '<span class="processing-badge">⏳ Processing...</span>' 
                 : isReady 
@@ -1239,7 +1241,7 @@ renderRecordings() {
             return `
                 <div class="recording-card ${isReady ? 'ready' : 'processing'}" 
                      data-recording-index="${index}" 
-                     data-recording-url="${videoUrl}"
+                     data-recording-url="${videoUrl || ''}"
                      data-mux-playback-id="${recording.muxPlaybackId || ''}"
                      data-mux-status="${muxStatus}">
                     <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
@@ -1261,12 +1263,14 @@ renderRecordings() {
             `;
         }).join('');
 
-        // Add click event to recording cards
-        recordingsContainer.querySelectorAll('.recording-card').forEach(card => {
-            card.addEventListener('click', () => {
+        // Add click event to recording cards - USING ARROW FUNCTION TO PRESERVE THIS
+        recordingsContainer.querySelectorAll('.recording-card').forEach((card) => {
+            card.addEventListener('click', (e) => {
                 const recordingUrl = card.dataset.recordingUrl;
                 const muxStatus = card.dataset.muxStatus;
                 const muxPlaybackId = card.dataset.muxPlaybackId;
+                
+                console.log('Recording card clicked, URL:', recordingUrl);
                 
                 if (!recordingUrl) {
                     window.showToast('Video URL not available', true);
