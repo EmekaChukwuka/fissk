@@ -6,6 +6,7 @@ import router from "./routes/api.js";
 import forumRouter from "./routes/forum.js";
 import Regisrouter from "./registration/server.js";
 import Dashboardrouter from "./routes/dashboard.js";
+import Review from "./models/Review.js";
 import connectDB from "./config/db.js";
 import path from 'path';
 import { fileURLToPath } from 'url';
