@@ -7,11 +7,12 @@ import forumRouter from "./routes/forum.js";
 import Regisrouter from "./registration/server.js";
 import Dashboardrouter from "./routes/dashboard.js";
 import Review from "./models/Review.js";
+import Enrollment from "./models/Enrollment.js"; // ← ADD THIS IMPORT
 import connectDB from "./config/db.js";
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { AccessToken } from 'livekit-server-sdk';
-import LiveSession from './models/LiveSession.js'; // Import LiveSession model
+import LiveSession from './models/LiveSession.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -220,7 +221,7 @@ app.post('/api/livekit/end-stream', async (req, res) => {
     
     // ===== FIX: Update both streamStatus and sessionType =====
     session.streamStatus = 'ended';
-    session.sessionType = 'recorded';   // ← THIS WAS MISSING
+    session.sessionType = 'recorded';
     session.hostConnected = false;
     session.recordingEndedAt = new Date();
     
@@ -283,12 +284,11 @@ app.post('/api/livekit/join-stream', async (req, res) => {
   }
 });
 
-// ===== GET SESSION BY MEETING ID (FIXED) =====
+// ===== GET SESSION BY MEETING ID =====
 app.get('/api/livekit/session/:meetingId', async (req, res) => {
   const { meetingId } = req.params;
   
   try {
-    // Find session by meetingId
     const session = await LiveSession.findOne({ meetingId })
       .populate('instructorId', 'firstName lastName email')
       .populate('classId', 'title description');
@@ -362,7 +362,6 @@ app.get('/api/livekit/session/meeting/:streamId', async (req, res) => {
   const { streamId } = req.params;
   
   try {
-    // First try to find by classId (since streamId might be classId)
     const session = await LiveSession.findOne({ 
       classId: streamId,
       streamStatus: 'scheduled'
@@ -379,7 +378,6 @@ app.get('/api/livekit/session/meeting/:streamId', async (req, res) => {
       });
     }
     
-    // If not found by classId, try by _id
     const sessionById = await LiveSession.findById(streamId);
     if (sessionById && sessionById.meetingId) {
       return res.json({
@@ -408,7 +406,6 @@ app.post('/api/livekit/session/create-meeting', async (req, res) => {
   const { instructorId, classId, title, description, date, time, duration } = req.body;
   
   try {
-    // Check if there's already a meeting for this class
     const existing = await LiveSession.findOne({
       classId,
       streamStatus: 'scheduled',
@@ -429,7 +426,6 @@ app.post('/api/livekit/session/create-meeting', async (req, res) => {
       });
     }
     
-    // Create new meeting session - meetingId will be auto-generated
     const session = new LiveSession({
       instructorId,
       classId,
@@ -506,15 +502,10 @@ app.get('/api/livekit/instructor/meetings/:instructorId', async (req, res) => {
 });
 
 // Update existing endpoint to include meeting info
-// Modify your existing /register/instructor/streams endpoint
-// In server.js or registration/server.js
-
-// This is a modified version of the existing streams endpoint
 app.post('/register/instructor/streams-with-meetings', async (req, res) => {
   const instructorId = req.body.id;
   
   try {
-    // Get past streams (recorded)
     const pastStreamsData = await LiveSession.find({
       instructorId,
       $or: [
@@ -538,7 +529,6 @@ app.post('/register/instructor/streams-with-meetings', async (req, res) => {
       recordingUrl: r.playbackUrl || null
     }));
     
-    // Get scheduled streams (upcoming)
     const scheduledStreamsData = await LiveSession.find({
       instructorId,
        $or: [
@@ -583,13 +573,11 @@ app.get('/api/reviews/class/:classId', async (req, res) => {
       .populate('userId', 'firstName lastName email profilePicture')
       .sort({ createdAt: -1 });
     
-    // Calculate average rating
     const totalReviews = reviews.length;
     const avgRating = totalReviews > 0 
       ? reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews 
       : 0;
     
-    // Get rating distribution
     const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     reviews.forEach(r => {
       if (distribution[r.rating] !== undefined) {
@@ -647,11 +635,10 @@ app.post('/api/reviews', async (req, res) => {
   }
   
   try {
-    // Check if user is enrolled in the class
-    const enrollment = await ClassEnrollment.findOne({ 
+    // ===== FIX: Use Enrollment model instead of ClassEnrollment =====
+    const enrollment = await Enrollment.findOne({ 
       userId, 
-      classId,
-      status: 'active'
+      classId
     });
     
     if (!enrollment) {
@@ -694,7 +681,6 @@ app.delete('/api/reviews/:reviewId', async (req, res) => {
       });
     }
     
-    // Check if user owns the review or is admin
     if (review.userId.toString() !== userId) {
       return res.status(403).json({ 
         success: false, 
@@ -729,8 +715,6 @@ app.post('/api/reviews/:reviewId/report', async (req, res) => {
       });
     }
     
-    // You can implement a Report model here
-    // For now, just log the report
     console.log(`Review ${reviewId} reported by ${userId}: ${reason}`);
     
     res.json({
@@ -742,7 +726,6 @@ app.post('/api/reviews/:reviewId/report', async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
 
 // ===== ORIGINAL ROUTES =====
 app.get('/live/stream-info', (req, res) => {
