@@ -675,6 +675,34 @@
             background: var(--bg-hover);
         }
 
+        /* Start Live Confirmation Modal */
+        #startLiveConfirmModal .modal-content {
+            max-width: 420px;
+        }
+        #startLiveConfirmModal .warning-text {
+            color: var(--accent-yellow);
+            font-weight: 500;
+            margin: 12px 0;
+        }
+        #startLiveConfirmModal .info-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .btn-modal-danger {
+            padding: 10px 24px;
+            background: var(--accent-red);
+            border: none;
+            border-radius: var(--radius-sm);
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: inherit;
+            font-weight: 500;
+            transition: background 0.15s;
+        }
+        .btn-modal-danger:hover { background: #d65a50; }
+
         @media (max-width: 1024px) {
             .side-panel { width: 280px; }
             .ctrl-btn { padding: 10px 16px; min-width: 80px; }
@@ -858,7 +886,7 @@
     </div>
 </div>
 
-<!-- MODAL -->
+<!-- MODAL: Create Class -->
 <div id="createClassModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -889,6 +917,25 @@
     </div>
 </div>
 
+<!-- MODAL: Start Live Confirmation -->
+<div id="startLiveConfirmModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>🔴 Confirm Start Livestream</h2>
+            <button class="modal-close" onclick="closeModal('startLiveConfirmModal')">✕</button>
+        </div>
+        <div class="info-text">
+            <p>You are about to start the livestream for:</p>
+            <p style="font-weight: 600; color: var(--text-primary); margin: 8px 0;" id="confirmStreamTitle">Loading...</p>
+            <p class="warning-text">⚠️ This will start recording immediately. Make sure you're ready to begin teaching.</p>
+        </div>
+        <div class="form-actions">
+            <button class="btn-modal-cancel" onclick="closeModal('startLiveConfirmModal')">Cancel</button>
+            <button class="btn-modal-danger" id="confirmLiveStartBtn">🔴 Start Live Now</button>
+        </div>
+    </div>
+</div>
+
 <script>
     window.LiveKitClient = window.LivekitClient || window.LiveKitClient;
 </script>
@@ -915,6 +962,9 @@
     let preloadedClasses = [];
     let classesLoaded = false;
     let lastFailedAction = null;
+    let sessionLoaded = null;
+    let isStartingStream = false;
+    let isScheduledSession = false;
 
     // ===== DOM ELEMENTS =====
     const startBtn         = document.getElementById('startStreamBtn');
@@ -953,88 +1003,103 @@
         return urlParams.get('meetingId') || urlParams.get('id');
     }
 
-async function loadSessionByMeetingId(meetingId) {
-    try {
-        showToast('Loading session...');
-        const response = await fetch(`${BACKEND_URL}/api/livekit/session/${meetingId}`);
-        
-        // Check if response is 404
-        if (response.status === 404) {
-            // Session not found - maybe it's a new meeting ID that hasn't been created yet
-            showWarning('No session found for this meeting ID. Please create a new session.');
-            // Show the create session modal instead
-            setTimeout(() => {
-                if (classesLoaded && preloadedClasses.length > 0) {
-                    showModal('createClassModal');
+    async function loadSessionByMeetingId(meetingId) {
+        try {
+            showToast('Loading session...');
+            const response = await fetch(`${BACKEND_URL}/api/livekit/session/${meetingId}`);
+            
+            if (response.status === 404) {
+                showWarning('No session found for this meeting ID. Please create a new session.');
+                setTimeout(() => {
+                    if (classesLoaded && preloadedClasses.length > 0) {
+                        showModal('createClassModal');
+                    }
+                }, 1000);
+                return null;
+            }
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.message || 'Session not found');
+            }
+
+            const session = data.session;
+            sessionLoaded = session;
+            currentRoomName = session.livekitRoomName || `meeting_${meetingId.replace(/-/g, '_')}`;
+            currentStreamData.title = session.title;
+            currentStreamData.classId = session.classId;
+            currentStreamData.sessionId = session.id;
+            currentStreamData.meetingId = meetingId;
+            currentStreamData.description = session.description || '';
+
+            streamTitleSpan.textContent = session.title;
+
+            // Determine session status display
+            const statusClass = session.streamStatus === 'live' ? 'live' : 
+                               session.streamStatus === 'scheduled' ? 'scheduled' : 'ended';
+            const statusLabel = session.streamStatus === 'live' ? '🔴 LIVE' :
+                               session.streamStatus === 'scheduled' ? '⏳ Scheduled' : '✅ Ended';
+
+            sessionInfoDiv.style.display = 'flex';
+            sessionInfoDiv.innerHTML = `
+                <span>📅 ${session.date ? new Date(session.date).toLocaleDateString() : ''} ${session.time || ''}</span>
+                <span class="meeting-id">🔑 ${session.meetingId}</span>
+                <span class="session-status ${statusClass}">${statusLabel}</span>
+                <span>👥 ${session.participants || 0} participants</span>
+                <button class="copy-btn" onclick="copyMeetingId()">📋 Copy</button>
+            `;
+
+            // Check if user is the instructor for this session
+            const storedUser = JSON.parse(localStorage.getItem('user'));
+            const isInstructor = storedUser && storedUser.user_type === 'instructor' && 
+                                storedUser.id === session.instructorId;
+
+            if (session.streamStatus === 'live' && session.hostConnected) {
+                updateStreamStatus(true, session.title);
+                joinBtn.disabled = false;
+                startBtn.disabled = true;
+                showToast('Session is live! Click Join to watch.');
+            } else if (session.streamStatus === 'scheduled') {
+                updateStreamStatus(false);
+                if (isInstructor) {
+                    // Enable Go Live button for scheduled session
+                    startBtn.textContent = '🎥 Start Scheduled Stream';
+                    startBtn.disabled = false;
+                    // Store the session data for starting
+                    currentStreamData = {
+                        title: session.title,
+                        description: session.description || '',
+                        classId: session.classId,
+                        meetingId: meetingId,
+                        sessionId: session.id
+                    };
+                    isScheduledSession = true;
+                    showToast('You can start this scheduled session when ready.', false);
+                } else {
+                    showToast(`This session is scheduled for ${new Date(session.date).toLocaleString()}`, false);
                 }
-            }, 1000);
+            } else if (session.streamStatus === 'ended') {
+                updateStreamStatus(false);
+                startBtn.disabled = true;
+                joinBtn.disabled = true;
+                showToast('This session has ended', true);
+            } else {
+                updateStreamStatus(false);
+                showToast('Session is not yet live', false);
+            }
+
+            return session;
+        } catch (error) {
+            console.error('Load session error:', error);
+            showError('Could not find this session. Please check the meeting ID or create a new session.', null);
             return null;
         }
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-
-        if (!data.success) {
-            throw new Error(data.message || 'Session not found');
-        }
-
-        const session = data.session;
-        currentRoomName = session.livekitRoomName || `meeting_${meetingId.replace(/-/g, '_')}`;
-        currentStreamData.title = session.title;
-        currentStreamData.classId = session.classId;
-        currentStreamData.sessionId = session.id;
-        currentStreamData.meetingId = meetingId;
-
-        streamTitleSpan.textContent = session.title;
-
-        // Build session info banner
-        const statusClass = session.streamStatus === 'live' ? 'live' : 
-                           session.streamStatus === 'scheduled' ? 'scheduled' : 'ended';
-        const statusLabel = session.streamStatus === 'live' ? '🔴 LIVE' :
-                           session.streamStatus === 'scheduled' ? '⏳ Scheduled' : '✅ Ended';
-
-        sessionInfoDiv.style.display = 'flex';
-        sessionInfoDiv.innerHTML = `
-            <span>📅 ${session.date ? new Date(session.date).toLocaleDateString() : ''} ${session.time || ''}</span>
-            <span class="meeting-id">🔑 ${session.meetingId}</span>
-            <span class="session-status ${statusClass}">${statusLabel}</span>
-            <span>👥 ${session.participants || 0} participants</span>
-            <button class="copy-btn" onclick="copyMeetingId()">📋 Copy</button>
-        `;
-
-        if (session.streamStatus === 'live' && session.hostConnected) {
-            updateStreamStatus(true, session.title);
-            joinBtn.disabled = false;
-            showToast('Session is live! Click Join to watch.');
-        } else if (session.streamStatus === 'scheduled') {
-            updateStreamStatus(false);
-            // Show the start button for instructors
-            const user = JSON.parse(localStorage.getItem('user'));
-            if (user && user.user_type === 'instructor' && user.id === session.instructorId) {
-                startBtn.textContent = '🎥 Start Scheduled Stream';
-                startBtn.disabled = false;
-                showToast('You can start this scheduled session now.', false);
-            } else {
-                showToast(`This session is scheduled for ${new Date(session.date).toLocaleString()}`, false);
-            }
-        } else if (session.streamStatus === 'ended') {
-            updateStreamStatus(false);
-            showToast('This session has ended', true);
-        } else {
-            updateStreamStatus(false);
-            showToast('Session is not yet live', false);
-        }
-
-        return session;
-    } catch (error) {
-        console.error('Load session error:', error);
-        showError('Could not find this session. Please check the meeting ID or create a new session.', null);
-        return null;
     }
-}
 
     function copyMeetingId() {
         const meetingId = getMeetingIdFromURL();
@@ -1042,7 +1107,6 @@ async function loadSessionByMeetingId(meetingId) {
             navigator.clipboard.writeText(meetingId).then(() => {
                 showToast('Meeting ID copied to clipboard!');
             }).catch(() => {
-                // Fallback
                 const input = document.createElement('input');
                 input.value = meetingId;
                 document.body.appendChild(input);
@@ -1120,6 +1184,11 @@ async function loadSessionByMeetingId(meetingId) {
     }
 
     function showModal(id) { 
+        if (id === 'startLiveConfirmModal') {
+            document.getElementById(id).style.display = 'flex';
+            return;
+        }
+        
         if (classesLoaded && preloadedClasses.length > 0) {
             document.getElementById(id).style.display = 'flex';
         } else if (!classesLoaded) {
@@ -1195,20 +1264,41 @@ async function loadSessionByMeetingId(meetingId) {
         }
 
         try {
-            const response = await fetch(`${BACKEND_URL}/api/livekit/start-stream`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ meetingId, userId })
-            });
-
-            const data = await response.json();
-            if (!data.success) {
-                throw new Error(data.message);
+            // First, ensure we have the session data loaded
+            const session = await loadSessionByMeetingId(meetingId);
+            if (!session) {
+                showError('Could not load session data', null);
+                return;
             }
 
-            currentRoomName = data.livekitRoomName;
-            showSuccess('Session started! You can now go live.');
-            await startLivestream();
+            // Set the stream data from the session
+            currentStreamData.title = session.title;
+            currentStreamData.classId = session.classId;
+            currentStreamData.sessionId = session.id;
+            currentStreamData.meetingId = meetingId;
+            currentStreamData.description = session.description || '';
+            isScheduledSession = true;
+
+            // Update the UI with the session info
+            streamTitleSpan.textContent = session.title;
+
+            // Pre-fill the create class modal with session data
+            const titleInput = document.getElementById('title');
+            const descriptionInput = document.getElementById('description');
+            const classSelect = document.getElementById('streamClass');
+            
+            if (titleInput) {
+                titleInput.value = session.title;
+            }
+            if (descriptionInput) {
+                descriptionInput.value = session.description || '';
+            }
+            if (classSelect && session.classId) {
+                classSelect.value = session.classId;
+            }
+
+            // Show the create class modal with pre-filled data
+            showModal('createClassModal');
 
         } catch (error) {
             console.error('Start session error:', error);
@@ -1552,36 +1642,48 @@ async function loadSessionByMeetingId(meetingId) {
 
     // ===== HOST: START LIVESTREAM =====
     async function startLivestream() {
-        // Check if meeting ID exists - if yes, use session title
-        const meetingId = getMeetingIdFromURL();
-        let title = document.getElementById('title')?.value || currentStreamData.title || 'Live Class';
-        const description = document.getElementById('description')?.value || currentStreamData.description || '';
-        const classId = document.getElementById('streamClass')?.value || currentStreamData.classId;
-
-        if (!classId || !title) {
-            showError('Please select a class and enter a title', null);
-            alert('Please select a class and enter a title');
-            return;
-        }
+        if (isStartingStream) return;
+        isStartingStream = true;
 
         try {
             hideError();
             lastFailedAction = 'startStream';
             updateConnectionStatus('connecting', 'Starting stream...');
 
-            closeModal('createClassModal');
             isHost = true;
+            
+            // Get data from modal or session
+            let title = document.getElementById('title')?.value || currentStreamData.title || 'Live Class';
+            const description = document.getElementById('description')?.value || currentStreamData.description || '';
+            const classId = document.getElementById('streamClass')?.value || currentStreamData.classId;
 
-            // If no meeting ID, create one
-            if (!meetingId) {
-                currentStreamData = { title, description, classId };
+            if (!classId || !title) {
+                showError('Please select a class and enter a title', null);
+                isStartingStream = false;
+                return;
+            }
+
+            // Close the create modal
+            closeModal('createClassModal');
+
+            // If it's a scheduled session, use the meeting ID room name
+            const meetingId = getMeetingIdFromURL();
+            if (meetingId && isScheduledSession) {
+                currentRoomName = `meeting_${meetingId.replace(/-/g, '_')}`;
+                currentStreamData.meetingId = meetingId;
+            } else if (!meetingId) {
                 currentRoomName = `class_${classId}_${Date.now()}`;
-                streamTitleSpan.textContent = title;
             } else {
                 currentRoomName = `meeting_${meetingId.replace(/-/g, '_')}`;
             }
 
-            // ===== STEP 1: Get camera AND microphone =====
+            // Update stream data
+            currentStreamData.title = title;
+            currentStreamData.description = description;
+            currentStreamData.classId = classId;
+            streamTitleSpan.textContent = title;
+
+            // Get camera and microphone
             showToast('Requesting camera and microphone…');
             updateConnectionStatus('connecting', 'Accessing camera & microphone...');
 
@@ -1681,11 +1783,18 @@ async function loadSessionByMeetingId(meetingId) {
 
             setupLiveKitChat(liveKitRoom);
 
-            // Notify backend
+            // Notify backend that session is live
             const sessionResponse = await fetch(`${BACKEND_URL}/api/livekit/start-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roomName: currentRoomName, title, description, classId, userId })
+                body: JSON.stringify({ 
+                    roomName: currentRoomName, 
+                    title, 
+                    description, 
+                    classId, 
+                    userId,
+                    meetingId: currentStreamData.meetingId
+                })
             });
 
             if (!sessionResponse.ok) {
@@ -1694,6 +1803,7 @@ async function loadSessionByMeetingId(meetingId) {
             }
 
             startBtn.disabled = true;
+            startBtn.textContent = '🎙️ Go Live';
             stopBtn.disabled = false;
             joinBtn.disabled = true;
             chatInput.disabled = false;
@@ -1716,12 +1826,14 @@ async function loadSessionByMeetingId(meetingId) {
             showSuccess('✅ Livestream started! Students can now join.');
             updateConnectionStatus('connected', '🔴 Live - Streaming');
             lastFailedAction = null;
+            isStartingStream = false;
 
         } catch(err) {
             console.error('Start stream error:', err);
             showError(`Failed to start stream: ${err.message}`, 'startStream');
             isHost = false;
             startBtn.disabled = false;
+            isStartingStream = false;
 
             if (localStream) {
                 localStream.getTracks().forEach(t => t.stop());
@@ -1797,7 +1909,6 @@ async function loadSessionByMeetingId(meetingId) {
                 showWarning('No recording data to save');
             }
 
-            // End the meeting session if meeting ID exists
             const meetingId = getMeetingIdFromURL();
             if (meetingId) {
                 await fetch(`${BACKEND_URL}/api/livekit/end-stream`, {
@@ -1814,12 +1925,14 @@ async function loadSessionByMeetingId(meetingId) {
             }).catch(e => console.warn('Session end notification failed:', e));
 
             startBtn.disabled = false;
+            startBtn.textContent = '🎙️ Go Live';
             stopBtn.disabled = true;
             chatInput.disabled = true;
             sendChatBtn.disabled = true;
             isHost = false;
             streamStartTime = null;
             currentRoomName = null;
+            isScheduledSession = false;
             updateStreamStatus(false);
             streamTitleSpan.textContent = '';
             updateConnectionStatus('disconnected', 'Stream ended');
@@ -1997,8 +2110,19 @@ async function loadSessionByMeetingId(meetingId) {
     }
 
     // ===== EVENT LISTENERS =====
-    document.getElementById('confirmStartBtn').addEventListener('click', createNewSession);
+    document.getElementById('confirmStartBtn').addEventListener('click', function() {
+        // When "Go Live" is clicked in the create modal, start the stream
+        startLivestream();
+    });
 
+    // Confirm Live Start button (for the confirmation modal)
+    document.getElementById('confirmLiveStartBtn').addEventListener('click', async () => {
+        closeModal('startLiveConfirmModal');
+        // This will just show the create modal which is already pre-filled
+        showModal('createClassModal');
+    });
+
+    // Modified start button click handler
     startBtn.addEventListener('click', async () => {
         const user = JSON.parse(localStorage.getItem('user'));
         if (!user || user.user_type !== 'instructor') {
@@ -2012,9 +2136,52 @@ async function loadSessionByMeetingId(meetingId) {
 
         const meetingId = getMeetingIdFromURL();
         if (meetingId) {
-            await startSession();
+            // Load session data first
+            const session = await loadSessionByMeetingId(meetingId);
+            if (session) {
+                // Check if it's a scheduled session
+                if (session.streamStatus === 'scheduled') {
+                    // Pre-fill the modal with session data
+                    const titleInput = document.getElementById('title');
+                    const descriptionInput = document.getElementById('description');
+                    const classSelect = document.getElementById('streamClass');
+                    
+                    if (titleInput) {
+                        titleInput.value = session.title;
+                    }
+                    if (descriptionInput) {
+                        descriptionInput.value = session.description || '';
+                    }
+                    if (classSelect && session.classId) {
+                        classSelect.value = session.classId;
+                    }
+                    
+                    // Set flag for scheduled session
+                    isScheduledSession = true;
+                    currentStreamData = {
+                        title: session.title,
+                        description: session.description || '',
+                        classId: session.classId,
+                        meetingId: meetingId,
+                        sessionId: session.id
+                    };
+                    
+                    // Show the create modal
+                    showModal('createClassModal');
+                } else if (session.streamStatus === 'live') {
+                    showWarning('This session is already live!');
+                } else {
+                    showWarning('This session has ended.');
+                }
+            }
         } else {
+            // No meeting ID - new stream
+            isScheduledSession = false;
             if (classesLoaded && preloadedClasses.length > 0) {
+                // Clear any pre-filled values
+                document.getElementById('title').value = '';
+                document.getElementById('description').value = '';
+                document.getElementById('streamClass').value = '';
                 showModal('createClassModal');
             } else {
                 showToast('Loading your classes...');
