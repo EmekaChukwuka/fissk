@@ -2,14 +2,19 @@
 const user = JSON.parse(localStorage.getItem("user"));
 const userId = user?.id;
 
-// Get topic ID from URL
+// Get topic ID from URL - support both 'id' and 'topicId' parameters
 const urlParams = new URLSearchParams(window.location.search);
-const topicId = urlParams.get('id');
+const topicId = urlParams.get('topicId') || urlParams.get('id');
+const classId = urlParams.get('classId');
+
+console.log('Topic ID:', topicId);
+console.log('Class ID:', classId);
 
 // DOM Elements
 const topicCard = document.getElementById('topicCard');
 const repliesList = document.getElementById('repliesList');
 const replyForm = document.getElementById('replyForm');
+const backLink = document.getElementById('backToForum');
 
 // Helper functions
 function escapeHtml(s) {
@@ -30,15 +35,18 @@ function formatDate(dateString) {
 
 // Load user dropdown
 if (user) {
-    document.getElementById('user-dropdown').innerHTML = `
-        <img src="https://ui-avatars.com/api/?name=${user.firstname}+${user.lastname}&background=8B5FBF&color=fff" alt="User" class="user-avatar" id="user-avatar">
-        <span id="instructorName">${user.firstname}</span>
-        <div class="dropdown-content">
-            <a href="profile.html">Profile</a>
-            <a href="settings.html">Settings</a>
-            <a href="#" class="logout" onclick="logout()">Logout</a>
-        </div>
-    `;
+    const userDropdown = document.getElementById('user-dropdown');
+    if (userDropdown) {
+        userDropdown.innerHTML = `
+            <img src="https://ui-avatars.com/api/?name=${user.firstName || user.firstname}+${user.lastName || user.lastname}&background=8B5FBF&color=fff" alt="User" class="user-avatar" id="user-avatar">
+            <span id="instructorName">${user.firstName || user.firstname}</span>
+            <div class="dropdown-content">
+                <a href="profile.html">Profile</a>
+                <a href="settings.html">Settings</a>
+                <a href="#" class="logout" onclick="logout()">Logout</a>
+            </div>
+        `;
+    }
 }
 
 async function logout() {
@@ -46,60 +54,101 @@ async function logout() {
     window.location.href = "/";
 }
 
-// Load topic details
+// Load topic details - support both class and global forum topics
 async function loadTopic() {
     if (!topicId) {
-        topicCard.innerHTML = '<div class="error">No topic ID specified</div>';
+        topicCard.innerHTML = `
+            <div class="error">
+                <p>❌ No topic specified</p>
+                <a href="${classId ? `class.html?id=${classId}` : 'forum.html'}" class="btn btn-outline">Back to Forum</a>
+            </div>
+        `;
         return;
     }
 
     try {
-        const response = await fetch(`https://fissk-backend.onrender.com/forum-api/topics/${topicId}`, {
+        // Try the class-specific endpoint first if we have a classId
+        let url;
+        if (classId) {
+            url = `https://fissk-backend.onrender.com/forum-api/class/${classId}/topics/${topicId}`;
+        } else {
+            url = `https://fissk-backend.onrender.com/forum-api/topics/${topicId}`;
+        }
+        
+        console.log('Fetching topic from:', url);
+        
+        const response = await fetch(url, {
             headers: {
                 'Content-Type': 'application/json',
-                'userId': userId
+                'userId': userId || ''
             }
         });
 
         if (!response.ok) {
-            throw new Error('Failed to load topic');
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
         const data = await response.json();
-        const topic = data.topic || data;
+        console.log('Topic data:', data);
         
+        // Handle different response formats
+        const topic = data.topic || data;
         displayTopic(topic);
         
-        // Load replies
+        // Load replies - check if replies are included or need separate fetch
         if (topic.replies && topic.replies.length > 0) {
             displayReplies(topic.replies);
         } else {
             loadReplies();
         }
+        
+        // Set back link
+        if (backLink) {
+            backLink.href = classId ? `class.html?id=${classId}` : 'forum.html';
+        }
+        
     } catch (error) {
         console.error('Error loading topic:', error);
-        topicCard.innerHTML = `<div class="error">Error loading topic: ${error.message}</div>`;
+        topicCard.innerHTML = `
+            <div class="error">
+                <p>❌ Error loading topic: ${error.message}</p>
+                <a href="${classId ? `class.html?id=${classId}` : 'forum.html'}" class="btn btn-outline">Back to Forum</a>
+            </div>
+        `;
     }
 }
 
 // Display topic
 function displayTopic(topic) {
     const isAuthor = userId && topic.userId && topic.userId._id === userId;
-    const authorName = topic.author?.first_name && topic.author?.last_name 
-        ? `${topic.author.first_name} ${topic.author.last_name}`
-        : topic.userId?.firstName && topic.userId?.lastName
-        ? `${topic.userId.firstName} ${topic.userId.lastName}`
-        : topic.author_name || 'Anonymous';
+    const isAuthorById = userId && topic.userId === userId;
+    
+    // Get author name from various possible structures
+    let authorName = 'Anonymous';
+    if (topic.author_name) {
+        authorName = topic.author_name;
+    } else if (topic.author?.first_name && topic.author?.last_name) {
+        authorName = `${topic.author.first_name} ${topic.author.last_name}`;
+    } else if (topic.userId?.firstName && topic.userId?.lastName) {
+        authorName = `${topic.userId.firstName} ${topic.userId.lastName}`;
+    } else if (topic.userId?.firstname && topic.userId?.lastname) {
+        authorName = `${topic.userId.firstname} ${topic.userId.lastname}`;
+    } else if (typeof topic.userId === 'string' && topic.userId !== userId) {
+        authorName = 'User';
+    }
     
     const authorAvatar = topic.author?.profile_picture || 
                         topic.userId?.profilePicture || 
                         `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&background=8B5FBF&color=fff`;
     
+    const categoryName = topic.category_name || topic.categoryId?.name || 'General';
+    const replyCount = topic.replyCount || topic.replies?.length || 0;
+    
     topicCard.innerHTML = `
         <div class="topic-header">
             <h2>${escapeHtml(topic.title)}</h2>
             <div class="topic-meta">
-                <span class="topic-category">📌 ${escapeHtml(topic.category_name || topic.categoryId?.name || 'General')}</span>
+                <span class="topic-category">📌 ${escapeHtml(categoryName)}</span>
                 ${topic.solved ? '<span class="badge-solved">✅ Solved</span>' : ''}
                 ${topic.isPinned ? '<span class="badge-pinned">📌 Pinned</span>' : ''}
             </div>
@@ -117,13 +166,14 @@ function displayTopic(topic) {
             </div>
             <div class="topic-stats">
                 <span>👀 ${topic.views || 0} views</span>
-                <span>💬 ${topic.replies?.length || 0} replies</span>
+                <span>💬 ${replyCount} replies</span>
             </div>
-            ${isAuthor ? `
-                <div class="topic-actions">
+            <div class="topic-actions">
+                <a href="${classId ? `class.html?id=${classId}` : 'forum.html'}" class="btn btn-outline">← Back to Forum</a>
+                ${(isAuthor || isAuthorById) ? `
                     <button onclick="deleteTopic()" class="btn btn-danger">Delete Topic</button>
-                </div>
-            ` : ''}
+                ` : ''}
+            </div>
         </div>
     `;
 }
@@ -131,7 +181,14 @@ function displayTopic(topic) {
 // Load replies separately if not included in topic
 async function loadReplies() {
     try {
-        const response = await fetch(`https://fissk-backend.onrender.com/forum-api/topics/${topicId}/replies`, {
+        let url;
+        if (classId) {
+            url = `https://fissk-backend.onrender.com/forum-api/class/${classId}/topics/${topicId}/replies`;
+        } else {
+            url = `https://fissk-backend.onrender.com/forum-api/topics/${topicId}/replies`;
+        }
+        
+        const response = await fetch(url, {
             headers: {
                 'Content-Type': 'application/json'
             }
@@ -140,6 +197,8 @@ async function loadReplies() {
         if (response.ok) {
             const replies = await response.json();
             displayReplies(replies);
+        } else {
+            repliesList.innerHTML = '<div class="error">Failed to load replies</div>';
         }
     } catch (error) {
         console.error('Error loading replies:', error);
@@ -156,10 +215,16 @@ function displayReplies(replies) {
 
     repliesList.innerHTML = replies.map((reply, index) => {
         const isAuthor = userId && reply.userId && reply.userId._id === userId;
-        const replyAuthorName = reply.author_name || 
-            (reply.userId?.firstName && reply.userId?.lastName 
-                ? `${reply.userId.firstName} ${reply.userId.lastName}`
-                : 'Anonymous');
+        const isAuthorById = userId && reply.userId === userId;
+        
+        let replyAuthorName = 'Anonymous';
+        if (reply.author_name) {
+            replyAuthorName = reply.author_name;
+        } else if (reply.userId?.firstName && reply.userId?.lastName) {
+            replyAuthorName = `${reply.userId.firstName} ${reply.userId.lastName}`;
+        } else if (reply.userId?.firstname && reply.userId?.lastname) {
+            replyAuthorName = `${reply.userId.firstname} ${reply.userId.lastname}`;
+        }
         
         const replyAuthorAvatar = reply.userId?.profilePicture || 
             `https://ui-avatars.com/api/?name=${encodeURIComponent(replyAuthorName)}&background=8B5FBF&color=fff`;
@@ -181,10 +246,10 @@ function displayReplies(replies) {
                 </div>
                 <div class="reply-actions">
                     <button onclick="likeReply(${index})" class="btn-like">❤️ ${reply.likes || 0} likes</button>
-                    ${!isBestAnswer && userId && !isAuthor ? `
+                    ${!isBestAnswer && userId && !isAuthor && !isAuthorById ? `
                         <button onclick="markAsBestAnswer(${index})" class="btn-best">⭐ Mark as Best Answer</button>
                     ` : ''}
-                    ${isAuthor ? `
+                    ${(isAuthor || isAuthorById) ? `
                         <button onclick="deleteReply(${index})" class="btn-delete">🗑️ Delete</button>
                     ` : ''}
                 </div>
@@ -196,7 +261,14 @@ function displayReplies(replies) {
 // Add reply
 async function addReply(content) {
     try {
-        const response = await fetch(`https://fissk-backend.onrender.com/forum-api/topics/${topicId}/replies`, {
+        let url;
+        if (classId) {
+            url = `https://fissk-backend.onrender.com/forum-api/class/${classId}/topics/${topicId}/replies`;
+        } else {
+            url = `https://fissk-backend.onrender.com/forum-api/topics/${topicId}/replies`;
+        }
+        
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -230,7 +302,14 @@ async function likeReply(replyIndex) {
     }
 
     try {
-        const response = await fetch(`https://fissk-backend.onrender.com/forum-api/replies/${topicId}/${replyIndex}/like`, {
+        let url;
+        if (classId) {
+            url = `https://fissk-backend.onrender.com/forum-api/replies/${topicId}/${replyIndex}/like`;
+        } else {
+            url = `https://fissk-backend.onrender.com/forum-api/replies/${topicId}/${replyIndex}/like`;
+        }
+        
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -258,7 +337,14 @@ async function markAsBestAnswer(replyIndex) {
     }
 
     try {
-        const response = await fetch(`https://fissk-backend.onrender.com/forum-api/replies/${topicId}/${replyIndex}/best`, {
+        let url;
+        if (classId) {
+            url = `https://fissk-backend.onrender.com/forum-api/replies/${topicId}/${replyIndex}/best`;
+        } else {
+            url = `https://fissk-backend.onrender.com/forum-api/replies/${topicId}/${replyIndex}/best`;
+        }
+        
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -283,7 +369,14 @@ async function deleteReply(replyIndex) {
     if (!confirm('Are you sure you want to delete this reply?')) return;
 
     try {
-        const response = await fetch(`https://fissk-backend.onrender.com/forum-api/delete-reply/${topicId}/${replyIndex}`, {
+        let url;
+        if (classId) {
+            url = `https://fissk-backend.onrender.com/forum-api/delete-reply/${topicId}/${replyIndex}`;
+        } else {
+            url = `https://fissk-backend.onrender.com/forum-api/delete-reply/${topicId}/${replyIndex}`;
+        }
+        
+        const response = await fetch(url, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
@@ -307,17 +400,25 @@ async function deleteTopic() {
     if (!confirm('Are you sure you want to delete this topic? This action cannot be undone.')) return;
 
     try {
-        const response = await fetch(`https://fissk-backend.onrender.com/forum-api/delete-post/${topicId}`, {
+        let url;
+        if (classId) {
+            url = `https://fissk-backend.onrender.com/forum-api/class/${classId}/topics/${topicId}`;
+        } else {
+            url = `https://fissk-backend.onrender.com/forum-api/delete-post/${topicId}`;
+        }
+        
+        const response = await fetch(url, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({ userId })
         });
 
         if (response.ok) {
             showMessage('Topic deleted successfully!', 'success');
             setTimeout(() => {
-                window.location.href = 'forum.html';
+                window.location.href = classId ? `class.html?id=${classId}` : 'forum.html';
             }, 1500);
         } else {
             throw new Error('Failed to delete topic');
@@ -343,6 +444,7 @@ function showMessage(message, type) {
         background: ${type === 'success' ? '#48BB78' : '#F56565'};
         z-index: 10000;
         box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        max-width: 400px;
     `;
 
     document.body.appendChild(messageEl);
@@ -403,5 +505,10 @@ document.querySelectorAll('.nav-link').forEach(link => {
 if (topicId) {
     loadTopic();
 } else {
-    topicCard.innerHTML = '<div class="error">No topic specified</div>';
+    topicCard.innerHTML = `
+        <div class="error">
+            <p>❌ No topic specified</p>
+            <a href="${classId ? `class.html?id=${classId}` : 'forum.html'}" class="btn btn-outline">Back to Forum</a>
+        </div>
+    `;
 }

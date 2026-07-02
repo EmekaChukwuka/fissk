@@ -678,11 +678,11 @@ async submitClassTopic() {
     }
     }
 
-    // ===== VIEW FORUM TOPIC =====
-    viewForumTopic(topicId) {
-        // Navigate to topic detail page
-        window.location.href = `forum-post.html?classId=${this.classId}&topicId=${topicId}`;
-    }
+   // ===== VIEW FORUM TOPIC =====
+viewForumTopic(topicId) {
+    // Navigate to topic detail page with both classId and topicId
+    window.location.href = `forum-post.html?classId=${this.classId}&topicId=${topicId}`;
+}
 
     // ===== FILTER FORUM TOPICS =====
     async filterForumTopics() {
