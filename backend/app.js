@@ -571,6 +571,178 @@ app.post('/register/instructor/streams-with-meetings', async (req, res) => {
   }
 });
 
+// ===== REVIEWS ENDPOINTS =====
+
+// Get all reviews for a class
+app.get('/api/reviews/class/:classId', async (req, res) => {
+  const { classId } = req.params;
+  
+  try {
+    const reviews = await Review.find({ classId })
+      .populate('userId', 'firstName lastName email profilePicture')
+      .sort({ createdAt: -1 });
+    
+    // Calculate average rating
+    const totalReviews = reviews.length;
+    const avgRating = totalReviews > 0 
+      ? reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews 
+      : 0;
+    
+    // Get rating distribution
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    reviews.forEach(r => {
+      if (distribution[r.rating] !== undefined) {
+        distribution[r.rating]++;
+      }
+    });
+    
+    res.json({
+      success: true,
+      reviews,
+      stats: {
+        total: totalReviews,
+        average: Math.round(avgRating * 10) / 10,
+        distribution
+      }
+    });
+  } catch (error) {
+    console.error('Get reviews error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get user's review for a class
+app.get('/api/reviews/user/:userId/class/:classId', async (req, res) => {
+  const { userId, classId } = req.params;
+  
+  try {
+    const review = await Review.findOne({ userId, classId });
+    res.json({
+      success: true,
+      review: review || null
+    });
+  } catch (error) {
+    console.error('Get user review error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Create or update a review
+app.post('/api/reviews', async (req, res) => {
+  const { userId, classId, rating, comment } = req.body;
+  
+  if (!userId || !classId || !rating) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Missing required fields: userId, classId, rating' 
+    });
+  }
+  
+  if (rating < 1 || rating > 5) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Rating must be between 1 and 5' 
+    });
+  }
+  
+  try {
+    // Check if user is enrolled in the class
+    const enrollment = await ClassEnrollment.findOne({ 
+      userId, 
+      classId,
+      status: 'active'
+    });
+    
+    if (!enrollment) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You must be enrolled in this class to leave a review' 
+      });
+    }
+    
+    // Upsert review
+    const review = await Review.findOneAndUpdate(
+      { userId, classId },
+      { rating, comment },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    
+    res.json({
+      success: true,
+      review,
+      message: 'Review saved successfully'
+    });
+  } catch (error) {
+    console.error('Save review error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete a review
+app.delete('/api/reviews/:reviewId', async (req, res) => {
+  const { reviewId } = req.params;
+  const { userId } = req.body;
+  
+  try {
+    const review = await Review.findById(reviewId);
+    
+    if (!review) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Review not found' 
+      });
+    }
+    
+    // Check if user owns the review or is admin
+    if (review.userId.toString() !== userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You can only delete your own reviews' 
+      });
+    }
+    
+    await Review.findByIdAndDelete(reviewId);
+    
+    res.json({
+      success: true,
+      message: 'Review deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete review error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Report a review (for moderation)
+app.post('/api/reviews/:reviewId/report', async (req, res) => {
+  const { reviewId } = req.params;
+  const { userId, reason } = req.body;
+  
+  try {
+    const review = await Review.findById(reviewId);
+    
+    if (!review) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Review not found' 
+      });
+    }
+    
+    // You can implement a Report model here
+    // For now, just log the report
+    console.log(`Review ${reviewId} reported by ${userId}: ${reason}`);
+    
+    res.json({
+      success: true,
+      message: 'Review reported successfully'
+    });
+  } catch (error) {
+    console.error('Report review error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+
 // ===== ORIGINAL ROUTES =====
 app.get('/live/stream-info', (req, res) => {
     res.json({ isActive: activeLiveKitRooms.size > 0 });

@@ -40,6 +40,7 @@ class ClassManager {
             // Only render after ALL data is loaded
             this.renderClassData();
             this.renderVideos();
+            this.renderClassReviews();
             this.renderRecordings(); // Render recordings in the recordings tab
             this.setupEventListeners();
         } catch (error) {
@@ -308,7 +309,7 @@ switchTab(tabName) {
     
     // Load reviews when reviews tab is clicked
     if (tabName === 'reviews') {
-        // this.renderClassReviews(); // We'll add this in the next feature
+    this.renderClassReviews(); 
     }
 }
 
@@ -644,6 +645,474 @@ async renderClassForum() {
         // Re-fetch with filter
         await this.renderClassForum();
     }    
+
+    // ===== REVIEWS METHODS =====
+
+// Render class reviews
+async renderClassReviews() {
+    const container = document.getElementById('classReviewsContainer');
+    if (!container) return;
+    
+    // Show loading state
+    container.innerHTML = '<div class="reviews-loading">Loading reviews...</div>';
+    
+    try {
+        // Get user's existing review
+        let userReview = null;
+        if (this.userId) {
+            const userReviewRes = await fetch(
+                `https://fissk-backend.onrender.com/api/reviews/user/${this.userId}/class/${this.classId}`
+            );
+            if (userReviewRes.ok) {
+                const userReviewData = await userReviewRes.json();
+                userReview = userReviewData.review;
+            }
+        }
+        
+        // Get all reviews for this class
+        const response = await fetch(
+            `https://fissk-backend.onrender.com/api/reviews/class/${this.classId}`
+        );
+        
+        if (!response.ok) {
+            throw new Error('Failed to load reviews');
+        }
+        
+        const data = await response.json();
+        const { reviews, stats } = data;
+        
+        // Build the reviews HTML
+        let html = `
+            <div class="reviews-header">
+                <div class="reviews-stats">
+                    <div class="average-rating">
+                        <span class="rating-number">${stats.average || 0}</span>
+                        <span class="rating-stars">${this.renderStars(stats.average || 0)}</span>
+                        <span class="rating-count">${stats.total} reviews</span>
+                    </div>
+                    <div class="rating-distribution">
+                        ${this.renderRatingDistribution(stats.distribution, stats.total)}
+                    </div>
+                </div>
+                <div class="reviews-actions">
+                    ${this.userId ? `
+                        ${userReview ? `
+                            <button class="btn btn-outline edit-review-btn">✏️ Edit Your Review</button>
+                            <button class="btn btn-danger delete-review-btn">🗑️ Delete</button>
+                        ` : `
+                            ${this.isEnrolled ? `
+                                <button class="btn btn-primary write-review-btn">✍️ Write a Review</button>
+                            ` : `
+                                <span class="review-locked">🔒 Enroll to leave a review</span>
+                            `}
+                        `}
+                    ` : `
+                        <a href="login.html" class="btn btn-outline">Login to Review</a>
+                    `}
+                </div>
+            </div>
+            <div class="reviews-list">
+                ${reviews.length === 0 ? `
+                    <div class="no-reviews">
+                        <p>No reviews yet. Be the first to review this class!</p>
+                    </div>
+                ` : `
+                    ${reviews.map(review => this.renderReviewCard(review, userReview?._id === review._id)).join('')}
+                `}
+            </div>
+        `;
+        
+        container.innerHTML = html;
+        this.attachReviewEventListeners(userReview);
+        
+    } catch (error) {
+        console.error('Render reviews error:', error);
+        container.innerHTML = `
+            <div class="reviews-error">
+                <p>⚠️ Failed to load reviews: ${error.message}</p>
+                <button class="btn btn-outline retry-reviews-btn">Retry</button>
+            </div>
+        `;
+        const retryBtn = container.querySelector('.retry-reviews-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => this.renderClassReviews());
+        }
+    }
+}
+
+// Render star rating
+renderStars(rating) {
+    const fullStars = Math.floor(rating);
+    const halfStar = rating % 1 >= 0.5 ? 1 : 0;
+    const emptyStars = 5 - fullStars - halfStar;
+    
+    let stars = '';
+    for (let i = 0; i < fullStars; i++) stars += '⭐';
+    if (halfStar) stars += '✨';
+    for (let i = 0; i < emptyStars; i++) stars += '☆';
+    
+    return stars;
+}
+
+// Render rating distribution bars
+renderRatingDistribution(distribution, total) {
+    if (total === 0) {
+        return '<div class="distribution-empty">No ratings yet</div>';
+    }
+    
+    const percentages = {};
+    for (let i = 5; i >= 1; i--) {
+        percentages[i] = total > 0 ? Math.round((distribution[i] / total) * 100) : 0;
+    }
+    
+    return `
+        ${[5, 4, 3, 2, 1].map(star => `
+            <div class="distribution-row">
+                <span class="star-label">${star}⭐</span>
+                <div class="distribution-bar">
+                    <div class="distribution-fill" style="width: ${percentages[star]}%"></div>
+                </div>
+                <span class="distribution-count">${distribution[star]}</span>
+            </div>
+        `).join('')}
+    `;
+}
+
+// Render a single review card
+renderReviewCard(review, isUserReview = false) {
+    const userName = review.userId?.firstName 
+        ? `${review.userId.firstName} ${review.userId.lastName || ''}`.trim()
+        : 'Anonymous';
+    
+    const userInitial = userName.charAt(0) || '?';
+    const avatar = review.userId?.profilePicture || '';
+    const date = new Date(review.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
+    
+    return `
+        <div class="review-card ${isUserReview ? 'user-review' : ''}">
+            <div class="review-header">
+                <div class="reviewer-info">
+                    ${avatar ? `
+                        <img src="${avatar}" alt="${userName}" class="reviewer-avatar">
+                    ` : `
+                        <div class="reviewer-avatar initials">${userInitial}</div>
+                    `}
+                    <div>
+                        <span class="reviewer-name">${this.escapeHtml(userName)}</span>
+                        ${isUserReview ? '<span class="your-review-badge">Your Review</span>' : ''}
+                        ${review.isVerifiedPurchase ? '<span class="verified-badge">✓ Verified</span>' : ''}
+                    </div>
+                </div>
+                <div class="review-meta">
+                    <span class="review-rating">${this.renderStars(review.rating)}</span>
+                    <span class="review-date">${date}</span>
+                </div>
+            </div>
+            ${review.comment ? `
+                <div class="review-body">
+                    <p>${this.escapeHtml(review.comment)}</p>
+                </div>
+            ` : ''}
+            <div class="review-footer">
+                <button class="review-helpful-btn" data-review-id="${review._id}">
+                    👍 Helpful (<span class="helpful-count">0</span>)
+                </button>
+                ${!isUserReview ? `
+                    <button class="review-report-btn" data-review-id="${review._id}">
+                        🚩 Report
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// Attach review event listeners
+attachReviewEventListeners(userReview) {
+    const container = document.getElementById('classReviewsContainer');
+    if (!container) return;
+    
+    // Write review button
+    const writeBtn = container.querySelector('.write-review-btn');
+    if (writeBtn) {
+        writeBtn.addEventListener('click', () => this.openReviewModal());
+    }
+    
+    // Edit review button
+    const editBtn = container.querySelector('.edit-review-btn');
+    if (editBtn) {
+        editBtn.addEventListener('click', () => this.openReviewModal(userReview));
+    }
+    
+    // Delete review button
+    const deleteBtn = container.querySelector('.delete-review-btn');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', () => this.deleteReview());
+    }
+    
+    // Helpful buttons
+    container.querySelectorAll('.review-helpful-btn').forEach(btn => {
+        btn.addEventListener('click', () => this.markReviewHelpful(btn.dataset.reviewId));
+    });
+    
+    // Report buttons
+    container.querySelectorAll('.review-report-btn').forEach(btn => {
+        btn.addEventListener('click', () => this.reportReview(btn.dataset.reviewId));
+    });
+}
+
+// Open review modal
+openReviewModal(existingReview = null) {
+    const modal = document.getElementById('reviewModal');
+    if (!modal) {
+        this.createReviewModal();
+        setTimeout(() => this.openReviewModal(existingReview), 100);
+        return;
+    }
+    
+    // Populate fields if editing
+    const ratingInputs = modal.querySelectorAll('.star-rating-input');
+    const commentInput = document.getElementById('reviewComment');
+    const submitBtn = document.getElementById('submitReviewBtn');
+    const modalTitle = modal.querySelector('.modal-title');
+    
+    if (existingReview) {
+        modalTitle.textContent = 'Edit Your Review';
+        submitBtn.textContent = 'Update Review';
+        // Set rating
+        ratingInputs.forEach(input => {
+            if (parseInt(input.value) === existingReview.rating) {
+                input.checked = true;
+                this.highlightStars(input.value);
+            }
+        });
+        if (commentInput) commentInput.value = existingReview.comment || '';
+        submitBtn.dataset.reviewId = existingReview._id;
+    } else {
+        modalTitle.textContent = 'Write a Review';
+        submitBtn.textContent = 'Submit Review';
+        ratingInputs.forEach(input => input.checked = false);
+        if (commentInput) commentInput.value = '';
+        delete submitBtn.dataset.reviewId;
+        this.resetStarHighlight();
+    }
+    
+    modal.style.display = 'flex';
+}
+
+// Create review modal
+createReviewModal() {
+    const modalHTML = `
+        <div id="reviewModal" class="modal">
+            <div class="modal-content review-modal-content">
+                <span class="close-modal" onclick="document.getElementById('reviewModal').style.display='none'">&times;</span>
+                <h2 class="modal-title">Write a Review</h2>
+                <form id="reviewForm">
+                    <div class="form-group">
+                        <label>Rating *</label>
+                        <div class="star-rating">
+                            ${[5, 4, 3, 2, 1].map(num => `
+                                <input type="radio" name="rating" value="${num}" id="star${num}" class="star-rating-input">
+                                <label for="star${num}" class="star-label" data-value="${num}">⭐</label>
+                            `).join('')}
+                        </div>
+                        <span id="ratingDisplay" class="rating-display">Select a rating</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Comment (optional)</label>
+                        <textarea id="reviewComment" rows="4" placeholder="Share your experience with this class..."></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="document.getElementById('reviewModal').style.display='none'">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="submitReviewBtn">Submit Review</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Star rating hover/click effects
+    const stars = document.querySelectorAll('.star-label');
+    const ratingDisplay = document.getElementById('ratingDisplay');
+    
+    stars.forEach(star => {
+        star.addEventListener('mouseenter', function() {
+            const value = parseInt(this.dataset.value);
+            highlightStars(value);
+            ratingDisplay.textContent = `${value} star${value > 1 ? 's' : ''}`;
+        });
+        
+        star.addEventListener('mouseleave', function() {
+            const checked = document.querySelector('.star-rating-input:checked');
+            if (checked) {
+                highlightStars(parseInt(checked.value));
+                ratingDisplay.textContent = `${checked.value} star${checked.value > 1 ? 's' : ''}`;
+            } else {
+                resetStarHighlight();
+                ratingDisplay.textContent = 'Select a rating';
+            }
+        });
+    });
+    
+    function highlightStars(value) {
+        document.querySelectorAll('.star-label').forEach(s => {
+            const starValue = parseInt(s.dataset.value);
+            s.style.opacity = starValue <= value ? '1' : '0.3';
+        });
+    }
+    
+    function resetStarHighlight() {
+        document.querySelectorAll('.star-label').forEach(s => {
+            s.style.opacity = '0.5';
+        });
+    }
+    
+    // Make functions globally accessible
+    window.highlightStars = highlightStars;
+    window.resetStarHighlight = resetStarHighlight;
+    
+    // Form submission
+    document.getElementById('reviewForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.submitReview();
+    });
+}
+
+// Highlight stars
+highlightStars(value) {
+    document.querySelectorAll('.star-label').forEach(s => {
+        const starValue = parseInt(s.dataset.value);
+        s.style.opacity = starValue <= value ? '1' : '0.3';
+        s.style.transform = starValue <= value ? 'scale(1.2)' : 'scale(1)';
+    });
+}
+
+// Reset star highlight
+resetStarHighlight() {
+    document.querySelectorAll('.star-label').forEach(s => {
+        s.style.opacity = '0.5';
+        s.style.transform = 'scale(1)';
+    });
+}
+
+// Submit review
+async submitReview() {
+    const ratingInput = document.querySelector('.star-rating-input:checked');
+    const comment = document.getElementById('reviewComment').value.trim();
+    const submitBtn = document.getElementById('submitReviewBtn');
+    const reviewId = submitBtn.dataset.reviewId;
+    
+    if (!ratingInput) {
+        alert('Please select a rating');
+        return;
+    }
+    
+    const rating = parseInt(ratingInput.value);
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving...';
+    
+    try {
+        const response = await fetch('https://fissk-backend.onrender.com/api/reviews', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: this.userId,
+                classId: this.classId,
+                rating,
+                comment: comment || ''
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('reviewModal').style.display = 'none';
+            showToast('Review saved successfully!', false);
+            this.renderClassReviews(); // Refresh reviews
+        } else {
+            showToast(data.message || 'Failed to save review', true);
+        }
+    } catch (error) {
+        console.error('Submit review error:', error);
+        showToast('Failed to save review. Please try again.', true);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = reviewId ? 'Update Review' : 'Submit Review';
+    }
+}
+
+// Delete review
+async deleteReview() {
+    if (!confirm('Are you sure you want to delete your review? This cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(
+            `https://fissk-backend.onrender.com/api/reviews/${this.userId}/class/${this.classId}`,
+            {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: this.userId })
+            }
+        );
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('Review deleted successfully', false);
+            this.renderClassReviews();
+        } else {
+            showToast(data.message || 'Failed to delete review', true);
+        }
+    } catch (error) {
+        console.error('Delete review error:', error);
+        showToast('Failed to delete review. Please try again.', true);
+    }
+}
+
+// Mark review as helpful
+async markReviewHelpful(reviewId) {
+    try {
+        // You can implement a helpful votes system here
+        // For now, just show a toast
+        showToast('Thanks for your feedback!', false);
+    } catch (error) {
+        console.error('Mark helpful error:', error);
+    }
+}
+
+// Report review
+async reportReview(reviewId) {
+    const reason = prompt('Please explain why you are reporting this review:');
+    if (!reason) return;
+    
+    try {
+        const response = await fetch(`https://fissk-backend.onrender.com/api/reviews/${reviewId}/report`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: this.userId, reason })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('Review reported successfully. Our team will review it.', false);
+        } else {
+            showToast(data.message || 'Failed to report review', true);
+        }
+    } catch (error) {
+        console.error('Report review error:', error);
+        showToast('Failed to report review. Please try again.', true);
+    }
+}
 
     renderVideos() {
         const videosContainer = document.getElementById('videosContainer');
