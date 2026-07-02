@@ -1126,6 +1126,81 @@ body {
     }
 }
 
+/* Video status badges */
+.processing-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(253, 214, 99, 0.9);
+    color: #000;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 2;
+    animation: pulse 1.5s infinite;
+}
+
+.ready-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(129, 201, 149, 0.9);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 2;
+}
+
+.error-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(242, 139, 130, 0.9);
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 2;
+}
+
+.processing-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 1;
+    backdrop-filter: blur(4px);
+}
+
+.recording-card.processing {
+    opacity: 0.8;
+    cursor: pointer;
+}
+
+.recording-card.ready {
+    opacity: 1;
+    cursor: pointer;
+}
+
+.recording-card.ready:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.status-text {
+    color: var(--accent-yellow);
+    font-size: 11px;
+}
+
 /* Dashboard Styles */
 .dashboard {
     padding: 100px 0 50px;

@@ -576,4 +576,50 @@ router.get('/debug/class-videos/:classId', async (req, res) => {
   }
 });
 
+// api.js - Add Mux asset status endpoint
+router.get('/mux/asset-status/:playbackId', async (req, res) => {
+    try {
+        const { playbackId } = req.params;
+        
+        // Try to get the asset by playback ID (requires listing assets)
+        const assets = await mux.video.assets.list({
+            limit: 100,
+        });
+        
+        let foundAsset = null;
+        for (const asset of assets) {
+            if (asset.playback_ids && asset.playback_ids.some(p => p.id === playbackId)) {
+                foundAsset = asset;
+                break;
+            }
+        }
+        
+        if (!foundAsset) {
+            return res.json({
+                success: true,
+                ready: false,
+                status: 'not_found',
+                message: 'Asset not found'
+            });
+        }
+        
+        const isReady = foundAsset.status === 'ready';
+        const isPreparing = foundAsset.status === 'preparing' || foundAsset.status === 'uploading';
+        
+        res.json({
+            success: true,
+            ready: isReady,
+            status: foundAsset.status,
+            assetId: foundAsset.id,
+            name: foundAsset.name,
+            duration: foundAsset.duration,
+            message: isReady ? 'Video is ready' : isPreparing ? 'Video is still processing' : 'Video has an error'
+        });
+        
+    } catch (error) {
+        console.error('Get asset status error:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 export default router;

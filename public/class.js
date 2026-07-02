@@ -1199,176 +1199,276 @@ async reportReview(reviewId) {
         }
     }
 
-    // NEW: Render Cloudinary recordings in the recordings tab
-    renderRecordings() {
-        const recordingsContainer = document.getElementById('recordingsContainer');
-        const noRecordings = document.getElementById('noRecordings');
+// ===== RENDER RECORDINGS (FIXED) =====
+renderRecordings() {
+    const recordingsContainer = document.getElementById('recordingsContainer');
+    const noRecordings = document.getElementById('noRecordings');
 
-        if (!this.recordings || this.recordings.length === 0) {
-            if (recordingsContainer) recordingsContainer.style.display = 'none';
-            if (noRecordings) {
-                noRecordings.style.display = 'block';
-                noRecordings.innerHTML = '<p>No past livestream recordings available for this class yet.</p>';
-            }
-            return;
+    if (!this.recordings || this.recordings.length === 0) {
+        if (recordingsContainer) recordingsContainer.style.display = 'none';
+        if (noRecordings) {
+            noRecordings.style.display = 'block';
+            noRecordings.innerHTML = '<p>No past livestream recordings available for this class yet.</p>';
         }
-        
-        if (noRecordings) noRecordings.style.display = 'none';
-        if (recordingsContainer) {
-            recordingsContainer.style.display = 'grid';
-            recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
-                // Get the video URL (support multiple formats)
-                console.log(recording)
-               // In class.js, look for this line in renderRecordings():
-                const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url || 
-                 (recording.muxPlaybackId ? `https://stream.mux.com/${recording.muxPlaybackId}.m3u8` : null);
-                const thumbnailUrl = recording.thumbnailUrl || '';
-                const title = recording.classTitle || recording.name || recording.filename || `Recording ${index + 1}`;
-                const description = recording.classDescription || recording.description || 'Past livestream recording';
-                const date = recording.uploadDate || recording.createdAt;
-                const duration = recording.duration || 'Unknown';
-                
-                return `
-                    <div class="recording-card" data-recording-index="${index}" data-recording-url="${videoUrl}">
-                        <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
-                            <span class="play-icon">▶</span>
-                            ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.3;">` : ''}
-                        </div>
-                        <div class="video-info">
-                            <h4>📹 ${this.escapeHtml(title)}</h4>
-                            <p>${this.escapeHtml(description)}</p>
-                            <div class="video-meta">
-                                <span>⏱️ ${duration}</span>
-                                ${date ? `<span>📅 ${new Date(date).toLocaleDateString()}</span>` : ''}
-                            </div>
+        return;
+    }
+    
+    if (noRecordings) noRecordings.style.display = 'none';
+    if (recordingsContainer) {
+        recordingsContainer.style.display = 'grid';
+        recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
+            const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url || 
+                (recording.muxPlaybackId ? `https://stream.mux.com/${recording.muxPlaybackId}.m3u8` : null);
+            const thumbnailUrl = recording.thumbnailUrl || 
+                (recording.muxPlaybackId ? `https://image.mux.com/${recording.muxPlaybackId}/thumbnail.jpg?time=5` : '');
+            const title = recording.classTitle || recording.name || recording.filename || `Recording ${index + 1}`;
+            const description = recording.classDescription || recording.description || 'Past livestream recording';
+            const date = recording.uploadDate || recording.createdAt;
+            const duration = recording.duration || 'Unknown';
+            const muxStatus = recording.muxStatus || 'preparing';
+            const isReady = muxStatus === 'ready';
+            const isPreparing = muxStatus === 'preparing' || muxStatus === 'uploading';
+            
+            // Show a badge for processing videos
+            const statusBadge = isPreparing 
+                ? '<span class="processing-badge">⏳ Processing...</span>' 
+                : isReady 
+                    ? '<span class="ready-badge">✅ Ready</span>' 
+                    : '<span class="error-badge">⚠️ Error</span>';
+            
+            return `
+                <div class="recording-card ${isReady ? 'ready' : 'processing'}" 
+                     data-recording-index="${index}" 
+                     data-recording-url="${videoUrl}"
+                     data-mux-playback-id="${recording.muxPlaybackId || ''}"
+                     data-mux-status="${muxStatus}">
+                    <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
+                        <span class="play-icon">▶</span>
+                        ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
+                        ${statusBadge}
+                        ${!isReady ? '<div class="processing-overlay">⏳ Processing...</div>' : ''}
+                    </div>
+                    <div class="video-info">
+                        <h4>📹 ${this.escapeHtml(title)}</h4>
+                        <p>${this.escapeHtml(description)}</p>
+                        <div class="video-meta">
+                            <span>⏱️ ${duration}</span>
+                            ${date ? `<span>📅 ${new Date(date).toLocaleDateString()}</span>` : ''}
+                            ${isPreparing ? `<span class="status-text">⏳ Processing...</span>` : ''}
                         </div>
                     </div>
-                `;
-            }).join('');
+                </div>
+            `;
+        }).join('');
 
-            // Add click event to recording cards
-            recordingsContainer.querySelectorAll('.recording-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    const recordingUrl = card.dataset.recordingUrl;
-                    if (recordingUrl) {
-                        this.playRecording(recordingUrl, card);
-                    } else {
-                        alert('Video URL not available');
-                    }
-                });
+        // Add click event to recording cards
+        recordingsContainer.querySelectorAll('.recording-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const recordingUrl = card.dataset.recordingUrl;
+                const muxStatus = card.dataset.muxStatus;
+                const muxPlaybackId = card.dataset.muxPlaybackId;
+                
+                if (!recordingUrl) {
+                    window.showToast('Video URL not available', true);
+                    return;
+                }
+                
+                // Check if video is ready
+                if (muxStatus === 'preparing' || muxStatus === 'uploading') {
+                    window.showToast('⏳ This video is still processing. Please wait a few minutes.', true);
+                    // Still try to play it
+                }
+                
+                this.playRecording(recordingUrl, card);
             });
-        }
-    }
-
-    // NEW: Play recording in modal
-    playRecording(videoUrl, cardElement) {
-        const title = cardElement.querySelector('h4')?.textContent || 'Recording';
-        const description = cardElement.querySelector('p')?.textContent || '';
-
-        const modal = document.getElementById('videoModal');
-        const videoPlayer = document.getElementById('videoPlayer');
-        const videoTitle = document.getElementById('videoTitle');
-        const videoDescription = document.getElementById('videoDescription');
-        
-        // Clear previous source
-        videoPlayer.innerHTML = '';
-        
-        // Create source element based on URL type
-        const source = document.createElement('source');
-        source.src = videoUrl;
-        
-        if (videoUrl.includes('.m3u8') || videoUrl.includes('m3u8')) {
-            source.type = 'application/x-mpegURL';
-            // For HLS, we need to use hls.js
-            if (typeof Hls !== 'undefined') {
-                const hls = new Hls();
-                hls.loadSource(videoUrl);
-                hls.attachMedia(videoPlayer);
-            }
-        } else if (videoUrl.includes('.mp4')) {
-            source.type = 'video/mp4';
-            videoPlayer.appendChild(source);
-        } else {
-            source.type = 'video/mp4';
-            videoPlayer.appendChild(source);
-        }
-        
-        videoPlayer.load();
-        videoTitle.textContent = title;
-        videoDescription.textContent = description;
-
-        modal.style.display = 'flex';
-        
-        // Close modal function
-        const closeModal = () => {
-            modal.style.display = 'none';
-            videoPlayer.pause();
-            videoPlayer.currentTime = 0;
-            if (this.progressInterval) clearInterval(this.progressInterval);
-        };
-
-        const closeBtn = document.querySelector('.close-modal');
-        if (closeBtn) closeBtn.onclick = closeModal;
-        
-        modal.onclick = (e) => {
-            if (e.target === modal) closeModal();
-        };
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.style.display === 'flex') {
-                closeModal();
-            }
         });
     }
+}
 
-    playVideo(videoIndex) {
-        const video = this.videos[videoIndex];
-        if (!video) return;
+   // ===== PLAY RECORDING (FIXED) =====
+playRecording(videoUrl, cardElement) {
+    const title = cardElement.querySelector('h4')?.textContent || 'Recording';
+    const description = cardElement.querySelector('p')?.textContent || '';
+    const muxPlaybackId = cardElement.dataset.muxPlaybackId;
 
-        const modal = document.getElementById('videoModal');
-        const videoPlayer = document.getElementById('videoPlayer');
-        const videoTitle = document.getElementById('videoTitle');
-        const videoDescription = document.getElementById('videoDescription');
+    const modal = document.getElementById('videoModal');
+    const videoPlayer = document.getElementById('videoPlayer');
+    const videoTitle = document.getElementById('videoTitle');
+    const videoDescription = document.getElementById('videoDescription');
+    
+    // Show loading state
+    videoTitle.textContent = 'Loading video...';
+    videoDescription.textContent = 'Please wait while the video loads...';
+    
+    // Clear previous source
+    videoPlayer.innerHTML = '';
+    videoPlayer.removeAttribute('src');
+    
+    // Check if video is actually ready
+    if (muxPlaybackId) {
+        // Check Mux asset status first
+        this.checkMuxStatus(muxPlaybackId, (isReady) => {
+            if (isReady) {
+                this.setupVideoPlayer(videoPlayer, videoUrl, title, description, modal);
+            } else {
+                // Show message that video is still processing
+                videoTitle.textContent = '⏳ Video is still processing...';
+                videoDescription.textContent = 'Please wait a few minutes and try again.';
+                
+                // Try to play anyway with HLS
+                this.setupVideoPlayer(videoPlayer, videoUrl, title, description, modal);
+                
+                // Show toast notification
+                window.showToast('⏳ Video is still processing. It may take a few minutes to become available.', true);
+            }
+        });
+    } else {
+        // No playback ID, try to play directly
+        this.setupVideoPlayer(videoPlayer, videoUrl, title, description, modal);
+    }
+
+    modal.style.display = 'flex';
+    
+    // Close modal function
+    const closeModal = () => {
+        modal.style.display = 'none';
+        videoPlayer.pause();
+        videoPlayer.currentTime = 0;
+        if (this.progressInterval) clearInterval(this.progressInterval);
+    };
+
+    const closeBtn = document.querySelector('.close-modal');
+    if (closeBtn) closeBtn.onclick = closeModal;
+    
+    modal.onclick = (e) => {
+        if (e.target === modal) closeModal();
+    };
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.style.display === 'flex') {
+            closeModal();
+        }
+    });
+}
+
+// ===== SETUP VIDEO PLAYER (NEW) =====
+setupVideoPlayer(videoPlayer, videoUrl, title, description, modal) {
+    // Set title and description
+    document.getElementById('videoTitle').textContent = title;
+    document.getElementById('videoDescription').textContent = description;
+    
+    // Check if URL is a HLS stream
+    const isHLS = videoUrl && (videoUrl.includes('.m3u8') || videoUrl.includes('m3u8'));
+    
+    if (isHLS) {
+        // Use HLS.js for HLS streams
+        if (typeof Hls !== 'undefined') {
+            // Destroy any existing HLS instance
+            if (this.hlsInstance) {
+                this.hlsInstance.destroy();
+                this.hlsInstance = null;
+            }
+            
+            const hls = new Hls({
+                enableWorker: true,
+                lowLatencyMode: true,
+                manifestLoadingMaxRetry: 5,
+                manifestLoadingRetryDelay: 1000,
+                levelLoadingMaxRetry: 5,
+                levelLoadingRetryDelay: 1000,
+                fragLoadingMaxRetry: 5,
+                fragLoadingRetryDelay: 1000,
+            });
+            
+            this.hlsInstance = hls;
+            
+            hls.loadSource(videoUrl);
+            hls.attachMedia(videoPlayer);
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                console.log('✅ HLS manifest parsed, playing video');
+                videoPlayer.play().catch(err => {
+                    console.log('Auto-play prevented:', err);
+                    window.showToast('Click play to start the video', false);
+                });
+            });
+            
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                console.error('HLS Error:', data);
+                if (data.fatal) {
+                    switch(data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            window.showToast('Network error loading video. Please try again.', true);
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            window.showToast('Media error loading video. Please try again.', true);
+                            break;
+                        default:
+                            window.showToast('Error loading video. Please try again.', true);
+                            break;
+                    }
+                }
+            });
+            
+            // Also handle native video events
+            videoPlayer.onerror = function() {
+                console.error('Video player error:', this.error);
+                // If HLS fails, try native playback
+                if (videoPlayer.error && videoPlayer.error.code === 4) {
+                    window.showToast('Video format not supported. Trying alternative playback...', true);
+                    // Try to play with native support
+                    videoPlayer.src = videoUrl;
+                    videoPlayer.load();
+                    videoPlayer.play().catch(() => {});
+                }
+            };
+            
+        } else {
+            // Fallback: use native video with HLS support (Safari)
+            videoPlayer.src = videoUrl;
+            videoPlayer.load();
+            videoPlayer.play().catch(() => {
+                window.showToast('Click play to start the video', false);
+            });
+        }
+    } else {
+        // Regular MP4 or other format
+        videoPlayer.src = videoUrl;
+        videoPlayer.load();
+        videoPlayer.play().catch(() => {
+            window.showToast('Click play to start the video', false);
+        });
+    }
+}
+
+// ===== CHECK MUX STATUS (NEW) =====
+async checkMuxStatus(playbackId, callback) {
+    try {
+        // First check if the thumbnail loads (indicates video is ready)
+        const thumbnailUrl = `https://image.mux.com/${playbackId}/thumbnail.jpg?time=5`;
         
-        const videoUrl = video.url || video.videoUrl;
-        if (!videoUrl) {
-            alert('Video URL not available');
+        const response = await fetch(thumbnailUrl, { method: 'HEAD' });
+        
+        if (response.ok) {
+            callback(true);
             return;
         }
         
-        videoPlayer.src = videoUrl;
-        videoTitle.textContent = video.videoDetails?.title || video.title || 'Video';
-        videoDescription.textContent = video.videoDetails?.description || video.description || '';
-
-        modal.style.display = 'flex';
+        // If thumbnail fails, try to check via our API
+        const statusResponse = await fetch(`https://fissk-backend.onrender.com/api/mux/asset-status/${playbackId}`);
         
-        // Resume progress
-        this.restoreProgress(videoPlayer, videoIndex);
+        if (statusResponse.ok) {
+            const data = await statusResponse.json();
+            callback(data.ready || false);
+            return;
+        }
         
-        // Track progress
-        this.trackProgress(videoPlayer, videoIndex);
-
-        // Close modal function
-        const closeModal = () => {
-            modal.style.display = 'none';
-            videoPlayer.pause();
-            videoPlayer.currentTime = 0;
-            clearInterval(this.progressInterval);
-        };
-
-        const closeBtn = document.querySelector('.close-modal');
-        if (closeBtn) closeBtn.onclick = closeModal;
-        
-        modal.onclick = (e) => {
-            if (e.target === modal) closeModal();
-        };
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.style.display === 'flex') {
-                closeModal();
-            }
-        });
+        callback(false);
+    } catch (error) {
+        console.error('Error checking Mux status:', error);
+        callback(false);
     }
+}
 
     trackProgress(videoPlayer, videoIndex) {
         clearInterval(this.progressInterval);
