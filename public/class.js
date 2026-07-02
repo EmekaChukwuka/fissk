@@ -400,7 +400,7 @@ switchTab(tabName) {
         `;
     }
        
-// ===== RENDER CLASS FORUM (FIXED WITH BETTER DEBUGGING) =====
+// ===== RENDER CLASS FORUM (FIXED) =====
 async renderClassForum() {
     const container = document.getElementById('classForumContainer');
     if (!container) {
@@ -462,7 +462,7 @@ async renderClassForum() {
             return;
         }
         
-        // Render topics
+        // Render topics - FIX: Use the data structure from the API response
         container.innerHTML = `
             <div class="forum-header-actions">
                 <button class="btn btn-primary" id="startDiscussionBtn">
@@ -478,8 +478,9 @@ async renderClassForum() {
             </div>
             <div class="forum-topics-list">
                 ${topics.map(topic => {
-                    const authorName = topic.author_name || topic.userId?.firstName ? `${topic.userId.firstName} ${topic.userId.lastName || ''}`.trim() : 'Anonymous';
-                    const replyCount = topic.replyCount || topic.replies?.length || 0;
+                    // Use the already formatted data from the API
+                    const authorName = topic.author_name || 'Anonymous';
+                    const replyCount = topic.replyCount || 0;
                     const views = topic.views || 0;
                     const isPinned = topic.isPinned || false;
                     const isSolved = topic.solved || false;
