@@ -1,9 +1,9 @@
+// backend/registration/server.js
 import express from "express";
 import bcrypt from "bcryptjs";
-const Regisrouter = express.Router();
-
 import cookieParser from "cookie-parser";
 import session from "express-session";
+import dotenv from "dotenv";
 
 // Import Mongoose models
 import User from "../models/User.js";
@@ -12,15 +12,21 @@ import Enrollment from "../models/Enrollment.js";
 import LiveSession from "../models/LiveSession.js";
 import Assignment from "../models/Assignment.js";
 
-// Configuration
-const saltRounds = 10; // For bcrypt hashing
+// Import Email Service
+import emailService from "../services/emailService.js";
 
+dotenv.config();
+
+const Regisrouter = express.Router();
+const saltRounds = 10;
+
+// Session configuration
 Regisrouter.use(session({
-  secret: 'fissk',
+  secret: process.env.SESSION_SECRET || 'fissk',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // set to true if using HTTPS
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
@@ -35,6 +41,10 @@ function isInstructor(req, res, next) {
   }
   next();
 }
+
+// ============================================================
+// REGISTRATION ENDPOINTS
+// ============================================================
 
 // Registration endpoint for instructors
 Regisrouter.post('/instructor-register', async (req, res) => {
@@ -79,7 +89,17 @@ Regisrouter.post('/instructor-register', async (req, res) => {
     
     await user.save();
 
-    // Store user in session (excluding password)
+    // ===== SEND WELCOME EMAIL TO INSTRUCTOR =====
+    try {
+      const fullName = `${firstName} ${lastName}`.trim();
+      await emailService.sendInstructorWelcomeEmail(email, fullName);
+      console.log(`✅ Welcome email sent to instructor: ${email}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send instructor welcome email:', emailError.message);
+      // Don't fail registration if email fails
+    }
+
+    // Store user in session
     const sessionUser = {
       id: user._id,
       firstname: user.firstName,
@@ -90,7 +110,11 @@ Regisrouter.post('/instructor-register', async (req, res) => {
     
     req.session.user = sessionUser;
 
-    res.json({ success: true, message: 'User registered successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Instructor registered successfully. Welcome email sent!',
+      sessionUser
+    });
 
   } catch (error) {
     console.error('Registration error:', error);
@@ -134,6 +158,16 @@ Regisrouter.post('/student-register', async (req, res) => {
     
     await user.save();
 
+    // ===== SEND WELCOME EMAIL TO STUDENT =====
+    try {
+      const fullName = `${firstName} ${lastName}`.trim();
+      await emailService.sendStudentWelcomeEmail(email, fullName);
+      console.log(`✅ Welcome email sent to student: ${email}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send student welcome email:', emailError.message);
+      // Don't fail registration if email fails
+    }
+
     // Store user in session
     const sessionUser = {
       id: user._id,
@@ -145,13 +179,21 @@ Regisrouter.post('/student-register', async (req, res) => {
     
     req.session.user = sessionUser;
 
-    res.json({ success: true, message: 'User registered successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Student registered successfully. Welcome email sent!',
+      sessionUser
+    });
 
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
+// ============================================================
+// AUTHENTICATION ENDPOINTS
+// ============================================================
 
 // Student login
 Regisrouter.post('/student-login', async (req, res) => {
@@ -191,13 +233,13 @@ Regisrouter.post('/student-login', async (req, res) => {
       user_type: user.userType
     };
 
+    req.session.user = sessionUser;
+
     res.json({
       success: true,
       message: 'Login successful',
       sessionUser
     });
-
-    req.session.user = sessionUser;
 
   } catch (error) {
     console.error('Login error:', error);
@@ -243,19 +285,23 @@ Regisrouter.post('/instructor-login', async (req, res) => {
       user_type: user.userType
     };
 
+    req.session.user = sessionUser;
+
     res.json({
       success: true,
       message: 'Login successful',
       sessionUser
     });
 
-    req.session.user = sessionUser;
-
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
+// ============================================================
+// SESSION MANAGEMENT
+// ============================================================
 
 // Get session variables
 Regisrouter.get('/session-variables', async (req, res) => {
@@ -281,6 +327,36 @@ Regisrouter.get('/user', async (req, res) => {
     userData: req.session.user
   });
 });
+
+// ============================================================
+// TEST EMAIL ENDPOINT
+// ============================================================
+
+Regisrouter.post('/test-email', async (req, res) => {
+  const { email, name, type } = req.body;
+  
+  try {
+    let result;
+    if (type === 'instructor') {
+      result = await emailService.sendInstructorWelcomeEmail(email, name || 'Instructor');
+    } else {
+      result = await emailService.sendStudentWelcomeEmail(email, name || 'Student');
+    }
+    
+    if (result.success) {
+      res.json({ success: true, message: 'Test email sent successfully' });
+    } else {
+      res.status(500).json({ success: false, message: result.error });
+    }
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({ success: false, message: 'Failed to send test email' });
+  }
+});
+
+// ============================================================
+// CLASS MANAGEMENT
+// ============================================================
 
 // Create a new class
 Regisrouter.post('/create-class', async (req, res) => {
@@ -405,6 +481,27 @@ Regisrouter.get('/classes-on-homepage', async (req, res) => {
   }
 });
 
+// Get class by ID
+Regisrouter.get('/class/:classId', async (req, res) => {
+  const classId = req.params.classId;
+  
+  try {
+    const classData = await Class.findById(classId);
+    
+    res.json({
+      success: true,
+      classA: classData ? [classData] : []
+    });
+  } catch (error) {
+    console.error('Get class error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// ============================================================
+// USER PROGRESS & ENROLLMENTS
+// ============================================================
+
 // Get user progress in a class
 Regisrouter.post('/user-progress', async (req, res) => {
   const { userId, classId } = req.body;
@@ -441,7 +538,7 @@ Regisrouter.post('/get-user-classes', async (req, res) => {
       .populate('classId')
       .lean();
     
-    // Format the response to match the original structure
+    // Format the response
     const classes = enrollments.map(enrollment => ({
       class_id: enrollment.classId._id,
       progress: enrollment.progress,
@@ -460,6 +557,33 @@ Regisrouter.post('/get-user-classes', async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
+
+// Update user progress
+Regisrouter.post('/progress/update', async (req, res) => {
+  const { classId, userId, progress } = req.body;
+  
+  try {
+    await Enrollment.findOneAndUpdate(
+      { userId, classId },
+      { 
+        progress,
+        lastAccessed: new Date()
+      }
+    );
+    
+    res.json({ 
+      success: true, 
+      message: 'Progress updated successfully' 
+    });
+  } catch (error) {
+    console.error('Progress update error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// ============================================================
+// LIVE SESSIONS - STUDENT DASHBOARD
+// ============================================================
 
 // Get live sessions for student dashboard
 Regisrouter.post('/dashboard/live-sessions', async (req, res) => {
@@ -563,6 +687,10 @@ Regisrouter.post('/class/upcoming', async (req, res) => {
   }
 });
 
+// ============================================================
+// DASHBOARD STATS
+// ============================================================
+
 // Get total learning time for a user
 Regisrouter.post('/dashboard/learning-time', async (req, res) => {
   const { email } = req.body;
@@ -609,9 +737,8 @@ Regisrouter.post('/dashboard/load-stats', async (req, res) => {
   const { id } = req.body;
   
   try {
-    // Get notifications (you'll need to create a Notification model)
-    // This is a placeholder - implement Notification model as needed
-    const notifications = []; // await Notification.find({ userId: id });
+    // Get notifications (placeholder - implement Notification model as needed)
+    const notifications = [];
     
     const stats = {
       notifications: notifications,
@@ -623,6 +750,10 @@ Regisrouter.post('/dashboard/load-stats', async (req, res) => {
     res.status(500).json({ message: "Error fetching stats" });
   }
 });
+
+// ============================================================
+// INSTRUCTOR MANAGEMENT
+// ============================================================
 
 // Check instructor session
 Regisrouter.get('/instructor/session', (req, res) => {
@@ -666,19 +797,38 @@ Regisrouter.post('/classes/instructor', async (req, res) => {
   }
 });
 
-// Get class by ID
-Regisrouter.get('/class/:classId', async (req, res) => {
-  const classId = req.params.classId;
+// Get instructor's classes
+Regisrouter.post('/instructor/classes', async (req, res) => {
+  const { id } = req.body;
   
   try {
-    const classData = await Class.findById(classId);
+    const classes = await Class.find({ instructorId: id })
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    // Get enrollment counts for each class
+    const classesWithStats = await Promise.all(
+      classes.map(async (cls) => {
+        const enrolledStudents = await Enrollment.countDocuments({ classId: cls._id });
+        const enrollments = await Enrollment.find({ classId: cls._id });
+        const avgProgress = enrollments.length > 0 
+          ? enrollments.reduce((sum, e) => sum + e.progress, 0) / enrollments.length 
+          : 0;
+        
+        return {
+          ...cls,
+          enrolled_students: enrolledStudents,
+          avg_progress: avgProgress
+        };
+      })
+    );
     
     res.json({
       success: true,
-      classA: classData ? [classData] : []
+      classes: classesWithStats
     });
   } catch (error) {
-    console.error('Get class error:', error);
+    console.error('Get instructor classes error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
@@ -736,131 +886,42 @@ Regisrouter.get('/instructor/classes/:id/students', async (req, res) => {
   }
 });
 
-// Get upcoming streams for a class
-Regisrouter.get('/instructor/classes/:id/streams', async (req, res) => {
-  try {
-    const streams = await LiveSession.find({
-      classId: req.params.id,
-      sessionType: 'upcoming'
-    }).sort({ date: 1, time: 1 }).lean();
-    
-    res.json(streams);
-  } catch (error) {
-    console.error('Get streams error:', error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-// Delete video
-Regisrouter.delete('/instructor/videos/:id', async (req, res) => {
-  const { id } = req.body;
+// Get instructor stats
+Regisrouter.post('/instructor/stats', async (req, res) => {
+  const instructorId = req.body.id;
   
   try {
-    await LiveSession.deleteOne({ 
-      _id: req.params.id, 
-      instructorId: id 
+    const totalClasses = await Class.countDocuments({ instructorId });
+    
+    const classes = await Class.find({ instructorId });
+    const classIds = classes.map(c => c._id);
+    const totalStudents = await Enrollment.countDocuments({ classId: { $in: classIds } });
+    
+    const totalVideos = await LiveSession.countDocuments({ 
+      instructorId, 
+      sessionType: 'recorded' 
     });
     
-    res.json({ ok: true });
-  } catch (error) {
-    console.error('Delete video error:', error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-// Delete stream (alias for video deletion)
-Regisrouter.delete('/instructor/streams/:id', async (req, res) => {
-  const { id } = req.body;
-  
-  try {
-    await LiveSession.deleteOne({ 
-      _id: req.params.id, 
-      instructorId: id 
+    const classesWithRating = await Class.find({ 
+      instructorId,
+      rating: { $gt: 0 }
     });
     
-    res.json({ ok: true });
-  } catch (error) {
-    console.error('Delete stream error:', error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-// Get videos for a class
-Regisrouter.get('/instructor/classes/:id/videos', async (req, res) => {
-  try {
-    const videos = await LiveSession.find({
-      classId: req.params.id,
-      sessionType: 'recorded'
-    }).sort({ createdAt: 1 }).lean();
+    const avgRating = classesWithRating.length > 0
+      ? classesWithRating.reduce((sum, c) => sum + c.rating, 0) / classesWithRating.length
+      : 0;
     
-    res.json(videos);
-  } catch (error) {
-    console.error('Get videos error:', error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-// Get all sessions for a class
-Regisrouter.get('/instructor/classes/:id/sessions', async (req, res) => {
-  try {
-    const sessions = await LiveSession.find({
-      classId: req.params.id
-    }).sort({ date: -1 }).lean();
+    const stats = {
+      totalClasses,
+      totalStudents,
+      totalVideos,
+      avgRating
+    };
     
-    res.json(sessions);
+    res.json([stats]);
   } catch (error) {
-    console.error('Get sessions error:', error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-// Get assignments for a class
-Regisrouter.get('/instructor/classes/:id/assignments', async (req, res) => {
-  try {
-    const assignments = await Assignment.find({
-      classId: req.params.id
-    }).lean();
-    
-    res.json(assignments);
-  } catch (error) {
-    console.error('Get assignments error:', error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-// Get instructor's classes
-Regisrouter.post('/instructor/classes', async (req, res) => {
-  const { id } = req.body;
-  
-  try {
-    const classes = await Class.find({ instructorId: id })
-      .sort({ createdAt: -1 })
-      .lean();
-    
-    // Get enrollment counts for each class
-    const classesWithStats = await Promise.all(
-      classes.map(async (cls) => {
-        const enrolledStudents = await Enrollment.countDocuments({ classId: cls._id });
-        const enrollments = await Enrollment.find({ classId: cls._id });
-        const avgProgress = enrollments.length > 0 
-          ? enrollments.reduce((sum, e) => sum + e.progress, 0) / enrollments.length 
-          : 0;
-        
-        return {
-          ...cls,
-          enrolled_students: enrolledStudents,
-          avg_progress: avgProgress
-        };
-      })
-    );
-    
-    res.json({
-      success: true,
-      classes: classesWithStats
-    });
-  } catch (error) {
-    console.error('Get instructor classes error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    console.error('Get stats error:', error);
+    res.status(500).json({ message: "Error fetching stats" });
   }
 });
 
@@ -923,59 +984,22 @@ Regisrouter.post('/instructor/enrollments/:classId', async (req, res) => {
   }
 });
 
-// Get instructor stats
-Regisrouter.post('/instructor/stats', async (req, res) => {
-  const instructorId = req.body.id;
-  
-  try {
-    // Get total classes
-    const totalClasses = await Class.countDocuments({ instructorId });
-    
-    // Get total students
-    const classes = await Class.find({ instructorId });
-    const classIds = classes.map(c => c._id);
-    const totalStudents = await Enrollment.countDocuments({ classId: { $in: classIds } });
-    
-    // Get total videos
-    const totalVideos = await LiveSession.countDocuments({ 
-      instructorId, 
-      sessionType: 'recorded' 
-    });
-    
-    // Get average rating
-    const classesWithRating = await Class.find({ 
-      instructorId,
-      rating: { $gt: 0 }
-    });
-    
-    const avgRating = classesWithRating.length > 0
-      ? classesWithRating.reduce((sum, c) => sum + c.rating, 0) / classesWithRating.length
-      : 0;
-    
-    const stats = {
-      totalClasses,
-      totalStudents,
-      totalVideos,
-      avgRating
-    };
-    
-    res.json([stats]); // Wrap in array to match original format
-  } catch (error) {
-    console.error('Get stats error:', error);
-    res.status(500).json({ message: "Error fetching stats" });
-  }
-});
+// ============================================================
+// LIVE STREAMS - INSTRUCTOR
+// ============================================================
 
-// ===== GET INSTRUCTOR STREAMS (UPDATED WITH MEETING IDS) =====
+// Get instructor's streams
 Regisrouter.post('/instructor/streams', async (req, res) => {
   const instructorId = req.body.id;
   
   try {
-    // Get past streams (recorded)
+    // Past streams - check BOTH streamStatus AND sessionType
     const pastStreamsData = await LiveSession.find({
       instructorId,
-      sessionType: 'recorded',
-      streamStatus: 'ended'
+      $or: [
+        { streamStatus: 'ended' },
+        { sessionType: 'recorded' }
+      ]
     })
       .populate('classId', 'title')
       .sort({ date: -1, time: -1 })
@@ -989,13 +1013,17 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
       duration: r.duration,
       participants: r.participants,
       recorded_at: `${r.date || ''} ${r.time || ''}`,
-      class_id: r.classId?._id
+      class_id: r.classId?._id,
+      recorded_at_full: r.createdAt
     }));
     
-    // Get scheduled streams (upcoming) with meeting IDs
+    // Scheduled streams - check BOTH streamStatus AND sessionType
     const scheduledStreamsData = await LiveSession.find({
       instructorId,
-      streamStatus: 'scheduled'
+      $or: [
+        { streamStatus: 'scheduled' },
+        { sessionType: 'upcoming' }
+      ]
     })
       .populate('classId', 'title')
       .sort({ date: 1, time: 1 })
@@ -1012,9 +1040,32 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
       participants: s.participants || 0
     }));
     
+    // Live streams (currently active)
+    const liveStreamsData = await LiveSession.find({
+      instructorId,
+      $or: [
+        { streamStatus: 'live' },
+        { sessionType: 'live' }
+      ],
+      hostConnected: true
+    })
+      .populate('classId', 'title')
+      .lean();
+    
+    const liveStreams = liveStreamsData.map(s => ({
+      id: s._id,
+      title: s.title,
+      description: s.description,
+      meetingId: s.meetingId || null,
+      joinUrl: s.joinUrl || null,
+      classId: s.classId?._id || null,
+      participants: s.participants || 0
+    }));
+    
     res.json({
       past: pastStreams,
-      scheduled: scheduledStreams
+      scheduled: scheduledStreams,
+      live: liveStreams
     });
     
   } catch (error) {
@@ -1023,26 +1074,47 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
   }
 });
 
-// Update user progress
-Regisrouter.post('/progress/update', async (req, res) => {
-  const { classId, userId, progress } = req.body;
-  
+// Get upcoming streams for a class
+Regisrouter.get('/instructor/classes/:id/streams', async (req, res) => {
   try {
-    await Enrollment.findOneAndUpdate(
-      { userId, classId },
-      { 
-        progress,
-        lastAccessed: new Date()
-      }
-    );
+    const streams = await LiveSession.find({
+      classId: req.params.id,
+      sessionType: 'upcoming'
+    }).sort({ date: 1, time: 1 }).lean();
     
-    res.json({ 
-      success: true, 
-      message: 'Progress updated successfully' 
-    });
+    res.json(streams);
   } catch (error) {
-    console.error('Progress update error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    console.error('Get streams error:', error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Get videos for a class
+Regisrouter.get('/instructor/classes/:id/videos', async (req, res) => {
+  try {
+    const videos = await LiveSession.find({
+      classId: req.params.id,
+      sessionType: 'recorded'
+    }).sort({ createdAt: 1 }).lean();
+    
+    res.json(videos);
+  } catch (error) {
+    console.error('Get videos error:', error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Get all sessions for a class
+Regisrouter.get('/instructor/classes/:id/sessions', async (req, res) => {
+  try {
+    const sessions = await LiveSession.find({
+      classId: req.params.id
+    }).sort({ date: -1 }).lean();
+    
+    res.json(sessions);
+  } catch (error) {
+    console.error('Get sessions error:', error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
@@ -1133,7 +1205,6 @@ Regisrouter.post('/instructor/schedule-stream', async (req, res) => {
       });
     }
     
-    // ===== FIX: Set both sessionType AND streamStatus correctly =====
     const liveSession = new LiveSession({
       instructorId: id,
       classId: payload.classId,
@@ -1141,8 +1212,8 @@ Regisrouter.post('/instructor/schedule-stream', async (req, res) => {
       description: payload.description || '',
       date: new Date(date),
       time: time,
-      sessionType: 'upcoming',      // ← This is the type
-      streamStatus: 'scheduled'     // ← This is the status
+      sessionType: 'upcoming',
+      streamStatus: 'scheduled'
     });
     
     await liveSession.save();
@@ -1164,90 +1235,251 @@ Regisrouter.post('/instructor/schedule-stream', async (req, res) => {
     });
   }
 });
+// backend/registration/server.js - Add these endpoints
 
-// ===== GET INSTRUCTOR STREAMS (FIXED - Handles both fields) =====
-Regisrouter.post('/instructor/streams', async (req, res) => {
-  const instructorId = req.body.id;
+// ===== UPDATE CLASS =====
+Regisrouter.put('/instructor/classes/:id', async (req, res) => {
+  const classId = req.params.id;
+  const { id, payload } = req.body;
   
-  try {
-    // ===== FIX: Past streams - check BOTH streamStatus AND sessionType =====
-    const pastStreamsData = await LiveSession.find({
-      instructorId,
-      $or: [
-        { streamStatus: 'ended' },
-        { sessionType: 'recorded' }
-      ]
-    })
-      .populate('classId', 'title')
-      .sort({ date: -1, time: -1 })
-      .lean();
-    
-    const pastStreams = pastStreamsData.map(r => ({
-      id: r._id,
-      title: r.title,
-      description: r.description,
-      class_title: r.classId?.title || 'Unknown',
-      duration: r.duration,
-      participants: r.participants,
-      recorded_at: `${r.date || ''} ${r.time || ''}`,
-      class_id: r.classId?._id,
-      recorded_at_full: r.createdAt
-    }));
-    
-    // ===== FIX: Scheduled streams - check BOTH streamStatus AND sessionType =====
-    const scheduledStreamsData = await LiveSession.find({
-      instructorId,
-       $or: [
-        { streamStatus: 'scheduled' },
-        { sessionType: 'upcoming' }
-      ]
-    })
-      .populate('classId', 'title')
-      .sort({ date: 1, time: 1 })
-      .lean();
-    
-    const scheduledStreams = scheduledStreamsData.map(s => ({
-      id: s._id,
-      title: s.title,
-      description: s.description,
-      scheduled_time: `${s.date || ''} ${s.time || ''}`,
-      meetingId: s.meetingId || null,
-      joinUrl: s.joinUrl || null,
-      classId: s.classId?._id || null,
-      participants: s.participants || 0
-    }));
-    
-    // ===== FIX: Live streams (currently active) =====
-    const liveStreamsData = await LiveSession.find({
-      instructorId,
-      $or: [
-        { streamStatus: 'live' },
-        { sessionType: 'live' }
-      ],
-      hostConnected: true
-    })
-      .populate('classId', 'title')
-      .lean();
-    
-    const liveStreams = liveStreamsData.map(s => ({
-      id: s._id,
-      title: s.title,
-      description: s.description,
-      meetingId: s.meetingId || null,
-      joinUrl: s.joinUrl || null,
-      classId: s.classId?._id || null,
-      participants: s.participants || 0
-    }));
-    
-    res.json({
-      past: pastStreams,
-      scheduled: scheduledStreams,
-      live: liveStreams
+  if (!id) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Instructor ID is required" 
     });
-    
+  }
+
+  try {
+    // Check if class exists and belongs to instructor
+    const classData = await Class.findOne({ 
+      _id: classId, 
+      instructorId: id 
+    });
+
+    if (!classData) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Class not found or you don't have permission to edit it" 
+      });
+    }
+
+    // Update the class
+    const updatedClass = await Class.findByIdAndUpdate(
+      classId,
+      {
+        title: payload.title,
+        description: payload.description,
+        category: payload.category,
+        level: payload.level,
+        duration: payload.duration,
+      },
+      { new: true, runValidators: true }
+    );
+
+    res.json({ 
+      success: true, 
+      message: "Class updated successfully",
+      class: updatedClass 
+    });
   } catch (error) {
-    console.error('Get streams error:', error);
-    res.status(500).json({ message: "Failed to load streams" });
+    console.error('Update class error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+});
+
+// ===== DELETE CLASS =====
+Regisrouter.delete('/instructor/classes/:id', async (req, res) => {
+  const classId = req.params.id;
+  const { id } = req.body;
+  
+  if (!id) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Instructor ID is required" 
+    });
+  }
+
+  try {
+    // Check if class exists and belongs to instructor
+    const classData = await Class.findOne({ 
+      _id: classId, 
+      instructorId: id 
+    });
+
+    if (!classData) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Class not found or you don't have permission to delete it" 
+      });
+    }
+
+    // Delete all enrollments for this class
+    await Enrollment.deleteMany({ classId: classId });
+    
+    // Delete all live sessions for this class
+    await LiveSession.deleteMany({ classId: classId });
+    
+    // Delete the class
+    await Class.deleteOne({ _id: classId });
+    
+    res.json({ 
+      success: true, 
+      message: "Class and all associated data deleted successfully" 
+    });
+  } catch (error) {
+    console.error('Delete class error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+});
+
+// Delete video (FIXED - better error handling)
+Regisrouter.delete('/instructor/videos/:id', async (req, res) => {
+  const { id } = req.body;
+  
+  // ===== FIX: Validate the id parameter =====
+  if (!id) {
+    return res.status(400).json({ 
+      ok: false, 
+      message: "Instructor ID is required" 
+    });
+  }
+
+  try {
+    // ===== FIX: Validate that the video ID is a valid ObjectId =====
+    const videoId = req.params.id;
+    if (!videoId || videoId === 'undefined' || videoId === 'null') {
+      return res.status(400).json({ 
+        ok: false, 
+        message: "Invalid video ID" 
+      });
+    }
+
+    // ===== FIX: Check if video exists and belongs to instructor =====
+    const video = await LiveSession.findOne({ 
+      _id: videoId, 
+      instructorId: id 
+    });
+
+    if (!video) {
+      return res.status(404).json({ 
+        ok: false, 
+        message: "Video not found or you don't have permission to delete it" 
+      });
+    }
+
+    // Delete the video
+    await LiveSession.deleteOne({ _id: videoId });
+    
+    res.json({ ok: true, message: "Video deleted successfully" });
+  } catch (error) {
+    console.error('Delete video error:', error);
+    res.status(500).json({ 
+      ok: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+});
+
+// Delete stream (FIXED - better error handling)
+Regisrouter.delete('/instructor/streams/:id', async (req, res) => {
+  const { id } = req.body;
+  
+  // ===== FIX: Validate the id parameter =====
+  if (!id) {
+    return res.status(400).json({ 
+      ok: false, 
+      message: "Instructor ID is required" 
+    });
+  }
+
+  try {
+    // ===== FIX: Validate that the stream ID is a valid ObjectId =====
+    const streamId = req.params.id;
+    if (!streamId || streamId === 'undefined' || streamId === 'null') {
+      return res.status(400).json({ 
+        ok: false, 
+        message: "Invalid stream ID" 
+      });
+    }
+
+    // ===== FIX: Check if stream exists and belongs to instructor =====
+    const stream = await LiveSession.findOne({ 
+      _id: streamId, 
+      instructorId: id 
+    });
+
+    if (!stream) {
+      return res.status(404).json({ 
+        ok: false, 
+        message: "Stream not found or you don't have permission to delete it" 
+      });
+    }
+
+    // Delete the stream
+    await LiveSession.deleteOne({ _id: streamId });
+    
+    res.json({ ok: true, message: "Stream deleted successfully" });
+  } catch (error) {
+    console.error('Delete stream error:', error);
+    res.status(500).json({ 
+      ok: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+});
+
+// ============================================================
+// ASSIGNMENTS
+// ============================================================
+
+// Get assignments for a class
+Regisrouter.get('/instructor/classes/:id/assignments', async (req, res) => {
+  try {
+    const assignments = await Assignment.find({
+      classId: req.params.id
+    }).lean();
+    
+    res.json(assignments);
+  } catch (error) {
+    console.error('Get assignments error:', error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Get assignments for a class (with instructor validation)
+Regisrouter.get('/instructor/classes/:classId/assignment', async (req, res) => {
+  const instructorId = req.body.id;
+  const classId = req.params.classId;
+
+  try {
+    // Validate instructor owns this class
+    const classData = await Class.findOne({ 
+      _id: classId, 
+      instructorId 
+    });
+
+    if (!classData) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const assignments = await Assignment.find({ classId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json(assignments);
+  } catch (error) {
+    console.error('Get assignments error:', error);
+    res.status(500).json({ message: "Could not load assignments" });
   }
 });
 
@@ -1282,33 +1514,6 @@ Regisrouter.post('/instructor/create-assignment', async (req, res) => {
   } catch (error) {
     console.error('Create assignment error:', error);
     res.status(500).json({ message: "Failed to create assignment" });
-  }
-});
-
-// Get assignments for a class
-Regisrouter.get('/instructor/classes/:classId/assignment', async (req, res) => {
-  const instructorId = req.body.id;
-  const classId = req.params.classId;
-
-  try {
-    // Validate instructor owns this class
-    const classData = await Class.findOne({ 
-      _id: classId, 
-      instructorId 
-    });
-
-    if (!classData) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
-
-    const assignments = await Assignment.find({ classId })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    res.json(assignments);
-  } catch (error) {
-    console.error('Get assignments error:', error);
-    res.status(500).json({ message: "Could not load assignments" });
   }
 });
 

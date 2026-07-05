@@ -8,7 +8,7 @@ class ClassManager {
         this.currentVideoIndex = null;
         this.progressInterval = null;
         this.videos = [];
-        this.recordings = []; // Store Cloudinary recordings
+        this.recordings = []; // Store recordings
         this.isEnrolled = false;
         this.isLoading = true;
         this.hlsInstance = null; // Add HLS instance reference

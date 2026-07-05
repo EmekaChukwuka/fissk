@@ -98,6 +98,79 @@
             </div>
         </div>
     </div>
+    <!-- Schedule Stream Modal -->
+<div id="scheduleStreamModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal">&times;</span>
+        <h2>Schedule Live Stream</h2>
+        <form id="scheduleStreamForm">
+            <div class="form-group">
+                <label for="streamTitle">Stream Title</label>
+                <input type="text" id="streamTitle" name="title" required placeholder="e.g., Lesson 5: Advanced Grammar">
+            </div>
+            <div class="form-group">
+                <label for="streamDescription">Description</label>
+                <textarea id="streamDescription" name="description" rows="3" placeholder="What will this session cover?"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="streamDateTime">Date & Time</label>
+                <input type="datetime-local" id="streamDateTime" name="scheduledTime" required>
+            </div>
+            <div class="form-actions" style="display: flex; gap: 12px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary">Schedule Stream</button>
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('scheduleStreamModal').style.display='none'">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- Edit Class Modal -->
+<div id="editClassModal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal">&times;</span>
+        <h2>Edit Class</h2>
+        <form id="editClassForm">
+            <div class="form-group">
+                <label for="editClassName">Class Title</label>
+                <input type="text" id="editClassName" name="title" required>
+            </div>
+            <div class="form-group">
+                <label for="editClassDescription">Description</label>
+                <textarea id="editClassDescription" name="description" rows="4"></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="editClassCategory">Subject</label>
+                    <select id="editClassCategory" name="category">
+                        <option value="french">French</option>
+                        <option value="english">English</option>
+                        <option value="biology">Biology</option>
+                        <option value="chemistry">Chemistry</option>
+                        <option value="physics">Physics</option>
+                        <option value="mathematics">Mathematics</option>
+                        <option value="economics">Economics</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editClassLevel">Level</label>
+                    <select id="editClassLevel" name="level">
+                        <option value="beginner">Beginner</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="advanced">Advanced</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="editClassDuration">Duration</label>
+                <input type="text" id="editClassDuration" name="duration" placeholder="e.g., 8 weeks">
+            </div>
+            <div class="form-actions" style="display: flex; gap: 12px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('editClassModal').style.display='none'">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <script src="instructor-class-details.js"></script>
 </body>

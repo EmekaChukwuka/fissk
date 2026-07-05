@@ -7,6 +7,254 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" href="fissklogo.jpg">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ===== STUDENT REVIEWS SECTION ===== */
+        .reviews-section {
+            padding: 80px 0;
+            background: var(--gray-light);
+        }
+
+        .reviews-section h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            color: var(--text-dark);
+        }
+
+        .reviews-subtitle {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 1.1rem;
+            margin-bottom: 50px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .reviews-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .review-card {
+            background: var(--white);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 1px solid var(--border);
+        }
+
+        .review-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+        }
+
+        .review-stars {
+            color: #F59E0B;
+            font-size: 1.1rem;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+        }
+
+        .review-text {
+            font-size: 1rem;
+            line-height: 1.7;
+            color: var(--text-dark);
+            font-style: italic;
+            margin-bottom: 16px;
+        }
+
+        .review-text::before {
+            content: '"';
+            font-size: 1.5rem;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .review-text::after {
+            content: '"';
+            font-size: 1.5rem;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .review-author {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .review-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: var(--primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .review-author-info h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 2px;
+        }
+
+        .review-author-info p {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .review-author-info .course-tag {
+            display: inline-block;
+            background: rgba(139, 95, 191, 0.1);
+            color: var(--primary);
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin-top: 4px;
+        }
+
+        .review-verified {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #10B981;
+            font-size: 0.8rem;
+            margin-left: 8px;
+        }
+
+        .reviews-cta {
+            text-align: center;
+        }
+
+        .reviews-cta .btn {
+            padding: 12px 32px;
+        }
+
+        .review-rating-average {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .rating-big {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .rating-big .number {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--text-dark);
+            line-height: 1;
+        }
+
+        .rating-big .stars {
+            color: #F59E0B;
+            font-size: 1.3rem;
+            margin: 4px 0;
+        }
+
+        .rating-big .count {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .rating-breakdown {
+            flex: 1;
+            max-width: 300px;
+        }
+
+        .rating-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 4px 0;
+        }
+
+        .rating-row .label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            min-width: 30px;
+        }
+
+        .rating-row .bar {
+            flex: 1;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .rating-row .bar .fill {
+            height: 100%;
+            background: #F59E0B;
+            border-radius: 3px;
+            transition: width 1s ease;
+        }
+
+        .rating-row .percent {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            min-width: 35px;
+            text-align: right;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .reviews-grid {
+                grid-template-columns: 1fr;
+                padding: 0 16px;
+            }
+
+            .reviews-section h2 {
+                font-size: 2rem;
+            }
+
+            .review-rating-average {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .rating-breakdown {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .rating-big .number {
+                font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .review-card {
+                padding: 20px;
+            }
+
+            .review-text {
+                font-size: 0.95rem;
+            }
+
+            .review-author {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
@@ -58,8 +306,8 @@
                     </div>
                 </div>
             </div>
-           <!-- <img src="Screenshot_20260121-194457.jpg">-->
-                
+            <!-- <img src="Screenshot_20260121-194457.jpg">-->
+        </div>
     </section>
 
     <!-- Features Section -->
@@ -75,14 +323,13 @@
                 <div class="feature-card">
                     <div class="feature-icon">💼</div>
                     <h3>Interactive Lessons</h3>
-                   <p> Engage with interactive classes, quizzes, and discussions. </p>
+                    <p>Engage with interactive classes, quizzes, and discussions.</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">📱</div>
                     <h3>Learn Anywhere</h3>
                     <p>Mobile-friendly platform that fits your busy schedule</p>
                 </div>
-              
             </div>
         </div>
     </section>
@@ -92,13 +339,148 @@
         <div class="container">
             <h2>Popular Courses</h2>
             <div class="courses-grid">
-                 <div id="classesContainer" class="classes-container">
-                <!-- Classes will be loaded dynamically -->
-            </div>
-               
+                <div id="classesContainer" class="classes-container">
+                    <!-- Classes will be loaded dynamically -->
+                </div>
             </div>
             <div class="text-center">
                 <a href="classes.html" class="btn btn-primary">View All Courses</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== STUDENT REVIEWS SECTION ===== -->
+    <section class="reviews-section">
+        <div class="container">
+            <h2>What Our Students Say</h2>
+            <p class="reviews-subtitle">Real stories from real students who have transformed their learning journey with FISSK</p>
+
+            <!-- Rating Summary -->
+            <div class="review-rating-average">
+                <div class="rating-big">
+                    <span class="number">4.8</span>
+                    <span class="stars">★★★★★</span>
+                    <span class="count">Based on 1,247 reviews</span>
+                </div>
+                <div class="rating-breakdown">
+                    <div class="rating-row">
+                        <span class="label">5★</span>
+                        <div class="bar"><div class="fill" style="width: 82%"></div></div>
+                        <span class="percent">82%</span>
+                    </div>
+                    <div class="rating-row">
+                        <span class="label">4★</span>
+                        <div class="bar"><div class="fill" style="width: 12%"></div></div>
+                        <span class="percent">12%</span>
+                    </div>
+                    <div class="rating-row">
+                        <span class="label">3★</span>
+                        <div class="bar"><div class="fill" style="width: 4%"></div></div>
+                        <span class="percent">4%</span>
+                    </div>
+                    <div class="rating-row">
+                        <span class="label">2★</span>
+                        <div class="bar"><div class="fill" style="width: 1%"></div></div>
+                        <span class="percent">1%</span>
+                    </div>
+                    <div class="rating-row">
+                        <span class="label">1★</span>
+                        <div class="bar"><div class="fill" style="width: 1%"></div></div>
+                        <span class="percent">1%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reviews Grid -->
+            <div class="reviews-grid">
+                <!-- Review 1 -->
+                <div class="review-card">
+                    <div class="review-stars">★★★★★</div>
+                    <p class="review-text">FISSK has completely changed how I learn. The live classes are so engaging, and I can learn from home without any pressure. The instructors actually care about your progress.</p>
+                    <div class="review-author">
+                        <div class="review-avatar">CO</div>
+                        <div class="review-author-info">
+                            <h4>Chioma O.</h4>
+                            <p>Lagos, Nigeria <span class="review-verified">✅ Verified Student</span></p>
+                            <span class="course-tag">📚 French Beginner</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Review 2 -->
+                <div class="review-card">
+                    <div class="review-stars">★★★★★</div>
+                    <p class="review-text">I love that I can attend live classes for FREE and only pay for the courses I really need. It's perfect for students like me who want quality education without breaking the bank.</p>
+                    <div class="review-author">
+                        <div class="review-avatar">EN</div>
+                        <div class="review-author-info">
+                            <h4>Emeka N.</h4>
+                            <p>Abuja, Nigeria <span class="review-verified">✅ Verified Student</span></p>
+                            <span class="course-tag">📚 Intermediate Spanish</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Review 3 -->
+                <div class="review-card">
+                    <div class="review-stars">★★★★★</div>
+                    <p class="review-text">The recorded sessions are a lifesaver! When I miss a live class, I can always catch up later. FISSK makes learning so flexible and convenient for my busy schedule.</p>
+                    <div class="review-author">
+                        <div class="review-avatar">FA</div>
+                        <div class="review-author-info">
+                            <h4>Funmi A.</h4>
+                            <p>Ibadan, Nigeria <span class="review-verified">✅ Verified Student</span></p>
+                            <span class="course-tag">📚 Exam Prep Workshop</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Review 4 -->
+                <div class="review-card">
+                    <div class="review-stars">★★★★★</div>
+                    <p class="review-text">The community forum is amazing! I've connected with other students who are learning the same things as me. We help each other out and it makes learning so much more fun.</p>
+                    <div class="review-author">
+                        <div class="review-avatar">BO</div>
+                        <div class="review-author-info">
+                            <h4>Blessing O.</h4>
+                            <p>Port Harcourt, Nigeria <span class="review-verified">✅ Verified Student</span></p>
+                            <span class="course-tag">📚 English Advanced</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Review 5 -->
+                <div class="review-card">
+                    <div class="review-stars">★★★★★</div>
+                    <p class="review-text">I was skeptical about online learning at first, but FISSK proved me wrong. The instructors are knowledgeable, the platform is easy to use, and I've learned so much in just a few weeks.</p>
+                    <div class="review-author">
+                        <div class="review-avatar">SO</div>
+                        <div class="review-author-info">
+                            <h4>Segun O.</h4>
+                            <p>Lagos, Nigeria <span class="review-verified">✅ Verified Student</span></p>
+                            <span class="course-tag">📚 Business French</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Review 6 -->
+                <div class="review-card">
+                    <div class="review-stars">★★★★☆</div>
+                    <p class="review-text">Great platform! The live classes are interactive and the instructors really know their stuff. My only suggestion would be more practice exercises, but overall it's been a great experience.</p>
+                    <div class="review-author">
+                        <div class="review-avatar">AA</div>
+                        <div class="review-author-info">
+                            <h4>Amara A.</h4>
+                            <p>Enugu, Nigeria <span class="review-verified">✅ Verified Student</span></p>
+                            <span class="course-tag">📚 Chemistry 101</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <div class="reviews-cta">
+                <a href="signup.html" class="btn btn-primary">Join 2,500+ Students Today →</a>
             </div>
         </div>
     </section>
@@ -159,5 +541,154 @@
     </footer>
 
     <script src="script.js"></script>
+    <script>
+        // ===== NAVIGATION =====
+        const hamburger = document.querySelector('.hamburger');
+        const navMenu = document.querySelector('.nav-menu');
+
+        if (hamburger) {
+            hamburger.addEventListener('click', () => {
+                hamburger.classList.toggle('active');
+                navMenu.classList.toggle('active');
+                if (navMenu.classList.contains('active')) {
+                    navMenu.style.display = 'flex';
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    navMenu.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }
+            });
+        }
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                hamburger.classList.remove('active');
+                navMenu.classList.remove('active');
+                navMenu.style.display = 'none';
+                document.body.style.overflow = 'auto';
+            });
+        });
+
+        // ===== USER STATUS =====
+        function checkUserStatus() {
+            const userId = localStorage.getItem('userId');
+            const userType = localStorage.getItem('userType');
+            
+            const loginBtn = document.getElementById('login-btn');
+            const signupBtn = document.getElementById('signup-btn');
+            const dashboardBtn = document.getElementById('dashboard-btn');
+
+            if (userId) {
+                if (loginBtn) loginBtn.style.display = 'none';
+                if (signupBtn) signupBtn.style.display = 'none';
+                if (dashboardBtn) {
+                    dashboardBtn.style.display = 'block';
+                    dashboardBtn.href = userType === 'instructor' ? 'instructor-dashboard.html' : 'dashboard.html';
+                }
+            } else {
+                if (loginBtn) loginBtn.style.display = 'block';
+                if (signupBtn) signupBtn.style.display = 'block';
+                if (dashboardBtn) dashboardBtn.style.display = 'none';
+            }
+        }
+
+        // ===== LOAD COURSES =====
+        async function loadHomepageCourses() {
+            const container = document.getElementById('classesContainer');
+            if (!container) return;
+
+            try {
+                const response = await fetch('/register/student/classes');
+                const data = await response.json();
+
+                if (data && data.classes && data.classes.length > 0) {
+                    container.innerHTML = data.classes.slice(0, 3).map(classItem => `
+                        <div class="course-card">
+                            <div class="course-image">
+                                ${classItem.thumbnail ? 
+                                    `<img src="${classItem.thumbnail}" alt="${classItem.name}">` : 
+                                    '<div class="course-placeholder">📚</div>'
+                                }
+                                ${classItem.isFree ? 
+                                    '<span class="course-badge free">Free</span>' : 
+                                    `<span class="course-badge paid">₦${classItem.price || 2500}</span>`
+                                }
+                            </div>
+                            <div class="course-content">
+                                <h3>${classItem.name}</h3>
+                                <p>${classItem.description ? classItem.description.substring(0, 80) + '...' : 'No description available'}</p>
+                                <div class="course-meta">
+                                    <span class="course-instructor">👨‍🏫 ${classItem.instructor ? classItem.instructor.name : 'Instructor'}</span>
+                                    <span class="course-students">👥 ${classItem.enrolledStudents || 0} students</span>
+                                </div>
+                                <a href="class.html?id=${classItem._id}" class="btn btn-primary btn-sm">View Course</a>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    showFallbackCourses(container);
+                }
+            } catch (error) {
+                console.error('Error loading courses:', error);
+                showFallbackCourses(container);
+            }
+        }
+
+        function showFallbackCourses(container) {
+            container.innerHTML = `
+                <div class="course-card">
+                    <div class="course-image">
+                        <div class="course-placeholder">🇫🇷</div>
+                        <span class="course-badge paid">₦2,500</span>
+                    </div>
+                    <div class="course-content">
+                        <h3>Beginner French</h3>
+                        <p>Learn basic French with interactive live sessions and expert guidance.</p>
+                        <div class="course-meta">
+                            <span class="course-instructor">👨‍🏫 Mrs. Ayeni Favour</span>
+                            <span class="course-students">👥 150 students</span>
+                        </div>
+                        <a href="class.html" class="btn btn-primary btn-sm">View Course</a>
+                    </div>
+                </div>
+                <div class="course-card">
+                    <div class="course-image">
+                        <div class="course-placeholder">🇪🇸</div>
+                        <span class="course-badge paid">₦3,000</span>
+                    </div>
+                    <div class="course-content">
+                        <h3>Intermediate Spanish</h3>
+                        <p>Take your Spanish to the next level with advanced conversational skills.</p>
+                        <div class="course-meta">
+                            <span class="course-instructor">👨‍🏫 Mrs. Ayeni Favour</span>
+                            <span class="course-students">👥 89 students</span>
+                        </div>
+                        <a href="class.html" class="btn btn-primary btn-sm">View Course</a>
+                    </div>
+                </div>
+                <div class="course-card">
+                    <div class="course-image">
+                        <div class="course-placeholder">📝</div>
+                        <span class="course-badge free">Free</span>
+                    </div>
+                    <div class="course-content">
+                        <h3>Exam Prep Workshop</h3>
+                        <p>Prepare for your exams with tips, strategies, and practice sessions.</p>
+                        <div class="course-meta">
+                            <span class="course-instructor">👨‍🏫 Mrs. Ayeni Favour</span>
+                            <span class="course-students">👥 210 students</span>
+                        </div>
+                        <a href="class.html" class="btn btn-primary btn-sm">View Course</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ===== INIT =====
+        document.addEventListener('DOMContentLoaded', function() {
+            checkUserStatus();
+            loadHomepageCourses();
+        });
+    </script>
 </body>
 </html>
