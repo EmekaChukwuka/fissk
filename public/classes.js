@@ -1,4 +1,4 @@
-// Classes Page Functionality
+// classes.js - Complete with Payment Integration
 class ClassesManager {
     constructor() {
         this.classes = [];
@@ -10,7 +10,6 @@ class ClassesManager {
     }
 
     async init() {
-        // Get logged in user
         this.user = JSON.parse(localStorage.getItem('user'));
         await this.loadClasses();
         this.setupEventListeners();
@@ -25,7 +24,6 @@ class ClassesManager {
             
             const coursesArray = data.classes;
             if (coursesArray && coursesArray.length !== 0) {
-                // Check which classes user is enrolled in
                 if (this.user && this.user.email) {
                     const enrolledResponse = await fetch('https://fissk-backend.onrender.com/register/get-user-classes', {
                         method: 'POST',
@@ -41,13 +39,20 @@ class ClassesManager {
                         });
                     }
                     
-                    // Mark enrolled classes
                     this.classes = coursesArray.map(c => ({
                         ...c,
-                        enrolled: enrolledClassIds.has(c._id?.toString())
+                        enrolled: enrolledClassIds.has(c._id?.toString()),
+                        price: c.price || 0,
+                        isFree: c.isFree !== undefined ? c.isFree : true,
+                        currency: c.currency || 'NGN'
                     }));
                 } else {
-                    this.classes = coursesArray;
+                    this.classes = coursesArray.map(c => ({
+                        ...c,
+                        price: c.price || 0,
+                        isFree: c.isFree !== undefined ? c.isFree : true,
+                        currency: c.currency || 'NGN'
+                    }));
                 }
             } else {
                 this.classes = [];
@@ -68,38 +73,13 @@ class ClassesManager {
         }
     }
 
-    showNoClassesMessage() {
-        const container = document.getElementById('classesContainer');
-        if (container) {
-            container.innerHTML = `
-                <div class="no-content">
-                    <p>No classes available at the moment. Please check back later.</p>
-                </div>
-            `;
-        }
-    }
-
-    showErrorMessage(message) {
-        const container = document.getElementById('classesContainer');
-        if (container) {
-            container.innerHTML = `
-                <div class="error-content">
-                    <p>⚠️ ${message}</p>
-                    <button class="btn btn-primary" onclick="location.reload()">Retry</button>
-                </div>
-            `;
-        }
-    }
-
     setupEventListeners() {
-        // Filter buttons
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 this.handleFilter(e.target.dataset.filter);
             });
         });
 
-        // Search functionality
         const searchInput = document.getElementById('classSearch');
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
@@ -107,7 +87,6 @@ class ClassesManager {
             });
         }
 
-        // Enrollment modal
         this.setupModalEvents();
     }
 
@@ -130,7 +109,9 @@ class ClassesManager {
         this.filteredClasses = this.classes.filter(classItem => {
             const matchesFilter = this.currentFilter === 'all' || 
                                 classItem.category === this.currentFilter ||
-                                classItem.level === this.currentFilter;
+                                classItem.level === this.currentFilter ||
+                                (this.currentFilter === 'free' && classItem.isFree) ||
+                                (this.currentFilter === 'paid' && !classItem.isFree && classItem.price > 0);
             
             const matchesSearch = !this.searchQuery || 
                                 (classItem.title && classItem.title.toLowerCase().includes(this.searchQuery)) ||
@@ -163,10 +144,23 @@ class ClassesManager {
             const classDuration = classItem.duration;
             const maxStudents = classItem.maxStudents || 0;
             const enrolled = classItem.enrolled || false;
+            const price = classItem.price || 0;
+            const isFree = classItem.isFree !== undefined ? classItem.isFree : true;
+            const currency = classItem.currency || 'NGN';
+            
+            // Price badge
+            let priceBadge = '';
+            if (isFree || price === 0) {
+                priceBadge = '<span class="price-badge free">🎓 FREE</span>';
+            } else {
+                priceBadge = `<span class="price-badge paid">${currency} ${price.toLocaleString()}</span>`;
+            }
             
             return `
                 <div class="class-card" data-class-id="${classId}">
-                    <div class="class-card-image" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);"></div>
+                    <div class="class-card-image" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);">
+                        ${priceBadge}
+                    </div>
                     <div class="class-card-content">
                         <h3>${this.escapeHtml(classTitle)}</h3>
                         <p>${this.escapeHtml(classDescription)}</p>
@@ -177,9 +171,11 @@ class ClassesManager {
                         </div>
                         <div class="class-actions">
                             ${enrolled ? 
-                                `<button class="btn btn-outline" disabled>Already Enrolled</button>
+                                `<button class="btn btn-outline" disabled>✅ Enrolled</button>
                                  <a href="class.html?id=${classId}" class="btn btn-primary">Continue Learning</a>` :
-                                `<button class="btn btn-primary enroll-btn" data-class-id="${classId}" data-class-name="${classTitle}" id="${classId}">Enroll Now</button>
+                                `<button class="btn btn-primary enroll-btn" data-class-id="${classId}" data-class-name="${classTitle}" id="${classId}">
+                                    ${isFree || price === 0 ? '🎓 Enroll Free' : `💳 Buy - ${currency} ${price.toLocaleString()}`}
+                                </button>
                                  <a href="class.html?id=${classId}" class="btn btn-outline">View Details</a>`
                             }
                         </div>
@@ -188,7 +184,6 @@ class ClassesManager {
             `;
         }).join('');
 
-        // Add event listeners to enroll buttons
         document.querySelectorAll('.enroll-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const classId = e.target.id;
@@ -208,7 +203,6 @@ class ClassesManager {
         const modalContent = document.getElementById('modalClassDetails');
         
         try {
-            // Get instructor info if available
             let instructorName = 'Staff';
             if (classItem.instructorId) {
                 const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
@@ -222,13 +216,19 @@ class ClassesManager {
                 }
             }
             
+            const price = classItem.price || 0;
+            const isFree = classItem.isFree !== undefined ? classItem.isFree : true;
+            const currency = classItem.currency || 'NGN';
+            
             modalContent.innerHTML = `
                 <h3>${this.escapeHtml(classItem.title)}</h3>
                 <p><strong>Category:</strong> ${classItem.category?.toUpperCase() || 'General'}</p>
                 <p><strong>Level:</strong> ${classItem.level || 'Beginner'}</p>
                 <p><strong>Duration:</strong> ${classItem.duration || 'Self-paced'}</p>
                 <p><strong>Instructor:</strong> ${this.escapeHtml(instructorName)}</p>
+                <p><strong>Price:</strong> ${isFree || price === 0 ? '🎓 FREE' : `${currency} ${price.toLocaleString()}`}</p>
                 <p>${this.escapeHtml(classItem.description)}</p><br>
+                ${!isFree && price > 0 ? `<p style="color: #6C3CE1; font-weight: 600;">💳 Payment required to access recordings</p>` : ''}
             `;
 
             modal.style.display = 'flex';
@@ -269,6 +269,17 @@ class ClassesManager {
             return;
         }
 
+        const classItem = this.classes.find(c => c._id == classId);
+        const isFree = classItem?.isFree !== undefined ? classItem.isFree : true;
+        const price = classItem?.price || 0;
+
+        // If not free, redirect to payment checkout
+        if (!isFree && price > 0) {
+            window.location.href = `payment-checkout.html?classId=${classId}`;
+            return;
+        }
+
+        // Free enrollment
         try {
             const response = await fetch('https://fissk-backend.onrender.com/register/join-class', {
                 method: 'POST',
@@ -277,7 +288,6 @@ class ClassesManager {
             });
 
             if (response.ok) {
-                // Update local state
                 const classItem = this.classes.find(c => c._id == classId);
                 if (classItem) {
                     classItem.enrolled = true;
@@ -286,7 +296,7 @@ class ClassesManager {
                 this.hideModal();
                 this.renderClasses();
                 
-                alert('Successfully enrolled in the class!');
+                alert('🎉 Successfully enrolled in the class!');
                 window.location.href = `class.html?id=${classId}`;
             } else {
                 const error = await response.json();
@@ -326,6 +336,29 @@ class ClassesManager {
         const loadingIndicator = document.getElementById('loadingIndicator');
         if (loadingIndicator) {
             loadingIndicator.style.display = 'none';
+        }
+    }
+
+    showNoClassesMessage() {
+        const container = document.getElementById('classesContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="no-content">
+                    <p>No classes available at the moment. Please check back later.</p>
+                </div>
+            `;
+        }
+    }
+
+    showErrorMessage(message) {
+        const container = document.getElementById('classesContainer');
+        if (container) {
+            container.innerHTML = `
+                <div class="error-content">
+                    <p>⚠️ ${message}</p>
+                    <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                </div>
+            `;
         }
     }
 

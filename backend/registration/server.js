@@ -96,7 +96,6 @@ Regisrouter.post('/instructor-register', async (req, res) => {
       console.log(`✅ Welcome email sent to instructor: ${email}`);
     } catch (emailError) {
       console.error('❌ Failed to send instructor welcome email:', emailError.message);
-      // Don't fail registration if email fails
     }
 
     // Store user in session
@@ -165,7 +164,6 @@ Regisrouter.post('/student-register', async (req, res) => {
       console.log(`✅ Welcome email sent to student: ${email}`);
     } catch (emailError) {
       console.error('❌ Failed to send student welcome email:', emailError.message);
-      // Don't fail registration if email fails
     }
 
     // Store user in session
@@ -355,10 +353,10 @@ Regisrouter.post('/test-email', async (req, res) => {
 });
 
 // ============================================================
-// CLASS MANAGEMENT
+// CLASS MANAGEMENT (WITH PAYMENT)
 // ============================================================
 
-// Create a new class
+// Create a new class (with payment fields)
 Regisrouter.post('/create-class', async (req, res) => {
   const { email, payload } = req.body;
 
@@ -382,26 +380,61 @@ Regisrouter.post('/create-class', async (req, res) => {
         field: 'class name'
       });
     }
-    
+
+    // ===== NEW: Validate price =====
+    let price = parseFloat(payload.price) || 0;
+    let isFree = payload.isFree === true || payload.isFree === 'true' || price === 0;
+
+    // If not marked as free, ensure minimum price
+    if (!isFree && price < 1000) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Minimum price is ₦1,000',
+        field: 'price'
+      });
+    }
+
+    // If price is 0, mark as free
+    if (price === 0) {
+      isFree = true;
+    }
+
     const newClass = new Class({
       title: payload.title,
       description: payload.description,
       category: payload.category,
       level: payload.level,
       duration: payload.duration,
-      instructorId: user._id
+      instructorId: user._id,
+      // ===== NEW PAYMENT FIELDS =====
+      price: price,
+      isFree: isFree,
+      currency: payload.currency || 'NGN',
+      totalRevenue: 0,
+      totalSales: 0,
+      enrolledStudents: 0
     });
     
     await newClass.save();
     
-    res.json({ success: true, message: 'Class created successfully' });
+    res.json({ 
+      success: true, 
+      message: 'Class created successfully',
+      class: {
+        id: newClass._id,
+        title: newClass.title,
+        price: newClass.price,
+        isFree: newClass.isFree,
+        currency: newClass.currency
+      }
+    });
   } catch (error) {
     console.error('Course creation error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
-// Join a class
+// Join a class (with payment check)
 Regisrouter.post('/join-class', async (req, res) => {
   const { email, classId } = req.body;
 
@@ -419,9 +452,9 @@ Regisrouter.post('/join-class', async (req, res) => {
     const classData = await Class.findById(classId);
     
     if (!classData) {
-      return res.status(401).json({ 
+      return res.status(404).json({ 
         success: false, 
-        message: 'Invalid credentials'
+        message: 'Class not found'
       });
     }
 
@@ -437,29 +470,98 @@ Regisrouter.post('/join-class', async (req, res) => {
         message: 'Already enrolled in this class' 
       });
     }
+
+    // ===== NEW: Check if class requires payment =====
+    let paidEnrollment = null;
+    if (!classData.isFree && classData.price > 0) {
+      paidEnrollment = await Enrollment.findOne({
+        userId: user._id,
+        classId: classData._id,
+        paymentStatus: 'paid'
+      });
+
+      if (!paidEnrollment) {
+        return res.status(402).json({ 
+          success: false, 
+          message: 'Payment required to enroll in this class',
+          requiresPayment: true,
+          price: classData.price,
+          currency: classData.currency || 'NGN'
+        });
+      }
+    }
+    
+    // Determine access type
+    const accessType = classData.isFree || classData.price === 0 ? 'free' : 'paid';
+    const paymentStatus = classData.isFree || classData.price === 0 ? 'free' : 'paid';
     
     // Create enrollment
     const enrollment = new Enrollment({
       userId: user._id,
-      classId: classData._id
+      classId: classData._id,
+      accessType: accessType,
+      paymentStatus: paymentStatus,
+      paymentReference: paidEnrollment?.paymentReference || null,
+      amountPaid: accessType === 'paid' ? classData.price : 0
     });
     
     await enrollment.save();
 
-    res.json({ success: true, message: 'Class registered successfully' });
+    // Update class enrollment count
+    await Class.findByIdAndUpdate(classId, {
+      $inc: { enrolledStudents: 1 }
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Class registered successfully',
+      enrollment: {
+        id: enrollment._id,
+        accessType: enrollment.accessType,
+        paymentStatus: enrollment.paymentStatus
+      }
+    });
   } catch (error) {
     console.error('Course enrollment error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
 
-// Get all classes
+// Get all classes (with payment info)
 Regisrouter.get('/classes', async (req, res) => {
   try {
-    const classes = await Class.find().sort({ createdAt: -1 });
+    const classes = await Class.find()
+      .populate('instructorId', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+    
+    // Format classes with payment info
+    const formattedClasses = classes.map(cls => ({
+      _id: cls._id,
+      title: cls.title,
+      description: cls.description,
+      category: cls.category,
+      level: cls.level,
+      duration: cls.duration,
+      instructor: cls.instructorId ? {
+        id: cls.instructorId._id,
+        name: `${cls.instructorId.firstName} ${cls.instructorId.lastName}`,
+        email: cls.instructorId.email
+      } : null,
+      price: cls.price || 0,
+      isFree: cls.isFree !== undefined ? cls.isFree : true,
+      currency: cls.currency || 'NGN',
+      totalRevenue: cls.totalRevenue || 0,
+      totalSales: cls.totalSales || 0,
+      enrolledStudents: cls.enrolledStudents || 0,
+      rating: cls.rating || 0,
+      totalRatings: cls.totalRatings || 0,
+      createdAt: cls.createdAt,
+      thumbnailUrl: cls.thumbnailUrl
+    }));
+    
     res.json({
       success: true,
-      classes
+      classes: formattedClasses
     });
   } catch (error) {
     console.error('Get classes error:', error);
@@ -470,10 +572,29 @@ Regisrouter.get('/classes', async (req, res) => {
 // Get classes for homepage (limited to 3)
 Regisrouter.get('/classes-on-homepage', async (req, res) => {
   try {
-    const classes = await Class.find().sort({ createdAt: -1 }).limit(3);
+    const classes = await Class.find()
+      .populate('instructorId', 'firstName lastName')
+      .sort({ createdAt: -1 })
+      .limit(3);
+    
+    const formattedClasses = classes.map(cls => ({
+      _id: cls._id,
+      title: cls.title,
+      description: cls.description,
+      category: cls.category,
+      level: cls.level,
+      instructor: cls.instructorId ? {
+        name: `${cls.instructorId.firstName} ${cls.instructorId.lastName}`
+      } : null,
+      price: cls.price || 0,
+      isFree: cls.isFree !== undefined ? cls.isFree : true,
+      currency: cls.currency || 'NGN',
+      enrolledStudents: cls.enrolledStudents || 0
+    }));
+    
     res.json({
       success: true,
-      classes
+      classes: formattedClasses
     });
   } catch (error) {
     console.error('Get classes error:', error);
@@ -481,26 +602,65 @@ Regisrouter.get('/classes-on-homepage', async (req, res) => {
   }
 });
 
-// Get class by ID
+// Get class by ID (with payment info)
 Regisrouter.get('/class/:classId', async (req, res) => {
   const classId = req.params.classId;
   
   try {
-    const classData = await Class.findById(classId);
+    const classData = await Class.findById(classId)
+      .populate('instructorId', 'firstName lastName email bio qualifications experienceYears');
+    
+    if (!classData) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Class not found' 
+      });
+    }
+    
+    // Format with payment info
+    const formattedClass = {
+      _id: classData._id,
+      title: classData.title,
+      description: classData.description,
+      shortDescription: classData.shortDescription,
+      category: classData.category,
+      level: classData.level,
+      duration: classData.duration,
+      instructor: classData.instructorId ? {
+        id: classData.instructorId._id,
+        name: `${classData.instructorId.firstName} ${classData.instructorId.lastName}`,
+        email: classData.instructorId.email,
+        bio: classData.instructorId.bio,
+        qualifications: classData.instructorId.qualifications,
+        experienceYears: classData.instructorId.experienceYears
+      } : null,
+      price: classData.price || 0,
+      isFree: classData.isFree !== undefined ? classData.isFree : true,
+      currency: classData.currency || 'NGN',
+      totalRevenue: classData.totalRevenue || 0,
+      totalSales: classData.totalSales || 0,
+      enrolledStudents: classData.enrolledStudents || 0,
+      rating: classData.rating || 0,
+      totalRatings: classData.totalRatings || 0,
+      requirements: classData.requirements,
+      learningOutcomes: classData.learningOutcomes,
+      syllabus: classData.syllabus,
+      thumbnailUrl: classData.thumbnailUrl,
+      isActive: classData.isActive,
+      maxStudents: classData.maxStudents,
+      createdAt: classData.createdAt,
+      updatedAt: classData.updatedAt
+    };
     
     res.json({
       success: true,
-      classA: classData ? [classData] : []
+      class: formattedClass
     });
   } catch (error) {
     console.error('Get class error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
-
-// ============================================================
-// USER PROGRESS & ENROLLMENTS
-// ============================================================
 
 // Get user progress in a class
 Regisrouter.post('/user-progress', async (req, res) => {
@@ -545,6 +705,8 @@ Regisrouter.post('/get-user-classes', async (req, res) => {
       completed: enrollment.completed,
       enrolled_at: enrollment.enrolledAt,
       last_accessed: enrollment.lastAccessed,
+      paymentStatus: enrollment.paymentStatus,
+      accessType: enrollment.accessType,
       ...enrollment.classId
     }));
     
@@ -737,7 +899,6 @@ Regisrouter.post('/dashboard/load-stats', async (req, res) => {
   const { id } = req.body;
   
   try {
-    // Get notifications (placeholder - implement Notification model as needed)
     const notifications = [];
     
     const stats = {
@@ -752,7 +913,7 @@ Regisrouter.post('/dashboard/load-stats', async (req, res) => {
 });
 
 // ============================================================
-// INSTRUCTOR MANAGEMENT
+// INSTRUCTOR MANAGEMENT (WITH PAYMENT)
 // ============================================================
 
 // Check instructor session
@@ -797,7 +958,7 @@ Regisrouter.post('/classes/instructor', async (req, res) => {
   }
 });
 
-// Get instructor's classes
+// Get instructor's classes (with payment stats)
 Regisrouter.post('/instructor/classes', async (req, res) => {
   const { id } = req.body;
   
@@ -806,10 +967,18 @@ Regisrouter.post('/instructor/classes', async (req, res) => {
       .sort({ createdAt: -1 })
       .lean();
     
-    // Get enrollment counts for each class
+    // Get enrollment counts and payment stats for each class
     const classesWithStats = await Promise.all(
       classes.map(async (cls) => {
         const enrolledStudents = await Enrollment.countDocuments({ classId: cls._id });
+        const paidEnrollments = await Enrollment.countDocuments({ 
+          classId: cls._id,
+          paymentStatus: 'paid' 
+        });
+        const freeEnrollments = await Enrollment.countDocuments({ 
+          classId: cls._id,
+          paymentStatus: 'free' 
+        });
         const enrollments = await Enrollment.find({ classId: cls._id });
         const avgProgress = enrollments.length > 0 
           ? enrollments.reduce((sum, e) => sum + e.progress, 0) / enrollments.length 
@@ -818,7 +987,14 @@ Regisrouter.post('/instructor/classes', async (req, res) => {
         return {
           ...cls,
           enrolled_students: enrolledStudents,
-          avg_progress: avgProgress
+          paid_students: paidEnrollments,
+          free_students: freeEnrollments,
+          avg_progress: avgProgress,
+          price: cls.price || 0,
+          isFree: cls.isFree !== undefined ? cls.isFree : true,
+          currency: cls.currency || 'NGN',
+          totalRevenue: cls.totalRevenue || 0,
+          totalSales: cls.totalSales || 0
         };
       })
     );
@@ -833,7 +1009,7 @@ Regisrouter.post('/instructor/classes', async (req, res) => {
   }
 });
 
-// Get instructor's class details
+// Get instructor's class details (with payment info)
 Regisrouter.post('/instructor/classes/:id', async (req, res) => {
   const classId = req.params.id;
   const { id } = req.body;
@@ -848,12 +1024,26 @@ Regisrouter.post('/instructor/classes/:id', async (req, res) => {
       return res.status(404).json({ message: "Class not found" });
     }
     
-    // Count enrolled students
+    // Count enrolled students with payment status
     const studentCount = await Enrollment.countDocuments({ classId });
+    const paidCount = await Enrollment.countDocuments({ 
+      classId, 
+      paymentStatus: 'paid' 
+    });
+    const freeCount = await Enrollment.countDocuments({ 
+      classId, 
+      paymentStatus: 'free' 
+    });
     
     const result = {
       ...classData.toObject(),
-      student_count: studentCount
+      student_count: studentCount,
+      paid_count: paidCount,
+      free_count: freeCount,
+      price: classData.price || 0,
+      isFree: classData.isFree !== undefined ? classData.isFree : true,
+      totalRevenue: classData.totalRevenue || 0,
+      totalSales: classData.totalSales || 0
     };
     
     res.json(result);
@@ -863,7 +1053,7 @@ Regisrouter.post('/instructor/classes/:id', async (req, res) => {
   }
 });
 
-// Get students in a class
+// Get students in a class (with payment info)
 Regisrouter.get('/instructor/classes/:id/students', async (req, res) => {
   try {
     const enrollments = await Enrollment.find({ classId: req.params.id })
@@ -876,7 +1066,10 @@ Regisrouter.get('/instructor/classes/:id/students', async (req, res) => {
       email: e.userId.email,
       progress: e.progress,
       enrolled_at: e.enrolledAt,
-      last_accessed: e.lastAccessed
+      last_accessed: e.lastAccessed,
+      paymentStatus: e.paymentStatus,
+      accessType: e.accessType,
+      amountPaid: e.amountPaid || 0
     }));
     
     res.json(students);
@@ -886,7 +1079,7 @@ Regisrouter.get('/instructor/classes/:id/students', async (req, res) => {
   }
 });
 
-// Get instructor stats
+// Get instructor stats (with earnings)
 Regisrouter.post('/instructor/stats', async (req, res) => {
   const instructorId = req.body.id;
   
@@ -911,11 +1104,17 @@ Regisrouter.post('/instructor/stats', async (req, res) => {
       ? classesWithRating.reduce((sum, c) => sum + c.rating, 0) / classesWithRating.length
       : 0;
     
+    // Get instructor earnings
+    const instructor = await User.findById(instructorId);
+    
     const stats = {
       totalClasses,
       totalStudents,
       totalVideos,
-      avgRating
+      avgRating,
+      earnings: instructor?.earnings || 0,
+      totalRevenue: instructor?.totalRevenue || 0,
+      totalSales: instructor?.totalSales || 0
     };
     
     res.json([stats]);
@@ -925,16 +1124,14 @@ Regisrouter.post('/instructor/stats', async (req, res) => {
   }
 });
 
-// Get all enrollments for instructor
+// Get all enrollments for instructor (with payment info)
 Regisrouter.post('/instructor/enrollments', async (req, res) => {
   const { instructorId } = req.body;
   
   try {
-    // Get all classes by this instructor
     const classes = await Class.find({ instructorId });
     const classIds = classes.map(c => c._id);
     
-    // Get enrollments for those classes
     const enrollments = await Enrollment.find({ classId: { $in: classIds } })
       .populate('userId', 'firstName lastName email phone')
       .populate('classId', 'title')
@@ -948,7 +1145,10 @@ Regisrouter.post('/instructor/enrollments', async (req, res) => {
       progress: e.progress,
       enrolled_at: e.enrolledAt,
       last_accessed: e.lastAccessed,
-      title: e.classId.title
+      title: e.classId.title,
+      paymentStatus: e.paymentStatus,
+      accessType: e.accessType,
+      amountPaid: e.amountPaid || 0
     }));
     
     res.json(formattedEnrollments);
@@ -958,7 +1158,7 @@ Regisrouter.post('/instructor/enrollments', async (req, res) => {
   }
 });
 
-// Get enrollments for a specific class
+// Get enrollments for a specific class (with payment info)
 Regisrouter.post('/instructor/enrollments/:classId', async (req, res) => {
   const classId = req.params.classId;
   
@@ -974,13 +1174,141 @@ Regisrouter.post('/instructor/enrollments/:classId', async (req, res) => {
       phone: e.userId.phone,
       progress: e.progress,
       enrolled_at: e.enrolledAt,
-      last_accessed: e.lastAccessed
+      last_accessed: e.lastAccessed,
+      paymentStatus: e.paymentStatus,
+      accessType: e.accessType,
+      amountPaid: e.amountPaid || 0
     }));
     
     res.json(formattedEnrollments);
   } catch (error) {
     console.error('Get class enrollments error:', error);
     res.status(500).json({ message: "Failed to load enrollments" });
+  }
+});
+
+// ============================================================
+// UPDATE CLASS (with payment fields)
+// ============================================================
+
+Regisrouter.put('/instructor/classes/:id', async (req, res) => {
+  const classId = req.params.id;
+  const { id, payload } = req.body;
+  
+  if (!id) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Instructor ID is required" 
+    });
+  }
+
+  try {
+    // Check if class exists and belongs to instructor
+    const classData = await Class.findOne({ 
+      _id: classId, 
+      instructorId: id 
+    });
+
+    if (!classData) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Class not found or you don't have permission to edit it" 
+      });
+    }
+
+    // ===== NEW: Validate price if being updated =====
+    let updateData = {
+      title: payload.title,
+      description: payload.description,
+      category: payload.category,
+      level: payload.level,
+      duration: payload.duration,
+    };
+
+    // If price is being updated
+    if (payload.price !== undefined) {
+      let price = parseFloat(payload.price) || 0;
+      let isFree = payload.isFree === true || payload.isFree === 'true' || price === 0;
+
+      if (!isFree && price < 1000) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Minimum price is ₦1,000',
+          field: 'price'
+        });
+      }
+
+      if (price === 0) {
+        isFree = true;
+      }
+
+      updateData.price = price;
+      updateData.isFree = isFree;
+      updateData.currency = payload.currency || 'NGN';
+    }
+
+    // Update the class
+    const updatedClass = await Class.findByIdAndUpdate(
+      classId,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    res.json({ 
+      success: true, 
+      message: "Class updated successfully",
+      class: updatedClass 
+    });
+  } catch (error) {
+    console.error('Update class error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
+  }
+});
+
+// ===== DELETE CLASS =====
+Regisrouter.delete('/instructor/classes/:id', async (req, res) => {
+  const classId = req.params.id;
+  const { id } = req.body;
+  
+  if (!id) {
+    return res.status(400).json({ 
+      success: false, 
+      message: "Instructor ID is required" 
+    });
+  }
+
+  try {
+    const classData = await Class.findOne({ 
+      _id: classId, 
+      instructorId: id 
+    });
+
+    if (!classData) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Class not found or you don't have permission to delete it" 
+      });
+    }
+
+    await Enrollment.deleteMany({ classId: classId });
+    await LiveSession.deleteMany({ classId: classId });
+    await Class.deleteOne({ _id: classId });
+    
+    res.json({ 
+      success: true, 
+      message: "Class and all associated data deleted successfully" 
+    });
+  } catch (error) {
+    console.error('Delete class error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Internal server error",
+      error: error.message 
+    });
   }
 });
 
@@ -993,7 +1321,6 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
   const instructorId = req.body.id;
   
   try {
-    // Past streams - check BOTH streamStatus AND sessionType
     const pastStreamsData = await LiveSession.find({
       instructorId,
       $or: [
@@ -1017,7 +1344,6 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
       recorded_at_full: r.createdAt
     }));
     
-    // Scheduled streams - check BOTH streamStatus AND sessionType
     const scheduledStreamsData = await LiveSession.find({
       instructorId,
       $or: [
@@ -1040,7 +1366,6 @@ Regisrouter.post('/instructor/streams', async (req, res) => {
       participants: s.participants || 0
     }));
     
-    // Live streams (currently active)
     const liveStreamsData = await LiveSession.find({
       instructorId,
       $or: [
@@ -1151,7 +1476,6 @@ Regisrouter.post('/instructor/schedule-stream', async (req, res) => {
   
   console.log('Schedule stream payload:', payload);
   
-  // Validate payload
   if (!payload) {
     return res.status(400).json({ success: false, message: "Payload is required" });
   }
@@ -1178,7 +1502,6 @@ Regisrouter.post('/instructor/schedule-stream', async (req, res) => {
   const time = scheduledDate.toTimeString().split(' ')[0].substring(0, 5);
   
   try {
-    // Check if a session already exists for this class at this time
     const existing = await LiveSession.findOne({
       classId: payload.classId,
       streamStatus: 'scheduled',
@@ -1192,7 +1515,6 @@ Regisrouter.post('/instructor/schedule-stream', async (req, res) => {
       });
     }
     
-    // Verify the instructor owns this class
     const classData = await Class.findOne({ 
       _id: payload.classId, 
       instructorId: id 
@@ -1235,116 +1557,11 @@ Regisrouter.post('/instructor/schedule-stream', async (req, res) => {
     });
   }
 });
-// backend/registration/server.js - Add these endpoints
 
-// ===== UPDATE CLASS =====
-Regisrouter.put('/instructor/classes/:id', async (req, res) => {
-  const classId = req.params.id;
-  const { id, payload } = req.body;
-  
-  if (!id) {
-    return res.status(400).json({ 
-      success: false, 
-      message: "Instructor ID is required" 
-    });
-  }
-
-  try {
-    // Check if class exists and belongs to instructor
-    const classData = await Class.findOne({ 
-      _id: classId, 
-      instructorId: id 
-    });
-
-    if (!classData) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Class not found or you don't have permission to edit it" 
-      });
-    }
-
-    // Update the class
-    const updatedClass = await Class.findByIdAndUpdate(
-      classId,
-      {
-        title: payload.title,
-        description: payload.description,
-        category: payload.category,
-        level: payload.level,
-        duration: payload.duration,
-      },
-      { new: true, runValidators: true }
-    );
-
-    res.json({ 
-      success: true, 
-      message: "Class updated successfully",
-      class: updatedClass 
-    });
-  } catch (error) {
-    console.error('Update class error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Internal server error",
-      error: error.message 
-    });
-  }
-});
-
-// ===== DELETE CLASS =====
-Regisrouter.delete('/instructor/classes/:id', async (req, res) => {
-  const classId = req.params.id;
-  const { id } = req.body;
-  
-  if (!id) {
-    return res.status(400).json({ 
-      success: false, 
-      message: "Instructor ID is required" 
-    });
-  }
-
-  try {
-    // Check if class exists and belongs to instructor
-    const classData = await Class.findOne({ 
-      _id: classId, 
-      instructorId: id 
-    });
-
-    if (!classData) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Class not found or you don't have permission to delete it" 
-      });
-    }
-
-    // Delete all enrollments for this class
-    await Enrollment.deleteMany({ classId: classId });
-    
-    // Delete all live sessions for this class
-    await LiveSession.deleteMany({ classId: classId });
-    
-    // Delete the class
-    await Class.deleteOne({ _id: classId });
-    
-    res.json({ 
-      success: true, 
-      message: "Class and all associated data deleted successfully" 
-    });
-  } catch (error) {
-    console.error('Delete class error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Internal server error",
-      error: error.message 
-    });
-  }
-});
-
-// Delete video (FIXED - better error handling)
+// Delete video
 Regisrouter.delete('/instructor/videos/:id', async (req, res) => {
   const { id } = req.body;
   
-  // ===== FIX: Validate the id parameter =====
   if (!id) {
     return res.status(400).json({ 
       ok: false, 
@@ -1353,7 +1570,6 @@ Regisrouter.delete('/instructor/videos/:id', async (req, res) => {
   }
 
   try {
-    // ===== FIX: Validate that the video ID is a valid ObjectId =====
     const videoId = req.params.id;
     if (!videoId || videoId === 'undefined' || videoId === 'null') {
       return res.status(400).json({ 
@@ -1362,7 +1578,6 @@ Regisrouter.delete('/instructor/videos/:id', async (req, res) => {
       });
     }
 
-    // ===== FIX: Check if video exists and belongs to instructor =====
     const video = await LiveSession.findOne({ 
       _id: videoId, 
       instructorId: id 
@@ -1375,7 +1590,6 @@ Regisrouter.delete('/instructor/videos/:id', async (req, res) => {
       });
     }
 
-    // Delete the video
     await LiveSession.deleteOne({ _id: videoId });
     
     res.json({ ok: true, message: "Video deleted successfully" });
@@ -1389,11 +1603,10 @@ Regisrouter.delete('/instructor/videos/:id', async (req, res) => {
   }
 });
 
-// Delete stream (FIXED - better error handling)
+// Delete stream
 Regisrouter.delete('/instructor/streams/:id', async (req, res) => {
   const { id } = req.body;
   
-  // ===== FIX: Validate the id parameter =====
   if (!id) {
     return res.status(400).json({ 
       ok: false, 
@@ -1402,7 +1615,6 @@ Regisrouter.delete('/instructor/streams/:id', async (req, res) => {
   }
 
   try {
-    // ===== FIX: Validate that the stream ID is a valid ObjectId =====
     const streamId = req.params.id;
     if (!streamId || streamId === 'undefined' || streamId === 'null') {
       return res.status(400).json({ 
@@ -1411,7 +1623,6 @@ Regisrouter.delete('/instructor/streams/:id', async (req, res) => {
       });
     }
 
-    // ===== FIX: Check if stream exists and belongs to instructor =====
     const stream = await LiveSession.findOne({ 
       _id: streamId, 
       instructorId: id 
@@ -1424,7 +1635,6 @@ Regisrouter.delete('/instructor/streams/:id', async (req, res) => {
       });
     }
 
-    // Delete the stream
     await LiveSession.deleteOne({ _id: streamId });
     
     res.json({ ok: true, message: "Stream deleted successfully" });
@@ -1462,7 +1672,6 @@ Regisrouter.get('/instructor/classes/:classId/assignment', async (req, res) => {
   const classId = req.params.classId;
 
   try {
-    // Validate instructor owns this class
     const classData = await Class.findOne({ 
       _id: classId, 
       instructorId 
@@ -1489,7 +1698,6 @@ Regisrouter.post('/instructor/create-assignment', async (req, res) => {
   const { class_id, title, description, instructions, due_date, max_points } = req.body;
 
   try {
-    // Validate if class belongs to instructor
     const classData = await Class.findOne({ 
       _id: class_id, 
       instructorId 

@@ -2,6 +2,8 @@ import express from "express";
 import multer from "multer";
 import Stream from "../models/Stream.js";
 import LiveSession from "../models/LiveSession.js";
+import Class from "../models/Class.js";
+import Enrollment from "../models/Enrollment.js";
 import Mux from '@mux/mux-node';
 
 const router = express.Router();
@@ -93,7 +95,7 @@ router.get('/mux/upload-status/:uploadId', async (req, res) => {
   }
 });
 
-// api.js - FIXED save-stream endpoint
+// Save stream endpoint
 router.post('/save-stream', async (req, res) => {
   try {
     const { 
@@ -119,7 +121,6 @@ router.post('/save-stream', async (req, res) => {
       muxUploadId
     });
     
-    // Validate required fields
     if (!userId) {
       return res.status(400).json({ 
         success: false, 
@@ -134,13 +135,11 @@ router.post('/save-stream', async (req, res) => {
       });
     }
     
-    // Check if stream already exists with this Mux asset ID
     let existingStream = await Stream.getByMuxAssetId(muxAssetId);
     
     if (existingStream) {
       console.log(`⚠️ Stream already exists for Mux asset ${muxAssetId}, updating...`);
       
-      // Update existing stream
       await Stream.update(existingStream._id, {
         muxPlaybackId: muxPlaybackId,
         muxStatus: 'ready',
@@ -161,7 +160,6 @@ router.post('/save-stream', async (req, res) => {
       });
     }
     
-    // Create new stream record
     const streamId = await Stream.create({
       userId,
       name: streamName || classTitle || 'Untitled Stream',
@@ -273,30 +271,117 @@ router.get('/stream-hls/:streamId', async (req, res) => {
   }
 });
 
-// api.js - FIXED by-class endpoint
+// ===== CHECK VIDEO ACCESS FOR STUDENT =====
+router.get('/check-video-access/:classId', async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const userId = req.query.userId;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    // Get class to check if free
+    const classData = await Class.findById(classId);
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: 'Class not found'
+      });
+    }
+
+    // If class is free, allow access
+    if (classData.isFree || classData.price === 0) {
+      return res.json({
+        success: true,
+        hasAccess: true,
+        accessType: 'free',
+        message: 'Free class - access granted'
+      });
+    }
+
+    // Check if user has paid enrollment
+    const enrollment = await Enrollment.findOne({
+      userId: userId,
+      classId: classId,
+      paymentStatus: 'paid'
+    });
+
+    if (enrollment) {
+      return res.json({
+        success: true,
+        hasAccess: true,
+        accessType: 'paid',
+        message: 'Paid access granted'
+      });
+    }
+
+    // No access
+    return res.json({
+      success: true,
+      hasAccess: false,
+      accessType: 'none',
+      message: 'Payment required to access this content',
+      price: classData.price,
+      currency: classData.currency || 'NGN'
+    });
+
+  } catch (error) {
+    console.error('Check video access error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check access'
+    });
+  }
+});
+
+// ===== GET VIDEOS BY CLASS WITH ACCESS CONTROL =====
 router.get('/by-class/:classId', async (req, res) => {
   try {
     const { classId } = req.params;
+    const userId = req.query.userId;
+
+    console.log(`🔍 Fetching videos for class: ${classId}, user: ${userId}`);
+
+    // Get class to check if free
+    const classData = await Class.findById(classId);
     
-    console.log(`🔍 Fetching videos for class: ${classId}`);
+    // Check if user has access
+    let hasAccess = false;
+    let accessType = 'none';
+
+    if (classData) {
+      if (classData.isFree || classData.price === 0) {
+        hasAccess = true;
+        accessType = 'free';
+      } else if (userId) {
+        const enrollment = await Enrollment.findOne({
+          userId: userId,
+          classId: classId,
+          paymentStatus: 'paid'
+        });
+        if (enrollment) {
+          hasAccess = true;
+          accessType = 'paid';
+        }
+      }
+    }
+
+    // Get videos from database
+    let classVideos = await Stream.getClassVideos(classId);
     
-    // Use the new getClassVideos method
-    const classVideos = await Stream.getClassVideos(classId);
-    
-    console.log(`✅ Found ${classVideos.length} videos for class ${classId}`);
-    
-    // If no videos in database, try to fetch from Mux directly
+    // If no videos, try to fetch from Mux
     if (classVideos.length === 0) {
       console.log('⚠️ No videos in database, checking Mux directly...');
       
       try {
-        // Get all Mux assets
         const assets = await mux.video.assets.list({
           limit: 100,
           status: 'ready'
         });
-        
-        const muxVideos = [];
         
         for (const asset of assets) {
           let passthrough = {};
@@ -304,13 +389,9 @@ router.get('/by-class/:classId', async (req, res) => {
             passthrough = JSON.parse(asset.passthrough || '{}');
           } catch (e) {}
           
-          // Check if this asset belongs to this class
           if (passthrough.classId === classId && asset.playback_ids?.[0]?.id) {
-            // Check if already in database
             const existing = await Stream.getByMuxAssetId(asset.id);
-            
             if (!existing) {
-              // Create a new stream record
               await Stream.create({
                 userId: passthrough.instructorId || 'unknown',
                 name: asset.name || passthrough.classTitle || 'Untitled',
@@ -328,17 +409,51 @@ router.get('/by-class/:classId', async (req, res) => {
             }
           }
         }
-        
-        // Re-fetch after creating missing records
-        const updatedVideos = await Stream.getClassVideos(classId);
-        return res.json(updatedVideos);
-        
+        classVideos = await Stream.getClassVideos(classId);
       } catch (muxError) {
         console.error('Mux fetch error:', muxError);
       }
     }
-    
-    res.json(classVideos);
+
+    // If user doesn't have access, return videos without playback URLs
+    const responseVideos = classVideos.map(video => {
+      const videoObj = video.toObject ? video.toObject() : video;
+      
+      if (!hasAccess) {
+        // Return video info but mask playback
+        return {
+          ...videoObj,
+          muxPlaybackId: null,
+          playbackUrl: null,
+          locked: true,
+          requiresPayment: true,
+          price: classData?.price || 0,
+          currency: classData?.currency || 'NGN'
+        };
+      }
+      
+      // Return full video with playback
+      return {
+        ...videoObj,
+        locked: false,
+        playbackUrl: videoObj.muxPlaybackId ? 
+          `https://stream.mux.com/${videoObj.muxPlaybackId}.m3u8` : null
+      };
+    });
+
+    res.json({
+      success: true,
+      videos: responseVideos,
+      hasAccess: hasAccess,
+      accessType: accessType,
+      classInfo: classData ? {
+        title: classData.title,
+        isFree: classData.isFree,
+        price: classData.price,
+        currency: classData.currency || 'NGN'
+      } : null
+    });
+
   } catch (error) {
     console.error('Get videos by class error:', error);
     res.status(500).json({ 
@@ -418,7 +533,6 @@ router.get('/mux/video/:assetId', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Video not found' });
     }
     
-    // Parse passthrough data
     let passthrough = {};
     try {
       passthrough = JSON.parse(asset.passthrough || '{}');
@@ -452,7 +566,6 @@ router.get('/mux/class-videos/:classId', async (req, res) => {
   try {
     const { classId } = req.params;
     
-    // List all assets from Mux (paginated)
     let allAssets = [];
     let page = 1;
     let hasMore = true;
@@ -465,12 +578,10 @@ router.get('/mux/class-videos/:classId', async (req, res) => {
       
       allAssets = [...allAssets, ...assets];
       
-      // Check if there are more pages
       hasMore = assets.length === 50;
       page++;
     }
     
-    // Filter assets by classId from passthrough data
     const classVideos = allAssets.filter(asset => {
       if (!asset.passthrough) return false;
       
@@ -481,7 +592,6 @@ router.get('/mux/class-videos/:classId', async (req, res) => {
         return false;
       }
     }).map(asset => {
-      // Parse passthrough data
       let passthrough = {};
       try {
         passthrough = JSON.parse(asset.passthrough || '{}');
@@ -503,7 +613,6 @@ router.get('/mux/class-videos/:classId', async (req, res) => {
       };
     });
     
-    // Sort by creation date (newest first)
     classVideos.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     
     res.json({
@@ -518,15 +627,13 @@ router.get('/mux/class-videos/:classId', async (req, res) => {
   }
 });
 
-// api.js - Debug endpoint to check class videos
+// Debug endpoint to check class videos
 router.get('/debug/class-videos/:classId', async (req, res) => {
   try {
     const { classId } = req.params;
     
-    // Get from database
     const dbVideos = await Stream.getClassVideos(classId);
     
-    // Get from Mux
     let muxVideos = [];
     try {
       const assets = await mux.video.assets.list({
@@ -576,12 +683,11 @@ router.get('/debug/class-videos/:classId', async (req, res) => {
   }
 });
 
-// api.js - Add Mux asset status endpoint
+// Mux asset status endpoint
 router.get('/mux/asset-status/:playbackId', async (req, res) => {
     try {
         const { playbackId } = req.params;
         
-        // Try to get the asset by playback ID (requires listing assets)
         const assets = await mux.video.assets.list({
             limit: 100,
         });

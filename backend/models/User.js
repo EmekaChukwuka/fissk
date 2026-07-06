@@ -16,7 +16,22 @@ const UserSchema = new mongoose.Schema({
   newsletterSubscribed: { type: Boolean, default: false },
   bio: String,
   qualifications: String,
-  experienceYears: { type: Number, default: 0 }
+  experienceYears: { type: Number, default: 0 },
+  
+  // ===== PAYMENT FIELDS =====
+  // For instructors
+  earnings: { type: Number, default: 0 },          // Available balance
+  totalRevenue: { type: Number, default: 0 },      // Total earned all time
+  totalSales: { type: Number, default: 0 },        // Total number of sales
+  
+  // Bank details for payouts
+  bankDetails: {
+    bankName: { type: String },
+    accountNumber: { type: String },
+    accountName: { type: String },
+    bankCode: { type: String }                     // Paystack bank code
+  },
+  bankDetailsVerified: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // Indexes

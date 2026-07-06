@@ -13,6 +13,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { AccessToken } from 'livekit-server-sdk';
 import LiveSession from './models/LiveSession.js';
+import paymentRouter from './routes/paymentRoutes.js';
+import payoutRouter from './routes/payoutRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +33,8 @@ app.use('/api', router);
 app.use('/forum-api', forumRouter);
 app.use('/users', Dashboardrouter);
 app.use('/register', Regisrouter);
+app.use('/api/payment', paymentRouter);
+app.use('/api/payout', payoutRouter);
 
 // ===== LIVEKIT CONFIGURATION =====
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;

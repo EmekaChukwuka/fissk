@@ -1,4 +1,4 @@
-// Individual Class Page Functionality - Real Data Only
+// Individual Class Page Functionality - With Payment Integration
 class ClassManager {
     constructor() {
         this.classId = this.getClassIdFromURL();
@@ -8,10 +8,12 @@ class ClassManager {
         this.currentVideoIndex = null;
         this.progressInterval = null;
         this.videos = [];
-        this.recordings = []; // Store recordings
+        this.recordings = [];
         this.isEnrolled = false;
         this.isLoading = true;
-        this.hlsInstance = null; // Add HLS instance reference
+        this.hlsInstance = null;
+        this.enrollmentPaymentStatus = 'free';
+        this.hasPaidAccess = false;
         this.init();
     }
 
@@ -26,23 +28,22 @@ class ClassManager {
             return;
         }
         
-        // Show loading state immediately
         this.showLoadingState();
         
         try {
-            // Load all data in parallel for better performance
             await Promise.all([
                 this.loadClassData(),
                 this.checkEnrollment(),
                 this.loadClassVideos(),
-                this.loadClassRecordings() // Load Cloudinary recordings
+                this.loadClassRecordings(),
+                this.checkPaymentStatus()
             ]);
             
-            // Only render after ALL data is loaded
             this.renderClassData();
             this.renderVideos();
             this.renderClassReviews();
-            this.renderRecordings(); // Render recordings in the recordings tab
+            this.renderRecordings();
+            this.renderPriceAndPayment();
             this.setupEventListeners();
         } catch (error) {
             console.error('Initialization error:', error);
@@ -54,7 +55,6 @@ class ClassManager {
     }
 
     showLoadingState() {
-        // Show loading indicators
         const classNameEl = document.getElementById('className');
         if (classNameEl) classNameEl.innerHTML = '<div class="loading-pulse">Loading...</div>';
         
@@ -81,9 +81,7 @@ class ClassManager {
         }
     }
 
-    hideLoadingState() {
-        // Remove loading indicators (they'll be replaced with actual content)
-    }
+    hideLoadingState() {}
 
     async loadClassData() {
         try {
@@ -148,22 +146,18 @@ class ClassManager {
             this.videos = await response.json();
             console.log('Videos loaded:', this.videos);
             
-            // Load user progress only if enrolled
             if (this.userId && this.isEnrolled) {
                 await this.loadUserProgress();
             }
             
-            // Load upcoming sessions
             await this.loadUpcomingSessions();
             
         } catch (error) {
             console.error('Error loading class videos:', error);
             this.videos = [];
-            // Don't throw - videos are optional
         }
     }
 
-    // NEW: Load Cloudinary recordings for this class
     async loadClassRecordings() {
         try {
             console.log('Loading recordings for class:', this.classId);
@@ -175,7 +169,6 @@ class ClassManager {
             
             const allVideos = await response.json();
             
-            // Filter recordings (videos with cloudinaryUrl or hlsUrl)
             this.recordings = allVideos.filter(video => 
                 video.cloudinaryUrl || video.hlsUrl || video.url || video.muxPlaybackId
             );
@@ -184,6 +177,34 @@ class ClassManager {
         } catch (error) {
             console.error('Error loading class recordings:', error);
             this.recordings = [];
+        }
+    }
+
+    async checkPaymentStatus() {
+        if (!this.user || !this.user.id) return;
+        
+        try {
+            const response = await fetch(`/api/payment/status/${this.classId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                console.warn('Payment status check failed, using fallback');
+                return;
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                this.enrollmentPaymentStatus = data.paymentStatus || 'free';
+                this.hasPaidAccess = data.paid || false;
+                console.log('Payment status:', this.enrollmentPaymentStatus, 'Paid:', this.hasPaidAccess);
+            }
+        } catch (error) {
+            console.error('Check payment status error:', error);
         }
     }
 
@@ -211,7 +232,6 @@ class ClassManager {
             }
         } catch (error) {
             console.error('Error loading progress:', error);
-            // Don't throw - progress is optional
         }
     }
 
@@ -251,7 +271,6 @@ class ClassManager {
                     </div><br>
                 `).join('');
                 
-                // Add event listeners to join buttons
                 container.querySelectorAll('.join-session').forEach(btn => {
                     btn.addEventListener('click', (e) => {
                         window.open(`newlivestream.html?session=${btn.dataset.sessionId}`, '_blank');
@@ -268,14 +287,12 @@ class ClassManager {
     }
 
     setupEventListeners() {
-        // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 this.switchTab(e.target.dataset.tab);
             });
         });
 
-        // Back to classes button
         const backBtn = document.getElementById('backToClasses');
         if (backBtn) {
             backBtn.addEventListener('click', () => {
@@ -283,10 +300,8 @@ class ClassManager {
             });
         }
 
-        // Enrollment button
         const enrollBtn = document.getElementById('enrollBtn');
         if (enrollBtn) {
-            // Remove existing listeners to avoid duplicates
             const newEnrollBtn = enrollBtn.cloneNode(true);
             enrollBtn.parentNode.replaceChild(newEnrollBtn, enrollBtn);
             newEnrollBtn.addEventListener('click', () => {
@@ -303,12 +318,10 @@ class ClassManager {
             content.classList.toggle('active', content.id === `${tabName}Tab`);
         });
         
-        // Load forum content when forum tab is clicked
         if (tabName === 'forum') {
             this.renderClassForum();
         }
         
-        // Load reviews when reviews tab is clicked
         if (tabName === 'reviews') {
             this.renderClassReviews(); 
         }
@@ -321,17 +334,14 @@ class ClassManager {
         }
         
         try {
-            // Update page title
             document.title = `${this.classData.title} - FISSK Online Academy`;
 
-            // Update hero section
             const classNameEl = document.getElementById('className');
             const classDescEl = document.getElementById('classDescription');
             
             if (classNameEl) classNameEl.textContent = this.classData.title;
             if (classDescEl) classDescEl.textContent = this.classData.description;
             
-            // Update meta information
             const levelEl = document.getElementById('classLevel');
             const durationEl = document.getElementById('classDuration');
             const studentsEl = document.getElementById('classStudents');
@@ -340,7 +350,6 @@ class ClassManager {
             if (durationEl) durationEl.textContent = `🕒 ${this.classData.duration || 'Self-paced'}`;
             if (studentsEl) studentsEl.textContent = `👥 ${this.classData.maxStudents || 0} Students`;
 
-            // Update enrollment button
             const enrollBtn = document.getElementById('enrollBtn');
             if (enrollBtn) {
                 if (this.isEnrolled) {
@@ -354,7 +363,6 @@ class ClassManager {
                 }
             }
 
-            // Load instructor info
             if (this.classData.instructorId) {
                 try {
                     const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
@@ -381,7 +389,6 @@ class ClassManager {
                 }
             }
 
-            // Render class details
             this.renderClassDetails();
         } catch(err) {
             console.error('Error rendering class data:', err);
@@ -400,7 +407,127 @@ class ClassManager {
             </div>
         `;
     }
-       
+
+    // ===== RENDER PRICE AND PAYMENT SECTION =====
+    renderPriceAndPayment() {
+        const price = this.classData?.price || 0;
+        const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
+        const currency = this.classData?.currency || 'NGN';
+        
+        // Check if user has paid
+        const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
+        
+        // Find or create payment section
+        let paymentSection = document.getElementById('paymentSection');
+        if (!paymentSection) {
+            paymentSection = document.createElement('div');
+            paymentSection.id = 'paymentSection';
+            paymentSection.className = 'payment-section';
+            const actionsContainer = document.querySelector('.class-actions');
+            if (actionsContainer) {
+                actionsContainer.parentNode.insertBefore(paymentSection, actionsContainer.nextSibling);
+            }
+        }
+        
+        if (isFree || price === 0) {
+            paymentSection.innerHTML = `
+                <div class="payment-info free-badge">
+                    <span class="badge free">🎓 FREE CLASS</span>
+                    <p>All content is available for free. No payment required.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        if (hasPaid) {
+            paymentSection.innerHTML = `
+                <div class="payment-info paid-badge">
+                    <span class="badge paid">✅ ACCESS GRANTED</span>
+                    <p>You have full access to all recordings and materials.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        paymentSection.innerHTML = `
+            <div class="payment-info">
+                <div class="price-display">
+                    <span class="price">${currency} ${price.toLocaleString()}</span>
+                    <span class="label">One-time payment • Lifetime access</span>
+                </div>
+                <div class="payment-benefits">
+                    <ul>
+                        <li>✅ Full access to all recorded sessions</li>
+                        <li>✅ Downloadable course materials</li>
+                        <li>✅ Lifetime access</li>
+                        <li>✅ Certificate of completion</li>
+                    </ul>
+                </div>
+                <button class="btn btn-primary buy-course-btn" id="buyCourseBtn">
+                    💳 Buy Course - ${currency} ${price.toLocaleString()}
+                </button>
+                <p class="secure-note">🔒 Secure payment via Paystack</p>
+            </div>
+        `;
+        
+        const buyBtn = document.getElementById('buyCourseBtn');
+        if (buyBtn) {
+            buyBtn.addEventListener('click', () => {
+                this.initiatePayment();
+            });
+        }
+    }
+
+    // ===== INITIATE PAYMENT =====
+    async initiatePayment() {
+        if (!this.user) {
+            window.showToast('Please login to purchase this course', 'error');
+            window.location.href = 'login.html';
+            return;
+        }
+        
+        const price = this.classData?.price || 0;
+        if (price <= 0) {
+            window.showToast('This course is free', 'info');
+            return;
+        }
+        
+        const buyBtn = document.getElementById('buyCourseBtn');
+        if (buyBtn) {
+            buyBtn.disabled = true;
+            buyBtn.textContent = '⏳ Processing...';
+        }
+        
+        try {
+            const response = await fetch('/api/payment/initialize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    classId: this.classId,
+                    userId: this.user.id
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                window.location.href = data.data.authorizationUrl;
+            } else {
+                window.showToast(data.message || 'Payment initialization failed', 'error');
+            }
+        } catch (error) {
+            console.error('Payment error:', error);
+            window.showToast('Failed to initialize payment. Please try again.', 'error');
+        } finally {
+            if (buyBtn) {
+                buyBtn.disabled = false;
+                buyBtn.textContent = `💳 Buy Course - ₦${price.toLocaleString()}`;
+            }
+        }
+    }
+
     // ===== RENDER CLASS FORUM =====
     async renderClassForum() {
         const container = document.getElementById('classForumContainer');
@@ -409,7 +536,6 @@ class ClassManager {
             return;
         }
         
-        // Check if user is enrolled
         if (!this.isEnrolled) {
             container.innerHTML = `
                 <div class="forum-locked">
@@ -463,7 +589,6 @@ class ClassManager {
                 return;
             }
             
-            // Render topics
             container.innerHTML = `
                 <div class="forum-header-actions">
                     <button class="btn btn-primary" id="startDiscussionBtn">
@@ -508,7 +633,6 @@ class ClassManager {
                 </div>
             `;
             
-            // Add event listener for the start discussion button
             const startBtn = container.querySelector('#startDiscussionBtn');
             if (startBtn) {
                 startBtn.addEventListener('click', () => {
@@ -516,7 +640,6 @@ class ClassManager {
                 });
             }
             
-            // Add event listener for the sort dropdown
             const sortSelect = container.querySelector('#forumSort');
             if (sortSelect) {
                 sortSelect.addEventListener('change', () => {
@@ -524,7 +647,6 @@ class ClassManager {
                 });
             }
             
-            // Add event listeners for topic clicks
             container.querySelectorAll('.forum-topic-title').forEach(el => {
                 el.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -552,21 +674,17 @@ class ClassManager {
         }
     }
 
-    // ===== OPEN NEW CLASS TOPIC MODAL =====
     openNewClassTopic() {
         const modal = document.getElementById('newClassTopicModal');
         if (!modal) {
-            // Create modal if it doesn't exist
             this.createNewTopicModal();
             return;
         }
         
-        // Populate categories
         this.loadClassForumCategories();
         modal.style.display = 'flex';
     }
 
-    // ===== CREATE NEW TOPIC MODAL =====
     createNewTopicModal() {
         const modalHTML = `
             <div id="newClassTopicModal" class="modal">
@@ -605,7 +723,6 @@ class ClassManager {
         });
     }
 
-    // ===== LOAD CLASS FORUM CATEGORIES =====
     async loadClassForumCategories() {
         try {
             const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/categories`);
@@ -623,7 +740,6 @@ class ClassManager {
         }
     }
 
-    // ===== SUBMIT CLASS TOPIC =====
     async submitClassTopic() {
         const title = document.getElementById('classTopicTitle').value.trim();
         const content = document.getElementById('classTopicContent').value.trim();
@@ -675,19 +791,15 @@ class ClassManager {
         }
     }
 
-    // ===== VIEW FORUM TOPIC =====
     viewForumTopic(topicId) {
         window.location.href = `forum-post.html?classId=${this.classId}&topicId=${topicId}`;
     }
 
-    // ===== FILTER FORUM TOPICS =====
     async filterForumTopics() {
         await this.renderClassForum();
-    }    
+    }
 
     // ===== REVIEWS METHODS =====
-
-    // Render class reviews
     async renderClassReviews() {
         const container = document.getElementById('classReviewsContainer');
         if (!container) return;
@@ -775,7 +887,6 @@ class ClassManager {
         }
     }
 
-    // Render star rating
     renderStars(rating) {
         const fullStars = Math.floor(rating);
         const halfStar = rating % 1 >= 0.5 ? 1 : 0;
@@ -789,7 +900,6 @@ class ClassManager {
         return stars;
     }
 
-    // Render rating distribution bars
     renderRatingDistribution(distribution, total) {
         if (total === 0) {
             return '<div class="distribution-empty">No ratings yet</div>';
@@ -813,7 +923,6 @@ class ClassManager {
         `;
     }
 
-    // Render a single review card
     renderReviewCard(review, isUserReview = false) {
         const userName = review.userId?.firstName 
             ? `${review.userId.firstName} ${review.userId.lastName || ''}`.trim()
@@ -866,7 +975,6 @@ class ClassManager {
         `;
     }
 
-    // Attach review event listeners
     attachReviewEventListeners(userReview) {
         const container = document.getElementById('classReviewsContainer');
         if (!container) return;
@@ -895,7 +1003,6 @@ class ClassManager {
         });
     }
 
-    // Open review modal
     openReviewModal(existingReview = null) {
         const modal = document.getElementById('reviewModal');
         if (!modal) {
@@ -932,7 +1039,6 @@ class ClassManager {
         modal.style.display = 'flex';
     }
 
-    // Create review modal
     createReviewModal() {
         const modalHTML = `
             <div id="reviewModal" class="modal">
@@ -1008,7 +1114,6 @@ class ClassManager {
         });
     }
 
-    // Highlight stars
     highlightStars(value) {
         document.querySelectorAll('.star-label').forEach(s => {
             const starValue = parseInt(s.dataset.value);
@@ -1017,7 +1122,6 @@ class ClassManager {
         });
     }
 
-    // Reset star highlight
     resetStarHighlight() {
         document.querySelectorAll('.star-label').forEach(s => {
             s.style.opacity = '0.5';
@@ -1025,7 +1129,6 @@ class ClassManager {
         });
     }
 
-    // Submit review
     async submitReview() {
         const ratingInput = document.querySelector('.star-rating-input:checked');
         const comment = document.getElementById('reviewComment').value.trim();
@@ -1072,7 +1175,6 @@ class ClassManager {
         }
     }
 
-    // Delete review
     async deleteReview() {
         if (!confirm('Are you sure you want to delete your review? This cannot be undone.')) {
             return;
@@ -1102,7 +1204,6 @@ class ClassManager {
         }
     }
 
-    // Mark review as helpful
     async markReviewHelpful(reviewId) {
         try {
             window.showToast('Thanks for your feedback!', false);
@@ -1111,7 +1212,6 @@ class ClassManager {
         }
     }
 
-    // Report review
     async reportReview(reviewId) {
         const reason = prompt('Please explain why you are reporting this review:');
         if (!reason) return;
@@ -1174,7 +1274,6 @@ class ClassManager {
                 `;
             }).join('');
 
-            // Add click event to video cards
             videosContainer.querySelectorAll('.video-card').forEach((card) => {
                 card.addEventListener('click', () => {
                     const videoIndex = parseInt(card.dataset.videoIndex);
@@ -1246,7 +1345,6 @@ class ClassManager {
                 `;
             }).join('');
 
-            // Add click event to recording cards
             recordingsContainer.querySelectorAll('.recording-card').forEach((card) => {
                 card.addEventListener('click', () => {
                     const recordingUrl = card.dataset.recordingUrl;
@@ -1269,7 +1367,7 @@ class ClassManager {
         }
     }
 
-    // ===== PLAY VIDEO (FOR REGULAR VIDEOS) =====
+    // ===== PLAY VIDEO =====
     playVideo(videoIndex) {
         const video = this.videos[videoIndex];
         if (!video) {
@@ -1284,7 +1382,6 @@ class ClassManager {
         const videoTitle = document.getElementById('videoTitle');
         const videoDescription = document.getElementById('videoDescription');
         
-        // Get the video URL
         const videoUrl = video.playbackUrl || video.url || video.videoUrl || 
             (video.muxPlaybackId ? `https://stream.mux.com/${video.muxPlaybackId}.m3u8` : null);
         
@@ -1293,22 +1390,15 @@ class ClassManager {
             return;
         }
         
-        // Set title and description
         const title = video.videoDetails?.title || video.title || 'Video';
         const description = video.videoDetails?.description || video.description || '';
         
-        // Setup the video player
         this.setupVideoPlayer(videoPlayer, videoUrl, title, description, modal);
-        
-        // Resume progress
         this.restoreProgress(videoPlayer, videoIndex);
-        
-        // Track progress
         this.trackProgress(videoPlayer, videoIndex);
 
         modal.style.display = 'flex';
         
-        // Close modal function
         const closeModal = () => {
             modal.style.display = 'none';
             videoPlayer.pause();
@@ -1334,7 +1424,6 @@ class ClassManager {
         });
     }
 
-    // ===== PLAY RECORDING =====
     playRecording(videoUrl, cardElement) {
         const title = cardElement.querySelector('h4')?.textContent || 'Recording';
         const description = cardElement.querySelector('p')?.textContent || '';
@@ -1345,15 +1434,12 @@ class ClassManager {
         const videoTitle = document.getElementById('videoTitle');
         const videoDescription = document.getElementById('videoDescription');
         
-        // Show loading state
         videoTitle.textContent = 'Loading video...';
         videoDescription.textContent = 'Please wait while the video loads...';
         
-        // Clear previous source
         videoPlayer.innerHTML = '';
         videoPlayer.removeAttribute('src');
         
-        // Check if video is actually ready
         if (muxPlaybackId) {
             this.checkMuxStatus(muxPlaybackId, (isReady) => {
                 if (!isReady) {
@@ -1392,22 +1478,17 @@ class ClassManager {
         });
     }
 
-    // ===== SETUP VIDEO PLAYER =====
     setupVideoPlayer(videoPlayer, videoUrl, title, description, modal) {
-        // Set title and description
         document.getElementById('videoTitle').textContent = title;
         document.getElementById('videoDescription').textContent = description;
         
-        // Clear previous source
         videoPlayer.innerHTML = '';
         videoPlayer.removeAttribute('src');
         
-        // Check if URL is a HLS stream
         const isHLS = videoUrl && (videoUrl.includes('.m3u8') || videoUrl.includes('m3u8'));
         
         if (isHLS && typeof Hls !== 'undefined') {
             try {
-                // Destroy any existing HLS instance
                 if (this.hlsInstance) {
                     this.hlsInstance.destroy();
                     this.hlsInstance = null;
@@ -1454,19 +1535,16 @@ class ClassManager {
                 });
             } catch (error) {
                 console.error('HLS setup error:', error);
-                // Fallback to native
                 videoPlayer.src = videoUrl;
                 videoPlayer.load();
             }
         } else {
-            // Regular MP4 or other format, or HLS with native support (Safari)
             videoPlayer.src = videoUrl;
             videoPlayer.load();
             videoPlayer.play().catch(() => {});
         }
     }
 
-    // ===== CHECK MUX STATUS =====
     async checkMuxStatus(playbackId, callback) {
         try {
             const thumbnailUrl = `https://image.mux.com/${playbackId}/thumbnail.jpg?time=5`;

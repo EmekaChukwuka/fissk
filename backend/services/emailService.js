@@ -163,6 +163,226 @@ class EmailService {
 
         return this.sendEmail(instructorEmail, subject, html);
     }
+
+    // ===== PAYMENT RECEIPT EMAIL =====
+async sendPaymentReceipt(studentEmail, studentName, data) {
+  const subject = `🎉 Payment Confirmation - ${data.courseName}`;
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; }
+        .header { background: linear-gradient(135deg, #6C3CE1, #8B5FBF); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+        .content { background: white; padding: 30px; border-radius: 0 0 12px 12px; }
+        .details { background: #f0f0ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .button { display: inline-block; background: #FF6B8B; color: white; padding: 14px 30px; text-decoration: none; border-radius: 50px; font-weight: 600; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 0.9rem; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h2>🎓 FISSK Online Academy</h2>
+          <p style="opacity:0.9;">Payment Confirmation</p>
+        </div>
+        <div class="content">
+          <h2>Thank you for your purchase, ${studentName}! 🎉</h2>
+          <p>Your payment for <strong>${data.courseName}</strong> has been confirmed.</p>
+          
+          <div class="details">
+            <p><strong>💰 Amount:</strong> ₦${data.amount.toLocaleString()}</p>
+            <p><strong>📝 Reference:</strong> ${data.reference}</p>
+            <p><strong>📅 Date:</strong> ${new Date(data.paidAt).toLocaleDateString()}</p>
+            <p><strong>👨‍🏫 Instructor:</strong> ${data.instructorName}</p>
+          </div>
+
+          <p style="text-align:center; margin: 25px 0;">
+            <a href="${process.env.FRONTEND_URL}/class.html?id=${data.classId}" class="button">
+              📚 Access Your Course
+            </a>
+          </p>
+
+          <p style="font-size: 0.9rem; color: #666;">
+            You now have full access to:
+            <br>✅ Recorded sessions
+            <br>✅ Course materials
+            <br>✅ Community forum
+          </p>
+        </div>
+        <div class="footer">
+          <p>FISSK Online Academy - Empowering students with knowledge</p>
+          <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return this.sendEmail(studentEmail, subject, html);
+}
+
+// ===== INSTRUCTOR SALE NOTIFICATION =====
+async sendInstructorSaleEmail(instructorEmail, instructorName, saleData) {
+  const subject = `📚 New Course Sale - ${saleData.courseName}`;
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; }
+        .header { background: linear-gradient(135deg, #6C3CE1, #8B5FBF); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+        .content { background: white; padding: 30px; border-radius: 0 0 12px 12px; }
+        .details { background: #f0f0ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .button { display: inline-block; background: #6C3CE1; color: white; padding: 14px 30px; text-decoration: none; border-radius: 50px; font-weight: 600; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 0.9rem; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h2>🎓 FISSK Online Academy</h2>
+          <p style="opacity:0.9;">New Course Sale</p>
+        </div>
+        <div class="content">
+          <h2>Congratulations, ${instructorName}! 🎉</h2>
+          <p>A student has purchased your course:</p>
+          <h3 style="color: #6C3CE1;">${saleData.courseName}</h3>
+          
+          <div class="details">
+            <p><strong>💰 Amount:</strong> ₦${saleData.amount.toLocaleString()}</p>
+            <p><strong>👤 Student:</strong> ${saleData.studentName}</p>
+            <p><strong>📧 Email:</strong> ${saleData.studentEmail}</p>
+            <p><strong>📅 Date:</strong> ${new Date(saleData.paidAt).toLocaleDateString()}</p>
+            <p><strong>💵 Your Earnings:</strong> ₦${saleData.instructorEarning.toLocaleString()} (70%)</p>
+            <p><strong>💰 Total Earnings:</strong> ₦${saleData.totalEarnings.toLocaleString()}</p>
+          </div>
+
+          <p style="text-align:center; margin: 25px 0;">
+            <a href="${process.env.FRONTEND_URL}/instructor-dashboard.html" class="button">
+              📊 View Dashboard
+            </a>
+          </p>
+        </div>
+        <div class="footer">
+          <p>FISSK Online Academy - Empowering students with knowledge</p>
+          <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return this.sendEmail(instructorEmail, subject, html);
+}
+
+// ===== WITHDRAWAL REQUEST EMAIL =====
+async sendWithdrawalRequestEmail(instructorEmail, instructorName, data) {
+  const subject = `💰 Withdrawal Request Submitted - ${data.reference}`;
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; }
+        .header { background: linear-gradient(135deg, #6C3CE1, #8B5FBF); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+        .content { background: white; padding: 30px; border-radius: 0 0 12px 12px; }
+        .details { background: #f0f0ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 0.9rem; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h2>💰 FISSK Online Academy</h2>
+          <p style="opacity:0.9;">Withdrawal Request</p>
+        </div>
+        <div class="content">
+          <h2>Hello ${instructorName}!</h2>
+          <p>Your withdrawal request has been submitted and is being processed.</p>
+          
+          <div class="details">
+            <p><strong>💵 Amount:</strong> ₦${data.amount.toLocaleString()}</p>
+            <p><strong>📝 Reference:</strong> ${data.reference}</p>
+            <p><strong>🏦 Bank:</strong> ${data.bankDetails.bankName}</p>
+            <p><strong>🔢 Account:</strong> ${data.bankDetails.accountNumber}</p>
+            <p><strong>📅 Requested:</strong> ${new Date().toLocaleDateString()}</p>
+          </div>
+
+          <p style="font-size: 0.9rem; color: #666;">
+            You'll receive a confirmation email once the transfer is completed.
+            <br>This usually takes 1-3 business days.
+          </p>
+        </div>
+        <div class="footer">
+          <p>FISSK Online Academy - Empowering students with knowledge</p>
+          <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return this.sendEmail(instructorEmail, subject, html);
+}
+
+// ===== WITHDRAWAL SUCCESS EMAIL =====
+async sendWithdrawalSuccessEmail(instructorEmail, instructorName, data) {
+  const subject = `✅ Withdrawal Completed - ${data.reference}`;
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; }
+        .header { background: linear-gradient(135deg, #10B981, #059669); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+        .content { background: white; padding: 30px; border-radius: 0 0 12px 12px; }
+        .details { background: #f0f0ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #666; font-size: 0.9rem; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h2>✅ FISSK Online Academy</h2>
+          <p style="opacity:0.9;">Withdrawal Completed</p>
+        </div>
+        <div class="content">
+          <h2>Hello ${instructorName}!</h2>
+          <p>Your withdrawal has been successfully processed and sent to your bank account.</p>
+          
+          <div class="details">
+            <p><strong>💵 Amount:</strong> ₦${data.amount.toLocaleString()}</p>
+            <p><strong>📝 Reference:</strong> ${data.reference}</p>
+            <p><strong>🏦 Bank:</strong> ${data.bankDetails.bankName}</p>
+            <p><strong>🔢 Account:</strong> ${data.bankDetails.accountNumber}</p>
+            <p><strong>📅 Completed:</strong> ${new Date(data.completedAt).toLocaleDateString()}</p>
+          </div>
+
+          <p style="font-size: 0.9rem; color: #666;">
+            Funds should reflect in your account within 1-3 business days.
+            <br>Contact us at hello@fissk.com if you have any questions.
+          </p>
+        </div>
+        <div class="footer">
+          <p>FISSK Online Academy - Empowering students with knowledge</p>
+          <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  return this.sendEmail(instructorEmail, subject, html);
+}
 }
 
 export default new EmailService();

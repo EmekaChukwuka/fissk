@@ -7,6 +7,164 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="instructor-dashboard.css">
     <link rel="icon" href="fissklogo.jpg">
+    <style>
+        /* ===== EARNINGS SECTION STYLES ===== */
+        .earnings-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-top: 24px;
+        }
+        .earnings-card h3 {
+            margin-bottom: 16px;
+            color: #1A1A2E;
+        }
+        .earnings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+        .earning-item {
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .earning-item .label {
+            display: block;
+            font-size: 0.8rem;
+            color: #6B7280;
+        }
+        .earning-item .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #1A1A2E;
+        }
+        .earning-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        /* ===== PAYMENT HISTORY TABLE ===== */
+        .payment-history-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .payment-history-table th {
+            background: #f8f9fa;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #2D3748;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .payment-history-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+        .payment-history-table tr:hover td {
+            background: #faf8ff;
+        }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-badge.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-badge.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-badge.failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-badge.refunded {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        /* ===== CREATE CLASS WITH PRICE ===== */
+        .price-input-group {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .price-input-group input {
+            flex: 1;
+        }
+        .price-input-group .currency-label {
+            font-weight: 600;
+            color: #2D3748;
+            font-size: 1.1rem;
+        }
+        .free-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .free-toggle input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #8B5FBF;
+        }
+        .free-toggle label {
+            color: #4a5568;
+            font-size: 0.95rem;
+        }
+
+        /* ===== WITHDRAWAL HISTORY ===== */
+        .withdrawal-history {
+            margin-top: 16px;
+        }
+        .withdrawal-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border-left: 3px solid #8B5FBF;
+        }
+        .withdrawal-item .amount {
+            font-weight: 700;
+            color: #1A1A2E;
+        }
+        .withdrawal-item .date {
+            color: #6B7280;
+            font-size: 0.85rem;
+        }
+        .withdrawal-item .status {
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .withdrawal-item .status.completed {
+            color: #10B981;
+        }
+        .withdrawal-item .status.pending {
+            color: #F59E0B;
+        }
+        .withdrawal-item .status.failed {
+            color: #EF4444;
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
@@ -21,10 +179,9 @@
                 <li><a href="#classes" class="nav-link" data-section="classes">📚 My Classes</a></li>
                 <li><a href="#livestreams" class="nav-link" data-section="livestreams">🎥 Live Streams</a></li>
                 <li><a href="#students" class="nav-link" data-section="students">👥 Students</a></li>
-                <li><a href="dashboard.html" class="nav-link">Student View</a></li>
+                <li><a href="#payments" class="nav-link" data-section="payments">💰 Payments</a></li>
                 <li class="nav-user">
-                    <div class="user-dropdown" id="user-dropdown">
-                    </div>
+                    <div class="user-dropdown" id="user-dropdown"></div>
                 </li>
             </ul>
             <div class="hamburger">
@@ -38,7 +195,8 @@
     <div class="dashboard-header">
         <div class="container">
             <h1>Instructor Dashboard</h1>
-            <p>Manage your classes and live streams</p><br><br>
+            <p>Manage your classes, live streams, and earnings</p>
+            <br>
             <div class="instructor-stats">
                 <div class="stat-card">
                     <div class="stat-icon">📚</div>
@@ -68,6 +226,13 @@
                         <p>Average Rating</p>
                     </div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-info">
+                        <h3 id="totalEarnings">₦0</h3>
+                        <p>Total Earnings</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -86,6 +251,7 @@
                         <li><a href="#classes" class="sidebar-link" data-section="classes">📚 My Classes</a></li>
                         <li><a href="#livestreams" class="sidebar-link" data-section="livestreams">🎥 Live Streams</a></li>
                         <li><a href="#students" class="sidebar-link" data-section="students">👥 Students</a></li>
+                        <li><a href="#payments" class="sidebar-link" data-section="payments">💰 Payments</a></li>
                         <li><a href="#analytics" class="sidebar-link" data-section="analytics">📈 Analytics</a></li>
                     </ul>
                     
@@ -96,6 +262,9 @@
                         </button>
                         <button class="btn btn-outline btn-full" id="scheduleLiveBtn2">
                             📅 Schedule Live
+                        </button>
+                        <button class="btn btn-outline btn-full" id="viewEarningsBtn">
+                            💰 View Earnings
                         </button>
                     </div>
                 </div>
@@ -110,6 +279,8 @@
                                 <!-- Activities will be loaded here -->
                             </div>
                         </div>
+                        <!-- Earnings Section will be rendered here -->
+                        <div id="earningsSection"></div>
                     </div>
                     
                     <!-- My Classes Section -->
@@ -160,7 +331,7 @@
                     <div id="students" class="dashboard-section">
                         <div class="section-header">
                             <h2>Student Management</h2>
-                            <select id="classFilter" onchange="instructorDashboard.loadEnrollments()">
+                            <select id="classFilter">
                                 <option value="">All Classes</option>
                             </select>
                         </div>
@@ -168,28 +339,43 @@
                             <!-- Enrollments will be loaded here -->
                         </div>
                     </div>
+
+                    <!-- Payments Section -->
+                    <div id="payments" class="dashboard-section">
+                        <div class="section-header">
+                            <h2>💰 Payment History</h2>
+                            <div class="section-actions">
+                                <button class="btn btn-primary" id="refreshPaymentsBtn">
+                                    🔄 Refresh
+                                </button>
+                            </div>
+                        </div>
+                        <div id="paymentHistoryContainer">
+                            <!-- Payment history will be loaded here -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Modals -->
+    <!-- ===== CREATE CLASS MODAL WITH PRICE ===== -->
     <div id="createClassModal" class="modal">
         <div class="modal-content">
             <span class="close-modal">&times;</span>
             <h2>Create New Class</h2>
             <form id="createClassForm">
                 <div class="form-group">
-                    <label for="className">Class Title</label>
+                    <label for="className">Class Title *</label>
                     <input type="text" id="className" name="title" required>
                 </div>
                 <div class="form-group">
-                    <label for="classDescription">Description</label>
+                    <label for="classDescription">Description *</label>
                     <textarea id="classDescription" name="description" rows="4" required></textarea>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="classCategory">Subject</label>
+                        <label for="classCategory">Subject *</label>
                         <select id="classCategory" name="category" required>
                             <option value="french">French</option>
                             <option value="english">English</option>
@@ -202,7 +388,7 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="classLevel">Level</label>
+                        <label for="classLevel">Level *</label>
                         <select id="classLevel" name="level" required>
                             <option value="beginner">Beginner</option>
                             <option value="intermediate">Intermediate</option>
@@ -211,30 +397,46 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="classDuration">Duration</label>
+                    <label for="classDuration">Duration *</label>
                     <input type="text" id="classDuration" name="duration" placeholder="e.g., 8 weeks" required>
                 </div>
+                
+                <!-- ===== NEW: PRICE FIELDS ===== -->
+                <div class="form-group">
+                    <label>Course Price</label>
+                    <div class="price-input-group">
+                        <span class="currency-label">₦</span>
+                        <input type="number" id="classPrice" name="price" placeholder="2500" min="1000" step="100">
+                    </div>
+                    <small style="color: #6B7280; font-size: 0.8rem;">Minimum price: ₦1,000. Leave 0 for free.</small>
+                </div>
+                <div class="free-toggle">
+                    <input type="checkbox" id="classFree" name="isFree">
+                    <label for="classFree">Make this class FREE</label>
+                </div>
+                
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" id="createClassBtn">Create Class</button>
-                    <button type="button" class="btn btn-outline">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Class</button>
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('createClassModal').style.display='none'">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Schedule Stream Modal -->
     <div id="scheduleStreamModal" class="modal">
         <div class="modal-content">
             <span class="close-modal">&times;</span>
             <h2>Schedule Live Stream</h2>
             <form id="scheduleStreamForm">
                 <div class="form-group">
-                    <label for="streamClass">Select Class</label>
+                    <label for="streamClass">Select Class *</label>
                     <select id="streamClass" name="classId" required>
                         <option value="">Choose a class...</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="streamTitle">Stream Title</label>
+                    <label for="streamTitle">Stream Title *</label>
                     <input type="text" id="streamTitle" name="title" required>
                 </div>
                 <div class="form-group">
@@ -242,7 +444,7 @@
                     <textarea id="streamDescription" name="description" rows="3"></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="streamDateTime">Date & Time</label>
+                    <label for="streamDateTime">Date & Time *</label>
                     <input type="datetime-local" id="streamDateTime" name="scheduledTime" required>
                 </div>
                 <div class="form-actions">
@@ -296,6 +498,7 @@
             </div>
         </div>
     </footer>
+    
     <script src="instructor-dashboard.js"></script>
 </body>
 </html>

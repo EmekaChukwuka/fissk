@@ -1,4 +1,4 @@
-// instructor-dashboard.js
+// instructor-dashboard.js - Complete with Payment Integration
 class InstructorDashboard {
   constructor() {
     this.currentUser = JSON.parse(localStorage.getItem('user'));
@@ -18,6 +18,7 @@ class InstructorDashboard {
       totalStudents: document.getElementById('totalStudents'),
       totalVideos: document.getElementById('totalVideos'),
       avgRating: document.getElementById('avgRating'),
+      totalEarnings: document.getElementById('totalEarnings'),
       classesList: document.getElementById('classesList'),
       scheduledStreams: document.getElementById('scheduledStreams'),
       pastStreams: document.getElementById('pastStreams'),
@@ -31,7 +32,10 @@ class InstructorDashboard {
       startLiveBtn: document.getElementById('startLiveBtn'),
       scheduleLiveBtn: document.getElementById('scheduleLiveBtn'),
       createClassBtn2: document.getElementById('createClassBtn2'),
-      scheduleLiveBtn2: document.getElementById('scheduleLiveBtn2')
+      scheduleLiveBtn2: document.getElementById('scheduleLiveBtn2'),
+      viewEarningsBtn: document.getElementById('viewEarningsBtn'),
+      refreshPaymentsBtn: document.getElementById('refreshPaymentsBtn'),
+      paymentHistoryContainer: document.getElementById('paymentHistoryContainer')
     };
   }
 
@@ -39,13 +43,12 @@ class InstructorDashboard {
     if (this.currentUser) {
       document.getElementById('user-dropdown').innerHTML = `
         <img src="https://ui-avatars.com/api/?name=${this.currentUser.firstname}+${this.currentUser.lastname}&background=8B5FBF&color=fff" alt="User" class="user-avatar" id="user-avatar">
-        <span id="instructorName"></span>
+        <span id="instructorName">${this.currentUser.firstname}</span>
         <div class="dropdown-content">
           <a href="profile.html">Profile</a>
           <a href="settings.html">Settings</a>
           <a href="#" class="logout" onclick="logout()">Logout</a>
         </div>`;
-      document.getElementById('instructorName').textContent = this.currentUser.firstname;
     } else {
       window.location.href = 'login.html';
     }
@@ -56,7 +59,9 @@ class InstructorDashboard {
       this.loadInstructorClasses(),
       this.loadInstructorStats(),
       this.loadInstructorStreams(),
-      this.loadEnrollments()
+      this.loadEnrollments(),
+      this.loadEarnings(),
+      this.loadPaymentHistory()
     ]);
   }
 
@@ -97,6 +102,7 @@ class InstructorDashboard {
           <span>👥 ${c.enrolled_students || 0} students</span>
           <span>🎥 ${c.video_count || 0} videos</span>
           <span>🕒 ${c.duration || '—'}</span>
+          ${c.price > 0 ? `<span>💰 ₦${c.price.toLocaleString()}</span>` : '<span>🎓 FREE</span>'}
         </div>
         <div class="class-actions">
           <button class="btn btn-primary manage-class" data-id="${c._id}">Manage</button>
@@ -159,6 +165,9 @@ class InstructorDashboard {
         if (this.el.totalStudents) this.el.totalStudents.textContent = s.totalStudents || 0;
         if (this.el.totalVideos) this.el.totalVideos.textContent = s.totalVideos || 0;
         if (this.el.avgRating) this.el.avgRating.textContent = (s.avgRating || 0).toFixed(1);
+        if (this.el.totalEarnings && s.earnings !== undefined) {
+          this.el.totalEarnings.textContent = `₦${(s.earnings || 0).toLocaleString()}`;
+        }
       }
       if (json.recent && this.el.recentActivities) {
         this.el.recentActivities.innerHTML = json.recent.map(r => `<div class="activity">${this.escapeHtml(r)}</div>`).join('');
@@ -194,7 +203,7 @@ class InstructorDashboard {
     container.innerHTML = `
       <table class="enrollments-table">
         <thead>
-          <tr><th>Student</th><th>Email</th><th>Joined</th><th>Progress</th><th>Class</th><th>Last Accessed</th></tr>
+          <tr><th>Student</th><th>Email</th><th>Joined</th><th>Progress</th><th>Class</th><th>Payment</th><th>Last Accessed</th></tr>
         </thead>
         <tbody>
           ${items.map(e => `
@@ -207,6 +216,11 @@ class InstructorDashboard {
                 <span>${e.progress||0}%</span>
               </td>
               <td>${e.title}</td>
+              <td>
+                ${e.paymentStatus === 'paid' ? '✅ Paid' : 
+                  e.paymentStatus === 'pending' ? '⏳ Pending' : 
+                  e.paymentStatus === 'free' ? '🎓 Free' : '—'}
+              </td>
               <td>${e.last_accessed ? new Date(e.last_accessed).toLocaleDateString() : 'Never'}</td>
             </tr>
           `).join('')}
@@ -215,26 +229,45 @@ class InstructorDashboard {
     `;
   }
 
-  // ===== CREATE CLASS API =====
+  // ===== CREATE CLASS API WITH PRICE =====
   async apiCreateClass(data) {
     try {
-      // Show spinner on button
       const submitBtn = document.querySelector('#createClassForm button[type="submit"]');
       const originalText = submitBtn.textContent;
       this.showButtonSpinner(submitBtn, 'Creating...');
+
+      // ===== NEW: Process price fields =====
+      const isFree = document.getElementById('classFree').checked;
+      let price = parseFloat(document.getElementById('classPrice').value) || 0;
+      
+      if (isFree) {
+        price = 0;
+      }
+      
+      // Validate minimum price
+      if (!isFree && price > 0 && price < 1000) {
+        this.showMessage('❌ Minimum price is ₦1,000', 'error');
+        if (submitBtn) this.hideButtonSpinner(submitBtn, originalText);
+        return;
+      }
+
+      const payload = {
+        ...data,
+        price: price,
+        isFree: isFree || price === 0
+      };
 
       const res = await fetch('https://fissk-backend.onrender.com/register/create-class', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: this.currentUser.email,
-          payload: data
+          payload: payload
         })
       });
 
       const json = await res.json();
       
-      // Reset button
       this.hideButtonSpinner(submitBtn, originalText);
 
       if (json.success) {
@@ -247,13 +280,272 @@ class InstructorDashboard {
       console.error('apiCreateClass error:', err);
       this.showMessage('❌ Error creating class', 'error');
       
-      // Reset button
       const submitBtn = document.querySelector('#createClassForm button[type="submit"]');
       if (submitBtn) {
         submitBtn.textContent = 'Create Class';
         submitBtn.disabled = false;
       }
     }
+  }
+
+  // ===== LOAD EARNINGS =====
+  async loadEarnings() {
+    try {
+      const res = await fetch('https://fissk-backend.onrender.com/api/payout/earnings', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to load earnings');
+      }
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        this.renderEarnings(data.earnings);
+        if (this.el.totalEarnings) {
+          this.el.totalEarnings.textContent = `₦${(data.earnings.totalRevenue || 0).toLocaleString()}`;
+        }
+      }
+    } catch (error) {
+      console.error('Load earnings error:', error);
+    }
+  }
+
+  renderEarnings(earnings) {
+    let earningsSection = document.getElementById('earningsSection');
+    if (!earningsSection) {
+      const overviewSection = document.getElementById('overview');
+      if (overviewSection) {
+        const activitiesDiv = overviewSection.querySelector('.recent-activities');
+        if (activitiesDiv) {
+          earningsSection = document.createElement('div');
+          earningsSection.id = 'earningsSection';
+          earningsSection.className = 'earnings-section';
+          activitiesDiv.parentNode.insertBefore(earningsSection, activitiesDiv.nextSibling);
+        }
+      }
+    }
+    
+    if (!earningsSection) return;
+    
+    earningsSection.innerHTML = `
+      <div class="earnings-card">
+        <h3>💰 Earnings Overview</h3>
+        <div class="earnings-grid">
+          <div class="earning-item">
+            <span class="label">Available Balance</span>
+            <span class="value">₦${(earnings.available || 0).toLocaleString()}</span>
+          </div>
+          <div class="earning-item">
+            <span class="label">Total Revenue</span>
+            <span class="value">₦${(earnings.totalRevenue || 0).toLocaleString()}</span>
+          </div>
+          <div class="earning-item">
+            <span class="label">Total Sales</span>
+            <span class="value">${earnings.totalSales || 0}</span>
+          </div>
+          <div class="earning-item">
+            <span class="label">Total Withdrawn</span>
+            <span class="value">₦${(earnings.totalWithdrawn || 0).toLocaleString()}</span>
+          </div>
+        </div>
+        <div class="earning-actions">
+          ${earnings.available > 0 ? `
+            <button class="btn btn-primary" onclick="window.instructorDashboard.requestWithdrawal()">
+              💰 Request Withdrawal
+            </button>
+          ` : ''}
+          <button class="btn btn-outline" onclick="window.instructorDashboard.showBankDetailsForm()">
+            🏦 Update Bank Details
+          </button>
+          <button class="btn btn-outline" onclick="window.instructorDashboard.switchSection('payments')">
+            📜 View Payment History
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  // ===== LOAD PAYMENT HISTORY =====
+  async loadPaymentHistory() {
+    const container = this.el.paymentHistoryContainer;
+    if (!container) return;
+
+    try {
+      const res = await fetch('https://fissk-backend.onrender.com/api/payment/instructor/transactions', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to load payment history');
+      }
+
+      const data = await res.json();
+
+      if (!data.success || !data.transactions || data.transactions.length === 0) {
+        container.innerHTML = `
+          <div class="no-content" style="text-align: center; padding: 40px;">
+            <p style="font-size: 1.2rem; color: #999;">💰 No payment transactions yet</p>
+            <p style="color: #bbb;">Students will appear here once they purchase your courses</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <table class="payment-history-table">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Course</th>
+              <th>Amount</th>
+              <th>Your Earnings</th>
+              <th>Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.transactions.map(t => `
+              <tr>
+                <td>${this.escapeHtml(t.studentName || 'Anonymous')}</td>
+                <td>${this.escapeHtml(t.courseName || 'Unknown')}</td>
+                <td>₦${(t.amount || 0).toLocaleString()}</td>
+                <td>₦${(t.instructorEarning || 0).toLocaleString()}</td>
+                <td>${t.paidAt ? new Date(t.paidAt).toLocaleDateString() : '—'}</td>
+                <td>
+                  <span class="status-badge ${t.status === 'success' ? 'success' : t.status === 'pending' ? 'pending' : 'failed'}">
+                    ${t.status || '—'}
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top: 16px; text-align: right; color: #6B7280; font-size: 0.85rem;">
+          Total: ₦${(data.totalEarnings || 0).toLocaleString()} earned from ${data.transactions.length} transactions
+        </div>
+      `;
+    } catch (error) {
+      console.error('Load payment history error:', error);
+      container.innerHTML = `
+        <div class="no-content" style="text-align: center; padding: 40px;">
+          <p style="color: #EF4444;">❌ Failed to load payment history</p>
+        </div>
+      `;
+    }
+  }
+
+  // ===== REQUEST WITHDRAWAL =====
+  async requestWithdrawal() {
+    const amount = prompt('Enter amount to withdraw (₦):');
+    if (!amount) return;
+    
+    const numAmount = parseFloat(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/payout/withdraw', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ amount: numAmount })
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        alert('✅ Withdrawal request submitted successfully!');
+        this.loadEarnings();
+        this.loadPaymentHistory();
+      } else {
+        alert('❌ ' + (data.message || 'Withdrawal failed'));
+      }
+    } catch (error) {
+      console.error('Withdrawal error:', error);
+      alert('Failed to request withdrawal. Please try again.');
+    }
+  }
+
+  // ===== SHOW BANK DETAILS FORM =====
+  showBankDetailsForm() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal-content" style="max-width: 500px;">
+        <span class="close-modal" onclick="this.closest('.modal').remove()">&times;</span>
+        <h2>🏦 Update Bank Details</h2>
+        <form id="bankDetailsForm">
+          <div class="form-group">
+            <label>Bank Name *</label>
+            <input type="text" id="bankName" placeholder="e.g., GTBank" required>
+          </div>
+          <div class="form-group">
+            <label>Account Number *</label>
+            <input type="text" id="accountNumber" placeholder="0123456789" required>
+          </div>
+          <div class="form-group">
+            <label>Account Name *</label>
+            <input type="text" id="accountName" placeholder="John Doe" required>
+          </div>
+          <div class="form-group">
+            <label>Bank Code *</label>
+            <input type="text" id="bankCode" placeholder="058 (for GTBank)" required>
+          </div>
+          <div class="form-actions" style="display: flex; gap: 12px; margin-top: 20px;">
+            <button type="submit" class="btn btn-primary">Save Bank Details</button>
+            <button type="button" class="btn btn-outline" onclick="this.closest('.modal').remove()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    
+    document.getElementById('bankDetailsForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const bankName = document.getElementById('bankName').value;
+      const accountNumber = document.getElementById('accountNumber').value;
+      const accountName = document.getElementById('accountName').value;
+      const bankCode = document.getElementById('bankCode').value;
+      
+      try {
+        const res = await fetch('/api/payout/bank-details', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ bankName, accountNumber, accountName, bankCode })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          alert('✅ Bank details updated successfully!');
+          modal.remove();
+          await this.loadEarnings();
+        } else {
+          alert('❌ ' + (data.message || 'Failed to update bank details'));
+        }
+      } catch (error) {
+        console.error('Bank details error:', error);
+        alert('Failed to update bank details. Please try again.');
+      }
+    });
   }
 
   // ===== STREAMS WITH MEETING URL =====
@@ -290,7 +582,6 @@ class InstructorDashboard {
   }
 
   renderStreams(scheduled, past) {
-    // Scheduled Streams
     if (this.el.scheduledStreams) {
         if (scheduled && scheduled.length > 0) {
             this.el.scheduledStreams.innerHTML = scheduled.map(s => `
@@ -325,7 +616,6 @@ class InstructorDashboard {
                 </div>
             `).join('');
 
-            // Add event listeners for generate link buttons
             this.el.scheduledStreams.querySelectorAll('.generate-link-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const streamId = e.currentTarget.dataset.streamId;
@@ -334,7 +624,6 @@ class InstructorDashboard {
                 });
             });
 
-            // Add event listeners for start stream buttons
             this.el.scheduledStreams.querySelectorAll('.start-stream').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const id = e.currentTarget.dataset.id;
@@ -347,7 +636,6 @@ class InstructorDashboard {
         }
     }
 
-    // Past Streams
     if (this.el.pastStreams) {
         if (past && past.length > 0) {
             this.el.pastStreams.innerHTML = past.map(s => `
@@ -377,9 +665,7 @@ class InstructorDashboard {
   // ===== GENERATE MEETING LINK =====
   async generateMeetingLink(streamId, streamTitle) {
     try {
-      // Show spinner on the button that was clicked
       const btn = document.querySelector(`.generate-link-btn[data-stream-id="${streamId}"]`);
-      const originalText = btn ? btn.textContent : 'Generating...';
       if (btn) this.showButtonSpinner(btn, 'Generating...');
 
       this.showMessage('Generating meeting link...', 'success');
@@ -407,18 +693,15 @@ class InstructorDashboard {
       const meetingId = data.session.meetingId;
       const meetingUrl = `https://fissk-online-academy.onrender.com/newlivestream.html?meetingId=${meetingId}`;
       
-      // Copy to clipboard
       this.copyToClipboard(meetingUrl);
       this.showMessage(`✅ Meeting link generated and copied to clipboard!`, 'success');
       
-      // Refresh the streams list to show the new link
       await this.loadInstructorStreams();
       
     } catch (err) {
       console.error('Generate meeting link error:', err);
       this.showMessage(`Failed to generate meeting link: ${err.message}`, 'error');
     } finally {
-      // Reset button
       const btn = document.querySelector(`.generate-link-btn[data-stream-id="${streamId}"]`);
       if (btn) {
         btn.textContent = '🔗 Generate Shareable Link';
@@ -468,9 +751,8 @@ class InstructorDashboard {
   }
 
   // ===== SCHEDULE STREAM =====
-  async apiScheduleStream(payload) {
+  async apiScheduleStream() {
     try {
-      // Show spinner on submit button
       const submitBtn = document.querySelector('#scheduleStreamForm button[type="submit"]');
       const originalText = submitBtn ? submitBtn.textContent : 'Schedule Stream';
       if (submitBtn) this.showButtonSpinner(submitBtn, 'Scheduling...');
@@ -523,10 +805,8 @@ class InstructorDashboard {
       
       this.showMessage('✅ Stream scheduled successfully!', 'success');
       
-      // Reset button
       if (submitBtn) this.hideButtonSpinner(submitBtn, originalText);
       
-      // Close modal and refresh
       document.getElementById('scheduleStreamModal').style.display = 'none';
       document.getElementById('scheduleStreamForm').reset();
       
@@ -543,7 +823,6 @@ class InstructorDashboard {
       console.error('Schedule stream error:', err);
       this.showMessage('❌ ' + (err.message || 'Failed to schedule stream'), 'error');
       
-      // Reset button
       const submitBtn = document.querySelector('#scheduleStreamForm button[type="submit"]');
       if (submitBtn) {
         submitBtn.textContent = 'Schedule Stream';
@@ -553,7 +832,7 @@ class InstructorDashboard {
   }
 
   setupEventHandlers() {
-    // ===== NAVIGATION LINKS =====
+    // Navigation Links
     document.querySelectorAll('.sidebar-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -576,12 +855,11 @@ class InstructorDashboard {
         });
     });
 
-    // ===== MODAL CLOSE =====
+    // Modal Close
     document.querySelectorAll('.close-modal').forEach(el => {
         el.addEventListener('click', () => el.closest('.modal').style.display = 'none');
     });
     
-    // Click outside modal to close
     document.querySelectorAll('.modal').forEach(modal => {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
@@ -590,7 +868,7 @@ class InstructorDashboard {
         });
     });
 
-    // ===== CREATE CLASS BUTTONS =====
+    // Create Class Buttons
     if (this.el.createClassBtn) {
         this.el.createClassBtn.addEventListener('click', () => {
             document.getElementById('createClassModal').style.display = 'flex';
@@ -601,11 +879,13 @@ class InstructorDashboard {
             document.getElementById('createClassModal').style.display = 'flex';
         });
     }
-    if (this.el.btnNewClass) {
-        this.el.btnNewClass.addEventListener('click', () => {
-            document.getElementById('createClassModal').style.display = 'flex';
+    if (this.el.viewEarningsBtn) {
+        this.el.viewEarningsBtn.addEventListener('click', () => {
+            this.switchSection('payments');
         });
     }
+
+    // Schedule Buttons
     if (this.el.btnSchedule) {
         this.el.btnSchedule.addEventListener('click', () => {
             document.getElementById('scheduleStreamModal').style.display = 'flex';
@@ -627,7 +907,15 @@ class InstructorDashboard {
         });
     }
 
-    // ===== CREATE CLASS FORM =====
+    // Refresh Payments
+    if (this.el.refreshPaymentsBtn) {
+        this.el.refreshPaymentsBtn.addEventListener('click', () => {
+            this.loadPaymentHistory();
+            this.showMessage('🔄 Payment history refreshed!', 'success');
+        });
+    }
+
+    // Create Class Form
     const createForm = document.getElementById('createClassForm');
     if (createForm) {
         createForm.addEventListener('submit', async (ev) => {
@@ -640,12 +928,29 @@ class InstructorDashboard {
         });
     }
 
-    // ===== SCHEDULE STREAM FORM =====
+    // Schedule Stream Form
     const scheduleForm = document.getElementById('scheduleStreamForm');
     if (scheduleForm) {
         scheduleForm.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             await this.apiScheduleStream();
+        });
+    }
+
+    // Free checkbox toggle
+    const freeCheckbox = document.getElementById('classFree');
+    const priceInput = document.getElementById('classPrice');
+    if (freeCheckbox && priceInput) {
+        freeCheckbox.addEventListener('change', () => {
+            if (freeCheckbox.checked) {
+                priceInput.value = 0;
+                priceInput.disabled = true;
+                priceInput.placeholder = 'Free';
+            } else {
+                priceInput.disabled = false;
+                priceInput.placeholder = '2500';
+                priceInput.value = '';
+            }
         });
     }
   }
@@ -656,7 +961,6 @@ class InstructorDashboard {
   }
 
   showMessage(message, type) {
-    // Remove existing messages
     const existing = document.querySelector('.custom-toast');
     if (existing) existing.remove();
 
@@ -742,7 +1046,7 @@ async function logout() {
   window.location.href = '/';
 }
 
-// Add spinner CSS if not already in styles
+// Add spinner CSS
 const spinnerStyle = document.createElement('style');
 spinnerStyle.textContent = `
   .spinner {

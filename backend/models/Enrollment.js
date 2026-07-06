@@ -21,7 +21,7 @@ const ProgressItemSchema = new mongoose.Schema({
     enum: ['Video', 'Assignment']
   },
   completed: { type: Boolean, default: false },
-  progressPercentage: { type: Number, default: 0 }, // e.g., % watched
+  progressPercentage: { type: Number, default: 0 },
   timeSpentSeconds: { type: Number, default: 0 },
   lastAccessed: { type: Date, default: Date.now },
   completedAt: Date,
@@ -38,12 +38,25 @@ const EnrollmentSchema = new mongoose.Schema({
   completedAt: Date,
   certificateIssued: { type: Boolean, default: false },
   certificateUrl: String,
-  progressItems: [ProgressItemSchema]
+  progressItems: [ProgressItemSchema],
+  
+  // ===== PAYMENT FIELDS =====
+  paymentReference: { type: String, sparse: true },
+  paymentStatus: { 
+    type: String, 
+    enum: ['pending', 'paid', 'free', 'failed'], 
+    default: 'free' 
+  },
+  amountPaid: { type: Number, default: 0 },
+  paidAt: { type: Date },
+  accessType: { type: String, enum: ['free', 'paid'], default: 'free' }
 }, { timestamps: true });
 
 // Compound unique index to prevent duplicate enrollments
 EnrollmentSchema.index({ userId: 1, classId: 1 }, { unique: true });
 EnrollmentSchema.index({ classId: 1 });
 EnrollmentSchema.index({ completed: 1 });
+EnrollmentSchema.index({ paymentReference: 1 });
+EnrollmentSchema.index({ paymentStatus: 1 });
 
 export default mongoose.model("Enrollment", EnrollmentSchema);

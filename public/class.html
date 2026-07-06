@@ -6,7 +6,87 @@
     <title>Class Details - FISSK Online Academy</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" href="fissklogo.jpg">
-<script src="https://cdn.jsdelivr.net/npm/hls.js@0.14.17"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@0.14.17"></script>
+    <style>
+        /* ===== PAYMENT SECTION STYLES ===== */
+        .payment-section {
+            margin-top: 20px;
+            padding: 24px;
+            background: rgba(255,255,255,0.12);
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .payment-info {
+            text-align: center;
+        }
+
+        .price-display .price {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: #FFD700;
+            display: block;
+        }
+
+        .price-display .label {
+            display: block;
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.7);
+            margin-top: 4px;
+        }
+
+        .payment-benefits ul {
+            list-style: none;
+            padding: 0;
+            margin: 16px 0;
+            display: inline-block;
+            text-align: left;
+        }
+
+        .payment-benefits ul li {
+            color: rgba(255,255,255,0.85);
+            padding: 6px 0;
+            font-size: 0.95rem;
+        }
+
+        .buy-course-btn {
+            font-size: 1.1rem;
+            padding: 14px 48px;
+            margin-top: 8px;
+        }
+
+        .secure-note {
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.5);
+            margin-top: 16px;
+        }
+
+        .free-badge .badge {
+            display: inline-block;
+            background: #10B981;
+            color: white;
+            padding: 8px 28px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .paid-badge .badge {
+            display: inline-block;
+            background: #8B5FBF;
+            color: white;
+            padding: 8px 28px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .free-badge p, .paid-badge p {
+            color: rgba(255,255,255,0.8);
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
@@ -49,6 +129,10 @@
                         <button id="enrollBtn" class="btn btn-primary">Enroll Now</button>
                         <button id="backToClasses" class="btn btn-outline" style="color:white;">Back to Classes</button>
                     </div>
+                    <!-- Payment Section -->
+                    <div id="paymentSection" class="payment-section">
+                        <!-- Payment section will be rendered dynamically -->
+                    </div>
                 </div>
                 <div class="class-image">
                     <img id="classThumbnail" src="" alt="Class Thumbnail">
@@ -63,13 +147,13 @@
             <div class="class-layout">
                 <!-- Main Content -->
                 <div class="class-main">
-                <div class="content-tabs">
-                    <button class="tab-btn active" data-tab="videos">📹 Recorded Classes</button>
-                    <button class="tab-btn" data-tab="forum">💬 Discussions</button>
-                    <button class="tab-btn" data-tab="reviews">⭐ Reviews</button>
-                    <button class="tab-btn" data-tab="materials">📚 Materials</button>
-                    <button class="tab-btn" data-tab="details">📋 Details</button>
-                </div>
+                    <div class="content-tabs">
+                        <button class="tab-btn active" data-tab="videos">📹 Recorded Classes</button>
+                        <button class="tab-btn" data-tab="forum">💬 Discussions</button>
+                        <button class="tab-btn" data-tab="reviews">⭐ Reviews</button>
+                        <button class="tab-btn" data-tab="materials">📚 Materials</button>
+                        <button class="tab-btn" data-tab="details">📋 Details</button>
+                    </div>
 
                     <!-- New Forum Tab Content -->
                     <div id="forumTab" class="tab-content">
@@ -87,7 +171,7 @@
                             <p>No recorded classes available yet.</p>
                         </div>
                     </div>
-                                        <!-- Reviews Tab -->
+                    <!-- Reviews Tab -->
                     <div id="reviewsTab" class="tab-content">
                         <h3>Class Reviews</h3>
                         <div id="classReviewsContainer">
@@ -148,10 +232,6 @@
     <!-- Video Modal -->
     <div id="videoModal" class="modal">
         <div class="modal-content video-modal">
-          <!--  <button id="markCompleteBtn" class="btn btn-outline">
-  ✅ Mark as Complete
-</button>-->
-
             <span class="close-modal">&times;</span><br>
             <video id="videoPlayer" controls>
                 Your browser does not support the video tag.
@@ -167,47 +247,46 @@
     <footer class="footer">
         <div class="container">
             <div class="footer-content">
-                <!-- Same footer as classes.html -->
                 <div class="container">
-            <div class="footer-content">
-                <div class="footer-section">
-                    <div class="footer-logo">
-                        <h3>FISSK</h3>
-                        <span>Online Academy</span>
+                    <div class="footer-content">
+                        <div class="footer-section">
+                            <div class="footer-logo">
+                                <h3>FISSK</h3>
+                                <span>Online Academy</span>
+                            </div>
+                            <p>Empowering Nigerians with skills for global success.</p>
+                        </div>
+                        <div class="footer-section">
+                            <h4>Quick Links</h4>
+                            <ul>
+                                <li><a href="index.html">Home</a></li>
+                                <li><a href="classes.html">Classes</a></li>
+                                <li><a href="about.html">About</a></li>
+                                <li><a href="contact.html">Contact</a></li>
+                            </ul>
+                        </div>
+                        <div class="footer-section">
+                            <h4>Courses</h4>
+                            <ul>
+                                <li><a href="#">French Courses</a></li>
+                                <li><a href="#">English Courses</a></li>
+                                <li><a href="#">Exam Preparation</a></li>
+                                <li><a href="#">Business</a></li>
+                            </ul>
+                        </div>
+                        <div class="footer-section">
+                            <h4>Contact</h4>
+                            <ul>
+                                <li>📧 hello@fissk.com</li>
+                                <li>📱 +234 812 345 6789</li>
+                                <li>📍 Lagos, Nigeria</li>
+                            </ul>
+                        </div>
                     </div>
-                    <p>Empowering Nigerians with skills for global success.</p>
+                    <div class="footer-bottom">
+                        <p>&copy; 2026 FISSK Online Academy. All rights reserved.</p>
+                    </div>
                 </div>
-                <div class="footer-section">
-                    <h4>Quick Links</h4>
-                    <ul>
-                        <li><a href="index.html">Home</a></li>
-                        <li><a href="classes.html">Classes</a></li>
-                        <li><a href="about.html">About</a></li>
-                        <li><a href="contact.html">Contact</a></li>
-                    </ul>
-                </div>
-                <div class="footer-section">
-                    <h4>Courses</h4>
-                    <ul>
-                        <li><a href="#">French Courses</a></li>
-                        <li><a href="#">English Courses</a></li>
-                        <li><a href="#">Exam Preparation</a></li>
-                        <li><a href="#">Business </a></li>
-                    </ul>
-                </div>
-                <div class="footer-section">
-                    <h4>Contact</h4>
-                    <ul>
-                        <li>📧 hello@fissk.com</li>
-                        <li>📱 +234 812 345 6789</li>
-                        <li>📍 Lagos, Nigeria</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="footer-bottom">
-                <p>&copy; 2026 FISSK Online Academy. All rights reserved.</p>
-            </div>
-        </div>
             </div>
         </div>
     </footer>

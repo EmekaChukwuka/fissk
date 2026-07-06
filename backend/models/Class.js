@@ -17,12 +17,20 @@ const ClassSchema = new mongoose.Schema({
   duration: String,
   instructorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   thumbnailUrl: { type: String, default: '/assets/default-class-thumbnail.jpg' },
-  price: { type: Number, default: 0.00 },
+  
+  // ===== PAYMENT FIELDS =====
+  price: { type: Number, default: 0 },           // 0 = free
+  isFree: { type: Boolean, default: true },
+  currency: { type: String, default: 'NGN' },
+  totalRevenue: { type: Number, default: 0 },
+  totalSales: { type: Number, default: 0 },
+  minPrice: { type: Number, default: 1000 },     // Minimum price in NGN
+  
   isActive: { type: Boolean, default: true },
   maxStudents: { type: Number, default: 100 },
   requirements: String,
   learningOutcomes: String,
-  syllabus: mongoose.Schema.Types.Mixed, // can store JSON or array of modules
+  syllabus: mongoose.Schema.Types.Mixed,
   rating: { type: Number, default: 0.00 },
   totalRatings: { type: Number, default: 0 }
 }, { timestamps: true });
@@ -32,6 +40,8 @@ ClassSchema.index({ category: 1 });
 ClassSchema.index({ level: 1 });
 ClassSchema.index({ instructorId: 1 });
 ClassSchema.index({ isActive: 1 });
+ClassSchema.index({ isFree: 1 });
+ClassSchema.index({ price: 1 });
 ClassSchema.index({ title: 'text', description: 'text', shortDescription: 'text' });
 
 export default mongoose.model("Class", ClassSchema);

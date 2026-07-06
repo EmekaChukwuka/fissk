@@ -6,9 +6,118 @@
     <title>About FISSK - Online Learning for Students</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="icon" href="fissklogo.jpg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ===== ABOUT PAGE STYLES ===== */
+        .about-hero {
+            padding: 80px 0 50px;
+            background: linear-gradient(135deg, #F8F7FC 0%, #EDE9F7 100%);
+            text-align: center;
+        }
+        .about-hero h1 {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--text-dark);
+            margin-bottom: 12px;
+        }
+        .about-hero p {
+            font-size: 1.2rem;
+            color: var(--text-light);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .about-content {
+            padding: 60px 0 80px;
+            background: var(--white);
+        }
+        .about-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 50px;
+            align-items: start;
+        }
+        .about-text h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin: 30px 0 12px;
+        }
+        .about-text h2:first-of-type {
+            margin-top: 0;
+        }
+        .about-text p {
+            color: var(--text-light);
+            line-height: 1.8;
+            margin-bottom: 16px;
+        }
+        .about-features {
+            list-style: none;
+            padding: 0;
+            margin: 20px 0;
+        }
+        .about-features li {
+            padding: 10px 0;
+            font-size: 1rem;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .about-features li:last-child {
+            border-bottom: none;
+        }
+        .about-features li strong {
+            color: var(--primary);
+        }
+        .about-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .about-stats .stat-card {
+            background: var(--gray-light);
+            padding: 28px 20px;
+            border-radius: 16px;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+        .about-stats .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow);
+        }
+        .about-stats .stat-card h3 {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+        .about-stats .stat-card p {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+        @media (max-width: 992px) {
+            .about-grid {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+            .about-stats {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        @media (max-width: 480px) {
+            .about-stats {
+                grid-template-columns: 1fr;
+            }
+            .about-hero h1 {
+                font-size: 2.2rem;
+            }
+        }
+    </style>
 </head>
 <body>
-    <!-- Navigation (same as index.html) -->
+    <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-logo">
@@ -19,7 +128,7 @@
                 <li><a href="index.html" class="nav-link">Home</a></li>
                 <li><a href="classes.html" class="nav-link">Classes</a></li>
                 <li><a href="about.html" class="nav-link active">About</a></li>
-                <li><a href="contact.html" class="nav-link">Contact</a></li>          
+                <li><a href="contact.html" class="nav-link">Contact</a></li>
                 <li><a href="dashboard.html" class="nav-link dashboard-btn" id="dashboard-btn">Dashboard</a></li>
                 <li><a href="login.html" class="nav-link login-btn" id="login-btn">Login</a></li>
                 <li><a href="signup.html" class="nav-link signup-btn" id="signup-btn">Sign Up</a></li>
@@ -31,7 +140,8 @@
             </div>
         </div>
     </nav>
-<br><br><br><br>
+
+    <!-- About Hero -->
     <section class="about-hero">
         <div class="container">
             <h1>About FISSK Online Academy</h1>
@@ -39,6 +149,7 @@
         </div>
     </section>
 
+    <!-- About Content -->
     <section class="about-content">
         <div class="container">
             <div class="about-grid">
@@ -46,13 +157,13 @@
                     <h2>Our Story</h2>
                     <p>FISSK Online Academy was created with one simple belief: every student deserves access to quality education. We saw that many students were struggling to find engaging, interactive learning opportunities that fit their schedules and budgets.</p>
                     <p>That's why we built a platform where students can attend live classes for free, learn from expert instructors, and only pay for the courses they truly want. We're making education accessible, flexible, and student-centered.</p>
-                    
+
                     <h2>Our Mission</h2>
                     <p>To empower students with knowledge through interactive live learning, connecting them with expert instructors who are passionate about teaching and helping students succeed.</p>
-                    
+
                     <h2>Our Vision</h2>
                     <p>A world where every student, regardless of their background or location, has access to quality education and the opportunity to achieve their dreams through learning.</p>
-                    
+
                     <h2>What Makes FISSK Different</h2>
                     <ul class="about-features">
                         <li>✅ <strong>Free Live Classes</strong> - Attend interactive sessions without paying</li>
@@ -84,9 +195,9 @@
         </div>
     </section>
 
-    <!-- Footer (same as index.html) -->
+    <!-- Footer -->
     <footer class="footer">
-         <div class="container">
+        <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
                     <div class="footer-logo">
@@ -105,12 +216,12 @@
                     </ul>
                 </div>
                 <div class="footer-section">
-                    <h4>For Students</h4>
+                    <h4>Popular Topics</h4>
                     <ul>
-                        <li><a href="classes.html">Browse Courses</a></li>
-                        <li><a href="signup.html">Join Free</a></li>
-                        <li><a href="#">Student FAQ</a></li>
-                        <li><a href="#">Learning Guide</a></li>
+                        <li><a href="#">Mathematics</a></li>
+                        <li><a href="#">Science &amp; Technology</a></li>
+                        <li><a href="#">Business &amp; Finance</a></li>
+                        <li><a href="#">Exam Preparation</a></li>
                     </ul>
                 </div>
                 <div class="footer-section">
@@ -129,42 +240,58 @@
     </footer>
 
     <script src="script.js"></script>
-    <style>
-        .about-features {
-            list-style: none;
-            padding: 0;
-            margin: 20px 0;
+    <script>
+        // ===== NAVIGATION =====
+        const hamburger = document.querySelector('.hamburger');
+        const navMenu = document.querySelector('.nav-menu');
+
+        if (hamburger) {
+            hamburger.addEventListener('click', () => {
+                hamburger.classList.toggle('active');
+                navMenu.classList.toggle('active');
+                if (navMenu.classList.contains('active')) {
+                    navMenu.style.display = 'flex';
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    navMenu.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }
+            });
         }
-        .about-features li {
-            padding: 8px 0;
-            font-size: 1rem;
-            color: #333;
-        }
-        .about-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-        .about-stats .stat-card {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 12px;
-            text-align: center;
-        }
-        .about-stats .stat-card h3 {
-            font-size: 2rem;
-            color: #e94560;
-            margin-bottom: 5px;
-        }
-        .about-stats .stat-card p {
-            color: #666;
-            font-size: 0.9rem;
-        }
-        @media (max-width: 768px) {
-            .about-stats {
-                grid-template-columns: 1fr 1fr;
+
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', () => {
+                hamburger.classList.remove('active');
+                navMenu.classList.remove('active');
+                navMenu.style.display = 'none';
+                document.body.style.overflow = 'auto';
+            });
+        });
+
+        // ===== USER STATUS =====
+        function checkUserStatus() {
+            const userId = localStorage.getItem('userId');
+            const userType = localStorage.getItem('userType');
+            
+            const loginBtn = document.getElementById('login-btn');
+            const signupBtn = document.getElementById('signup-btn');
+            const dashboardBtn = document.getElementById('dashboard-btn');
+
+            if (userId) {
+                if (loginBtn) loginBtn.style.display = 'none';
+                if (signupBtn) signupBtn.style.display = 'none';
+                if (dashboardBtn) {
+                    dashboardBtn.style.display = 'block';
+                    dashboardBtn.href = userType === 'instructor' ? 'instructor-dashboard.html' : 'dashboard.html';
+                }
+            } else {
+                if (loginBtn) loginBtn.style.display = 'block';
+                if (signupBtn) signupBtn.style.display = 'block';
+                if (dashboardBtn) dashboardBtn.style.display = 'none';
             }
         }
-    </style>
+
+        document.addEventListener('DOMContentLoaded', checkUserStatus);
+    </script>
 </body>
 </html>

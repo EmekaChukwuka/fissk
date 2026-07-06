@@ -1201,6 +1201,101 @@ body {
     font-size: 11px;
 }
 
+/* ===== PAYMENT STYLES ===== */
+.payment-section {
+    margin-top: 20px;
+    padding: 20px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.payment-info {
+    text-align: center;
+}
+
+.price-display .price {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #FFD700;
+}
+
+.price-display .label {
+    display: block;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.7);
+}
+
+.payment-benefits ul {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0;
+}
+
+.payment-benefits ul li {
+    color: rgba(255,255,255,0.8);
+    padding: 4px 0;
+    font-size: 0.95rem;
+}
+
+.buy-course-btn {
+    font-size: 1.1rem;
+    padding: 14px 40px;
+}
+
+.secure-note {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.5);
+    margin-top: 12px;
+}
+
+.free-badge .badge {
+    display: inline-block;
+    background: #10B981;
+    color: white;
+    padding: 8px 24px;
+    border-radius: 50px;
+    font-weight: 700;
+}
+
+.paid-badge .badge {
+    display: inline-block;
+    background: #8B5FBF;
+    color: white;
+    padding: 8px 24px;
+    border-radius: 50px;
+    font-weight: 700;
+}
+
+.price-badge {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    padding: 6px 16px;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: white;
+    z-index: 2;
+}
+
+.price-badge.free {
+    background: #10B981;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+}
+
+.price-badge.paid {
+    background: #8B5FBF;
+    box-shadow: 0 4px 15px rgba(139, 95, 191, 0.3);
+}
+
+.class-card-image {
+    position: relative;
+}
+
+
 /* Dashboard Styles */
 .dashboard {
     padding: 100px 0 50px;
