@@ -1,56 +1,51 @@
 // backend/services/emailService.js
-import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 class EmailService {
     constructor() {
-        // Use Brevo's SMTP (works on Render!)
-        this.transporter = nodemailer.createTransport({
-            host: 'smtp-relay.brevo.com', // Brevo SMTP server
-            port: 2525,
-            secure: false, // true for 465, false for other ports
-            auth: {
-                user: process.env.BREVO_SMTP_USER, // Your Brevo login email
-                pass: process.env.BREVO_SMTP_KEY // Your Brevo SMTP key (not API key!)
-            },
-            // No need for family:4 - Brevo handles this properly
-            pool: true,
-            maxConnections: 5,
-            maxMessages: 100,
-            connectionTimeout: 15000,
-            socketTimeout: 15000,
-        });
-
-        // Verify connection on startup
-        this.verifyConnection();
-    }
-
-    async verifyConnection() {
-        try {
-            await this.transporter.verify();
-            console.log('✅ Brevo email service connected successfully');
-        } catch (error) {
-            console.error('❌ Brevo email service verification failed:', error.message);
+        this.apiKey = process.env.BREVO_API_KEY;
+        this.baseUrl = 'https://api.brevo.com/v3';
+        
+        if (!this.apiKey) {
+            console.error('❌ BREVO_API_KEY is not set in environment variables');
+        } else {
+            console.log('✅ Brevo API key found');
         }
     }
 
     async sendEmail(to, subject, html, text = '') {
         try {
-            const mailOptions = {
-                from: process.env.EMAIL_FROM || `"FISSK Online Academy" <noreply@fissk.com>`,
-                to: to,
-                subject: subject,
-                text: text || html.replace(/<[^>]*>/g, ''),
-                html: html
-            };
+            const response = await fetch(`${this.baseUrl}/smtp/email`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'api-key': this.apiKey
+                },
+                body: JSON.stringify({
+                    sender: {
+                        email: process.env.EMAIL_FROM || 'noreply@yourcompany.com',
+                        name: 'FISSK Online Academy'
+                    },
+                    to: [{ email: to }],
+                    subject: subject,
+                    htmlContent: html,
+                    textContent: text || html.replace(/<[^>]*>/g, '')
+                })
+            });
 
-            const info = await this.transporter.sendMail(mailOptions);
-            console.log(`✅ Email sent via Brevo to ${to}: ${info.messageId}`);
-            return { success: true, messageId: info.messageId };
+            const data = await response.json();
+
+            if (response.ok) {
+                console.log(`✅ Email sent via Brevo API to ${to}: ${data.messageId}`);
+                return { success: true, messageId: data.messageId };
+            } else {
+                console.error('❌ Brevo API error:', data);
+                return { success: false, error: data.message || 'Unknown API error' };
+            }
         } catch (error) {
-            console.error('❌ Brevo email send error:', error);
+            console.error('❌ Brevo API send error:', error.message);
             return { success: false, error: error.message };
         }
     }
