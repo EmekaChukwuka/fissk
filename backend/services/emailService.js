@@ -25,7 +25,7 @@ class EmailService {
                 },
                 body: JSON.stringify({
                     sender: {
-                        email: process.env.EMAIL_FROM || 'noreply@yourcompany.com',
+                        email: process.env.EMAIL_FROM,
                         name: 'FISSK Online Academy'
                     },
                     to: [{ email: to }],
