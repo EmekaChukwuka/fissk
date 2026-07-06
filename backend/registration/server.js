@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import session from "express-session";
 import dotenv from "dotenv";
 import jwt from 'jsonwebtoken';
+import { generateToken } from '../middleware/auth.js';
 
 // Import Mongoose models
 import User from "../models/User.js";
@@ -192,130 +193,122 @@ Regisrouter.post('/student-register', async (req, res) => {
 
 // ===== UPDATE STUDENT LOGIN =====
 Regisrouter.post('/student-login', async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({
-            success: false,
-            message: 'Email and password are required'
-        });
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email and password are required'
+    });
+  }
+
+  try {
+    const user = await User.findOne({ email, userType: 'student' });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
     }
 
-    try {
-        const user = await User.findOne({ email, userType: 'student' });
+    const isMatch = await bcrypt.compare(password, user.password);
 
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid credentials'
-            });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-
-        if (!isMatch) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid credentials'
-            });
-        }
-
-        const sessionUser = {
-            id: user._id,
-            firstname: user.firstName,
-            lastname: user.lastName,
-            email: user.email,
-            user_type: user.userType
-        };
-
-        // ===== NEW: Generate JWT token =====
-        const token = jwt.sign(
-            { 
-                id: user._id, 
-                email: user.email, 
-                userType: user.userType 
-            },
-            process.env.JWT_SECRET || 'fissk-secret-key',
-            { expiresIn: '7d' }
-        );
-
-        req.session.user = sessionUser;
-
-        res.json({
-            success: true,
-            message: 'Login successful',
-            sessionUser,
-            token 
-        });
-
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
     }
+
+    const sessionUser = {
+      id: user._id,
+      firstname: user.firstName,
+      lastname: user.lastName,
+      email: user.email,
+      user_type: user.userType
+    };
+
+    // ===== GENERATE JWT TOKEN =====
+    const token = generateToken({
+      _id: user._id,
+      email: user.email,
+      userType: user.userType
+    });
+
+    req.session.user = sessionUser;
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      sessionUser,
+      token  // ← Include token in response
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
 });
 
 // ===== UPDATE INSTRUCTOR LOGIN =====
 Regisrouter.post('/instructor-login', async (req, res) => {
-    const { email, password } = req.body;
+  const { email, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({
-            success: false,
-            message: 'Email and password are required'
-        });
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email and password are required'
+    });
+  }
+
+  try {
+    const user = await User.findOne({ email, userType: 'instructor' });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
     }
 
-    try {
-        const user = await User.findOne({ email, userType: 'instructor' });
+    const isMatch = await bcrypt.compare(password, user.password);
 
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid credentials'
-            });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-
-        if (!isMatch) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid credentials'
-            });
-        }
-
-        const sessionUser = {
-            id: user._id,
-            firstname: user.firstName,
-            lastname: user.lastName,
-            email: user.email,
-            user_type: user.userType
-        };
-
-        // ===== NEW: Generate JWT token =====
-        const token = jwt.sign(
-            { 
-                id: user._id, 
-                email: user.email, 
-                userType: user.userType 
-            },
-            process.env.JWT_SECRET || 'fissk-secret-key',
-            { expiresIn: '7d' }
-        );
-
-        req.session.user = sessionUser;
-
-        res.json({
-            success: true,
-            message: 'Login successful',
-            sessionUser,
-            token 
-        });
-
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ success: false, message: 'Internal server error' });
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
     }
+
+    const sessionUser = {
+      id: user._id,
+      firstname: user.firstName,
+      lastname: user.lastName,
+      email: user.email,
+      user_type: user.userType
+    };
+
+    // ===== GENERATE JWT TOKEN =====
+    const token = generateToken({
+      _id: user._id,
+      email: user.email,
+      userType: user.userType
+    });
+
+    req.session.user = sessionUser;
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      sessionUser,
+      token  // ← Include token in response
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
 });
 
 // ============================================================
