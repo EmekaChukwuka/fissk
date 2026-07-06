@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 import dotenv from "dotenv";
+import jwt from 'jsonwebtoken';
 
 // Import Mongoose models
 import User from "../models/User.js";
@@ -189,112 +190,132 @@ Regisrouter.post('/student-register', async (req, res) => {
   }
 });
 
-// ============================================================
-// AUTHENTICATION ENDPOINTS
-// ============================================================
-
-// Student login
+// ===== UPDATE STUDENT LOGIN =====
 Regisrouter.post('/student-login', async (req, res) => {
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email and password are required'
-    });
-  }
-
-  try {
-    const user = await User.findOne({ email, userType: 'student' });
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+    if (!email || !password) {
+        return res.status(400).json({
+            success: false,
+            message: 'Email and password are required'
+        });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    try {
+        const user = await User.findOne({ email, userType: 'student' });
 
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid credentials'
+            });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        if (!isMatch) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid credentials'
+            });
+        }
+
+        const sessionUser = {
+            id: user._id,
+            firstname: user.firstName,
+            lastname: user.lastName,
+            email: user.email,
+            user_type: user.userType
+        };
+
+        // ===== NEW: Generate JWT token =====
+        const token = jwt.sign(
+            { 
+                id: user._id, 
+                email: user.email, 
+                userType: user.userType 
+            },
+            process.env.JWT_SECRET || 'fissk-secret-key',
+            { expiresIn: '7d' }
+        );
+
+        req.session.user = sessionUser;
+
+        res.json({
+            success: true,
+            message: 'Login successful',
+            sessionUser,
+            token 
+        });
+
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
-
-    const sessionUser = {
-      id: user._id,
-      firstname: user.firstName,
-      lastname: user.lastName,
-      email: user.email,
-      user_type: user.userType
-    };
-
-    req.session.user = sessionUser;
-
-    res.json({
-      success: true,
-      message: 'Login successful',
-      sessionUser
-    });
-
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
 });
 
-// Instructor login
+// ===== UPDATE INSTRUCTOR LOGIN =====
 Regisrouter.post('/instructor-login', async (req, res) => {
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email and password are required'
-    });
-  }
-
-  try {
-    const user = await User.findOne({ email, userType: 'instructor' });
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+    if (!email || !password) {
+        return res.status(400).json({
+            success: false,
+            message: 'Email and password are required'
+        });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    try {
+        const user = await User.findOne({ email, userType: 'instructor' });
 
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid credentials'
+            });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        if (!isMatch) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid credentials'
+            });
+        }
+
+        const sessionUser = {
+            id: user._id,
+            firstname: user.firstName,
+            lastname: user.lastName,
+            email: user.email,
+            user_type: user.userType
+        };
+
+        // ===== NEW: Generate JWT token =====
+        const token = jwt.sign(
+            { 
+                id: user._id, 
+                email: user.email, 
+                userType: user.userType 
+            },
+            process.env.JWT_SECRET || 'fissk-secret-key',
+            { expiresIn: '7d' }
+        );
+
+        req.session.user = sessionUser;
+
+        res.json({
+            success: true,
+            message: 'Login successful',
+            sessionUser,
+            token 
+        });
+
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ success: false, message: 'Internal server error' });
     }
-
-    const sessionUser = {
-      id: user._id,
-      firstname: user.firstName,
-      lastname: user.lastName,
-      email: user.email,
-      user_type: user.userType
-    };
-
-    req.session.user = sessionUser;
-
-    res.json({
-      success: true,
-      message: 'Login successful',
-      sessionUser
-    });
-
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
 });
 
 // ============================================================

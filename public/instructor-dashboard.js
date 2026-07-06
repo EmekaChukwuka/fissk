@@ -2,6 +2,7 @@
 class InstructorDashboard {
   constructor() {
     this.currentUser = JSON.parse(localStorage.getItem('user'));
+    this.token = localStorage.getItem('token');
     this.init();
   }
 
@@ -39,6 +40,21 @@ class InstructorDashboard {
     };
   }
 
+  // ===== HEADERS WITH TOKEN =====
+  getHeaders() {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    
+    // Add token if available
+    const token = this.token || localStorage.getItem('token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
+  }
+
   async loadUserData() {
     if (this.currentUser) {
       document.getElementById('user-dropdown').innerHTML = `
@@ -55,7 +71,8 @@ class InstructorDashboard {
   }
 
   async loadDashboardData() {
-    await Promise.all([
+    // Load all data in parallel, but handle errors gracefully
+    const results = await Promise.allSettled([
       this.loadInstructorClasses(),
       this.loadInstructorStats(),
       this.loadInstructorStreams(),
@@ -63,6 +80,13 @@ class InstructorDashboard {
       this.loadEarnings(),
       this.loadPaymentHistory()
     ]);
+    
+    // Log any failures
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.log(`Task ${index} failed:`, result.reason);
+      }
+    });
   }
 
   async loadInstructorClasses() {
@@ -236,7 +260,6 @@ class InstructorDashboard {
       const originalText = submitBtn.textContent;
       this.showButtonSpinner(submitBtn, 'Creating...');
 
-      // ===== NEW: Process price fields =====
       const isFree = document.getElementById('classFree').checked;
       let price = parseFloat(document.getElementById('classPrice').value) || 0;
       
@@ -244,7 +267,6 @@ class InstructorDashboard {
         price = 0;
       }
       
-      // Validate minimum price
       if (!isFree && price > 0 && price < 1000) {
         this.showMessage('❌ Minimum price is ₦1,000', 'error');
         if (submitBtn) this.hideButtonSpinner(submitBtn, originalText);
@@ -288,16 +310,36 @@ class InstructorDashboard {
     }
   }
 
-  // ===== LOAD EARNINGS =====
+  // ===== LOAD EARNINGS (FIXED - Handles 401 gracefully) =====
   async loadEarnings() {
     try {
+      const token = this.token || localStorage.getItem('token');
+      
+      // If no token, skip earnings loading
+      if (!token) {
+        console.log('No token found, skipping earnings');
+        this.showMessage('Please login again to view earnings', 'warning');
+        return;
+      }
+
       const res = await fetch('https://fissk-backend.onrender.com/api/payout/earnings', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
+      
+      if (res.status === 401) {
+        console.log('Unauthorized - token may have expired');
+        // Try to refresh token or redirect to login
+        localStorage.removeItem('token');
+        this.showMessage('Session expired. Please login again.', 'error');
+        setTimeout(() => {
+          window.location.href = 'login.html';
+        }, 2000);
+        return;
+      }
       
       if (!res.ok) {
         throw new Error('Failed to load earnings');
@@ -313,7 +355,37 @@ class InstructorDashboard {
       }
     } catch (error) {
       console.error('Load earnings error:', error);
+      // Show a message but don't break the dashboard
+      this.renderEarningsFallback();
     }
+  }
+
+  renderEarningsFallback() {
+    let earningsSection = document.getElementById('earningsSection');
+    if (!earningsSection) {
+      const overviewSection = document.getElementById('overview');
+      if (overviewSection) {
+        const activitiesDiv = overviewSection.querySelector('.recent-activities');
+        if (activitiesDiv) {
+          earningsSection = document.createElement('div');
+          earningsSection.id = 'earningsSection';
+          earningsSection.className = 'earnings-section';
+          activitiesDiv.parentNode.insertBefore(earningsSection, activitiesDiv.nextSibling);
+        }
+      }
+    }
+    
+    if (!earningsSection) return;
+    
+    earningsSection.innerHTML = `
+      <div class="earnings-card">
+        <h3>💰 Earnings Overview</h3>
+        <div style="text-align: center; padding: 20px;">
+          <p style="color: #6B7280;">Login required to view earnings</p>
+          <button class="btn btn-primary" onclick="window.location.href='login.html'">Login</button>
+        </div>
+      </div>
+    `;
   }
 
   renderEarnings(earnings) {
@@ -363,7 +435,7 @@ class InstructorDashboard {
           <button class="btn btn-outline" onclick="window.instructorDashboard.showBankDetailsForm()">
             🏦 Update Bank Details
           </button>
-          <button class="btn btn-outline" onclick="window.instructorDashboard.switchSection('payments')">
+          <button class="btn btn-outline" onclick="window.instructorDashboard.loadPaymentHistory()">
             📜 View Payment History
           </button>
         </div>
@@ -371,19 +443,42 @@ class InstructorDashboard {
     `;
   }
 
-  // ===== LOAD PAYMENT HISTORY =====
+  // ===== LOAD PAYMENT HISTORY (FIXED - Uses existing endpoint) =====
   async loadPaymentHistory() {
     const container = this.el.paymentHistoryContainer;
     if (!container) return;
 
     try {
-      const res = await fetch('https://fissk-backend.onrender.com/api/payment/instructor/transactions', {
+      const token = this.token || localStorage.getItem('token');
+      
+      if (!token) {
+        container.innerHTML = `
+          <div class="no-content" style="text-align: center; padding: 40px;">
+            <p style="color: #6B7280;">🔒 Please login to view payment history</p>
+            <button class="btn btn-primary" onclick="window.location.href='login.html'">Login</button>
+          </div>
+        `;
+        return;
+      }
+
+      // Try to fetch from the earnings endpoint which includes transactions
+      const res = await fetch('https://fissk-backend.onrender.com/api/payout/earnings', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
+
+      if (res.status === 401) {
+        container.innerHTML = `
+          <div class="no-content" style="text-align: center; padding: 40px;">
+            <p style="color: #EF4444;">❌ Session expired. Please login again.</p>
+            <button class="btn btn-primary" onclick="window.location.href='login.html'">Login</button>
+          </div>
+        `;
+        return;
+      }
 
       if (!res.ok) {
         throw new Error('Failed to load payment history');
@@ -391,7 +486,19 @@ class InstructorDashboard {
 
       const data = await res.json();
 
-      if (!data.success || !data.transactions || data.transactions.length === 0) {
+      if (!data.success || !data.earnings || !data.earnings.transactions) {
+        container.innerHTML = `
+          <div class="no-content" style="text-align: center; padding: 40px;">
+            <p style="font-size: 1.2rem; color: #999;">💰 No payment transactions yet</p>
+            <p style="color: #bbb;">Students will appear here once they purchase your courses</p>
+          </div>
+        `;
+        return;
+      }
+
+      const transactions = data.earnings.transactions || [];
+
+      if (transactions.length === 0) {
         container.innerHTML = `
           <div class="no-content" style="text-align: center; padding: 40px;">
             <p style="font-size: 1.2rem; color: #999;">💰 No payment transactions yet</p>
@@ -414,10 +521,10 @@ class InstructorDashboard {
             </tr>
           </thead>
           <tbody>
-            ${data.transactions.map(t => `
+            ${transactions.map(t => `
               <tr>
-                <td>${this.escapeHtml(t.studentName || 'Anonymous')}</td>
-                <td>${this.escapeHtml(t.courseName || 'Unknown')}</td>
+                <td>${this.escapeHtml(t.user?.firstName || 'Anonymous')} ${this.escapeHtml(t.user?.lastName || '')}</td>
+                <td>${this.escapeHtml(t.class?.title || 'Unknown')}</td>
                 <td>₦${(t.amount || 0).toLocaleString()}</td>
                 <td>₦${(t.instructorEarning || 0).toLocaleString()}</td>
                 <td>${t.paidAt ? new Date(t.paidAt).toLocaleDateString() : '—'}</td>
@@ -431,7 +538,7 @@ class InstructorDashboard {
           </tbody>
         </table>
         <div style="margin-top: 16px; text-align: right; color: #6B7280; font-size: 0.85rem;">
-          Total: ₦${(data.totalEarnings || 0).toLocaleString()} earned from ${data.transactions.length} transactions
+          Total: ₦${(data.earnings.totalRevenue || 0).toLocaleString()} earned from ${transactions.length} transactions
         </div>
       `;
     } catch (error) {
@@ -439,6 +546,7 @@ class InstructorDashboard {
       container.innerHTML = `
         <div class="no-content" style="text-align: center; padding: 40px;">
           <p style="color: #EF4444;">❌ Failed to load payment history</p>
+          <button class="btn btn-outline" onclick="window.instructorDashboard.loadPaymentHistory()">Retry</button>
         </div>
       `;
     }
@@ -456,10 +564,17 @@ class InstructorDashboard {
     }
     
     try {
-      const res = await fetch('/api/payout/withdraw', {
+      const token = this.token || localStorage.getItem('token');
+      
+      if (!token) {
+        alert('Please login to request withdrawal');
+        return;
+      }
+
+      const res = await fetch('https://fissk-backend.onrender.com/api/payout/withdraw', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ amount: numAmount })
@@ -469,8 +584,8 @@ class InstructorDashboard {
       
       if (data.success) {
         alert('✅ Withdrawal request submitted successfully!');
-        this.loadEarnings();
-        this.loadPaymentHistory();
+        await this.loadEarnings();
+        await this.loadPaymentHistory();
       } else {
         alert('❌ ' + (data.message || 'Withdrawal failed'));
       }
@@ -523,10 +638,17 @@ class InstructorDashboard {
       const bankCode = document.getElementById('bankCode').value;
       
       try {
-        const res = await fetch('/api/payout/bank-details', {
+        const token = this.token || localStorage.getItem('token');
+        
+        if (!token) {
+          alert('Please login to update bank details');
+          return;
+        }
+
+        const res = await fetch('https://fissk-backend.onrender.com/api/payout/bank-details', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ bankName, accountNumber, accountName, bankCode })
@@ -974,7 +1096,7 @@ class InstructorDashboard {
       padding: 16px 24px;
       border-radius: 12px;
       color: white;
-      background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#6C3CE1'};
+      background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : type === 'warning' ? '#F59E0B' : '#6C3CE1'};
       z-index: 10000;
       box-shadow: 0 10px 40px rgba(0,0,0,0.2);
       font-weight: 500;
@@ -1043,6 +1165,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
 
 async function logout() {
   localStorage.removeItem('user');
+  localStorage.removeItem('token');
   window.location.href = '/';
 }
 
@@ -1074,5 +1197,16 @@ spinnerStyle.textContent = `
     opacity: 0.7;
     cursor: not-allowed;
   }
+
+  .status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .status-badge.success { background: #d4edda; color: #155724; }
+  .status-badge.pending { background: #fff3cd; color: #856404; }
+  .status-badge.failed { background: #f8d7da; color: #721c24; }
+  .status-badge.refunded { background: #e2e3e5; color: #383d41; }
 `;
 document.head.appendChild(spinnerStyle);
