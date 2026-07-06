@@ -6,25 +6,21 @@ dotenv.config();
 
 class EmailService {
     constructor() {
-        // ===== FIXED: Force IPv4 and proper SMTP config =====
+        // Use Brevo's SMTP (works on Render!)
         this.transporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
+            host: 'smtp-relay.brevo.com', // Brevo SMTP server
             port: 587,
             secure: false, // true for 465, false for other ports
             auth: {
-                user: process.env.EMAIL_USER,
-                pass: process.env.EMAIL_PASS
+                user: process.env.BREVO_SMTP_USER, // Your Brevo login email
+                pass: process.env.BREVO_SMTP_KEY // Your Brevo SMTP key (not API key!)
             },
-            family: 4, // ← Force IPv4 only
+            // No need for family:4 - Brevo handles this properly
             pool: true,
             maxConnections: 5,
             maxMessages: 100,
-            requireTLS: true,
             connectionTimeout: 15000,
             socketTimeout: 15000,
-            tls: {
-                rejectUnauthorized: false // For testing only, remove in production
-            }
         });
 
         // Verify connection on startup
@@ -34,16 +30,16 @@ class EmailService {
     async verifyConnection() {
         try {
             await this.transporter.verify();
-            console.log('✅ Email service connected successfully');
+            console.log('✅ Brevo email service connected successfully');
         } catch (error) {
-            console.error('❌ Email service verification failed:', error.message);
+            console.error('❌ Brevo email service verification failed:', error.message);
         }
     }
 
     async sendEmail(to, subject, html, text = '') {
         try {
             const mailOptions = {
-                from: process.env.EMAIL_FROM || `"FISSK Online Academy" <${process.env.EMAIL_USER}>`,
+                from: process.env.EMAIL_FROM || `"FISSK Online Academy" <noreply@fissk.com>`,
                 to: to,
                 subject: subject,
                 text: text || html.replace(/<[^>]*>/g, ''),
@@ -51,51 +47,10 @@ class EmailService {
             };
 
             const info = await this.transporter.sendMail(mailOptions);
-            console.log(`✅ Email sent to ${to}: ${info.messageId}`);
+            console.log(`✅ Email sent via Brevo to ${to}: ${info.messageId}`);
             return { success: true, messageId: info.messageId };
         } catch (error) {
-            console.error('❌ Email send error:', error);
-            
-            // Try fallback with different config
-            if (error.code === 'ENETUNREACH' || error.code === 'ESOCKET') {
-                console.log('🔄 Retrying with alternative config...');
-                return this.sendEmailWithFallback(to, subject, html, text);
-            }
-            
-            return { success: false, error: error.message };
-        }
-    }
-
-    // ===== FALLBACK SEND METHOD =====
-    async sendEmailWithFallback(to, subject, html, text = '') {
-        try {
-            // Create a new transporter with different settings
-            const fallbackTransporter = nodemailer.createTransport({
-                host: 'smtp.gmail.com',
-                port: 465,
-                secure: true,
-                auth: {
-                    user: process.env.EMAIL_USER,
-                    pass: process.env.EMAIL_PASS
-                },
-                family: 4,
-                connectionTimeout: 30000,
-                socketTimeout: 30000,
-            });
-
-            const mailOptions = {
-                from: process.env.EMAIL_FROM || `"FISSK Online Academy" <${process.env.EMAIL_USER}>`,
-                to: to,
-                subject: subject,
-                text: text || html.replace(/<[^>]*>/g, ''),
-                html: html
-            };
-
-            const info = await fallbackTransporter.sendMail(mailOptions);
-            console.log(`✅ Fallback email sent to ${to}: ${info.messageId}`);
-            return { success: true, messageId: info.messageId };
-        } catch (error) {
-            console.error('❌ Fallback email also failed:', error);
+            console.error('❌ Brevo email send error:', error);
             return { success: false, error: error.message };
         }
     }
