@@ -99,7 +99,7 @@ class EmailService {
                     </div>
                     <div class="footer">
                         <p>FISSK Online Academy - Empowering students with knowledge</p>
-                        <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+                        <p>📍 Warri, Nigeria | 📧 hello@fissk.com</p>
                     </div>
                 </div>
             </body>
@@ -170,7 +170,7 @@ class EmailService {
                     </div>
                     <div class="footer">
                         <p>FISSK Online Academy - Empowering students with knowledge</p>
-                        <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+                        <p>📍 Warri, Nigeria | 📧 hello@fissk.com</p>
                     </div>
                 </div>
             </body>
@@ -230,7 +230,7 @@ class EmailService {
                     </div>
                     <div class="footer">
                         <p>FISSK Online Academy - Empowering students with knowledge</p>
-                        <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+                        <p>📍 Warri, Nigeria | 📧 hello@fissk.com</p>
                     </div>
                 </div>
             </body>
@@ -286,7 +286,7 @@ class EmailService {
                     </div>
                     <div class="footer">
                         <p>FISSK Online Academy - Empowering students with knowledge</p>
-                        <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+                        <p>📍 Warri, Nigeria | 📧 hello@fissk.com</p>
                     </div>
                 </div>
             </body>
@@ -338,7 +338,7 @@ class EmailService {
                     </div>
                     <div class="footer">
                         <p>FISSK Online Academy - Empowering students with knowledge</p>
-                        <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+                        <p>📍 Warri, Nigeria | 📧 hello@fissk.com</p>
                     </div>
                 </div>
             </body>
@@ -390,7 +390,7 @@ class EmailService {
                     </div>
                     <div class="footer">
                         <p>FISSK Online Academy - Empowering students with knowledge</p>
-                        <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+                        <p>📍 Warri, Nigeria | 📧 hello@fissk.com</p>
                     </div>
                 </div>
             </body>
@@ -453,7 +453,7 @@ class EmailService {
                     </div>
                     <div class="footer">
                         <p>FISSK Online Academy - Empowering students with knowledge</p>
-                        <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+                        <p>📍 Warri, Nigeria | 📧 hello@fissk.com</p>
                         <p style="font-size:0.8rem; color:#999;">
                             You received this because you're enrolled in ${classData.title}.
                         </p>
