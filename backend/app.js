@@ -746,7 +746,7 @@ app.get('/live/chat-history', (req, res) => {
 // ===== START SERVER =====
 const PORT = process.env.PORT || 3000;
 connectDB();
-createAdmin();
+//createAdmin();
 
 server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
