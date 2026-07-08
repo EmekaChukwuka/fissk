@@ -11,6 +11,9 @@
 </head>
 <body>
     <div class="admin-wrapper">
+        <!-- Sidebar Overlay (Mobile) -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
         <!-- Sidebar -->
         <aside class="admin-sidebar" id="adminSidebar">
             <div class="logo">
@@ -42,21 +45,24 @@
             <!-- Topbar -->
             <div class="admin-topbar">
                 <div class="page-title">
-                    <h1>⚙️ Settings</h1>
-                    <p>Configure platform settings</p>
+                    <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+                    <div>
+                        <h1>⚙️ Settings</h1>
+                        <p>Configure platform settings</p>
+                    </div>
                 </div>
                 <div class="topbar-actions">
-                    <button class="btn btn-primary" onclick="AdminSettings.saveSettings()">
+                    <button class="btn btn-primary" onclick="if(window.AdminSettings) AdminSettings.saveSettings()">
                         💾 Save Changes
                     </button>
                 </div>
             </div>
 
             <!-- Settings Form -->
-            <div style="background: white; border-radius: var(--admin-radius); padding: 32px; box-shadow: var(--admin-shadow);">
+            <div class="settings-form-container">
                 <form id="settingsForm">
                     <!-- General Settings -->
-                    <h3 style="margin-bottom: 16px;">General Settings</h3>
+                    <h3>General Settings</h3>
                     <div class="form-group">
                         <label for="platformName">Platform Name</label>
                         <input type="text" id="platformName" value="FISSK Online Academy">
@@ -73,50 +79,50 @@
                     <div class="form-group">
                         <label for="commissionRate">Commission Rate (%)</label>
                         <input type="number" id="commissionRate" value="30" min="0" max="100">
-                        <small style="color: var(--admin-gray);">Percentage taken from each sale</small>
+                        <small>Percentage taken from each sale</small>
                     </div>
                     <div class="form-group">
                         <label for="minPrice">Minimum Course Price</label>
                         <input type="number" id="minPrice" value="1000" min="0">
-                        <small style="color: var(--admin-gray);">Minimum price instructors can set for courses</small>
+                        <small>Minimum price instructors can set for courses</small>
                     </div>
 
-                    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--admin-gray-light);">
+                    <hr>
 
                     <!-- Email Settings -->
-                    <h3 style="margin-bottom: 16px;">Email Notifications</h3>
+                    <h3>Email Notifications</h3>
                     <div class="form-group">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <label class="checkbox-label">
                             <input type="checkbox" id="welcomeEmail" checked>
                             Welcome Email
                         </label>
-                        <small style="color: var(--admin-gray);">Send welcome emails to new students</small>
+                        <small>Send welcome emails to new students</small>
                     </div>
                     <div class="form-group">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <label class="checkbox-label">
                             <input type="checkbox" id="paymentReceipt" checked>
                             Payment Receipt
                         </label>
-                        <small style="color: var(--admin-gray);">Send payment receipts to students</small>
+                        <small>Send payment receipts to students</small>
                     </div>
                     <div class="form-group">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <label class="checkbox-label">
                             <input type="checkbox" id="classReminders" checked>
                             Class Reminders
                         </label>
-                        <small style="color: var(--admin-gray);">Send reminders for upcoming classes</small>
+                        <small>Send reminders for upcoming classes</small>
                     </div>
 
-                    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--admin-gray-light);">
+                    <hr>
 
                     <!-- Maintenance -->
-                    <h3 style="margin-bottom: 16px;">Maintenance</h3>
+                    <h3>Maintenance</h3>
                     <div class="form-group">
-                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <label class="checkbox-label">
                             <input type="checkbox" id="maintenanceMode">
                             Maintenance Mode
                         </label>
-                        <small style="color: var(--admin-gray);">When enabled, the platform will show a maintenance message</small>
+                        <small>When enabled, the platform will show a maintenance message</small>
                     </div>
                 </form>
             </div>
@@ -125,5 +131,52 @@
 
     <script src="js/admin.js"></script>
     <script src="js/admin-settings.js"></script>
+    <script>
+        // ===== SIDEBAR TOGGLE FUNCTIONALITY =====
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('sidebarToggle');
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    sidebar.classList.toggle('open');
+                    overlay.classList.toggle('active');
+                    document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : 'auto';
+                });
+            }
+
+            if (overlay) {
+                overlay.addEventListener('click', function() {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                    document.body.style.overflow = 'auto';
+                });
+            }
+
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                    document.body.style.overflow = 'auto';
+                }
+            });
+
+            document.querySelectorAll('.admin-nav a').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('open');
+                        overlay.classList.remove('active');
+                        document.body.style.overflow = 'auto';
+                    }
+                });
+            });
+
+            if (typeof AdminSettings !== 'undefined') {
+                window.AdminSettings = AdminSettings;
+            }
+        });
+    </script>
 </body>
 </html>

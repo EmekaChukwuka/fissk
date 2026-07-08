@@ -11,6 +11,9 @@
 </head>
 <body>
     <div class="admin-wrapper">
+        <!-- Sidebar Overlay (Mobile) -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
         <!-- Sidebar -->
         <aside class="admin-sidebar" id="adminSidebar">
             <div class="logo">
@@ -42,8 +45,11 @@
             <!-- Topbar -->
             <div class="admin-topbar">
                 <div class="page-title">
-                    <h1>Dashboard</h1>
-                    <p>Overview of your platform</p>
+                    <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+                    <div>
+                        <h1>Dashboard</h1>
+                        <p>Overview of your platform</p>
+                    </div>
                 </div>
                 <div class="topbar-actions">
                     <button class="btn btn-outline" onclick="window.location.href='../index.html'">
@@ -95,23 +101,25 @@
                     <h3 style="margin: 0; color: var(--admin-gray-dark);">📋 Recent Activity</h3>
                 </div>
                 <div id="recentActivityContainer">
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Action</th>
-                                <th>Target</th>
-                                <th>Admin</th>
-                                <th>Date</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recentActivityBody">
-                            <tr>
-                                <td colspan="4" style="text-align: center; padding: 40px; color: var(--admin-gray);">
-                                    Loading activities...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div style="overflow-x: auto;">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Action</th>
+                                    <th>Target</th>
+                                    <th>Admin</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentActivityBody">
+                                <tr>
+                                    <td colspan="4" style="text-align: center; padding: 40px; color: var(--admin-gray);">
+                                        Loading activities...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </main>
@@ -119,12 +127,61 @@
 
     <script src="js/admin.js"></script>
     <script>
-        // Initialize dashboard when page loads
-        document.addEventListener('DOMContentLoaded', () => {
+        // ===== SIDEBAR TOGGLE FUNCTIONALITY =====
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('sidebarToggle');
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    sidebar.classList.toggle('open');
+                    overlay.classList.toggle('active');
+                    document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : 'auto';
+                });
+            }
+
+            if (overlay) {
+                overlay.addEventListener('click', function() {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                    document.body.style.overflow = 'auto';
+                });
+            }
+
+            // Close sidebar on window resize to desktop
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                    document.body.style.overflow = 'auto';
+                }
+            });
+
+            // Close sidebar when a nav link is clicked (mobile)
+            document.querySelectorAll('.admin-nav a').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('open');
+                        overlay.classList.remove('active');
+                        document.body.style.overflow = 'auto';
+                    }
+                });
+            });
+
+            // Initialize dashboard
             if (window.AdminApp) {
                 window.AdminApp.initDashboard();
             }
         });
+
+        // ===== LOGOUT =====
+        function logout() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '../login.html';
+        }
     </script>
 </body>
 </html>

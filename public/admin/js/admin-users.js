@@ -1,5 +1,5 @@
 // ===== ADMIN USERS MANAGEMENT =====
-class AdminUsers {
+class AdminUsersClass {
     constructor() {
         this.currentPage = 1;
         this.totalPages = 1;
@@ -7,16 +7,35 @@ class AdminUsers {
         this.users = [];
         this.filteredUsers = [];
         this.pendingUserId = null;
+        this.isInitialized = false;
         this.init();
     }
     
     async init() {
+        if (this.isInitialized) return;
+        this.isInitialized = true;
+        
+        // Wait for AdminApp to be ready
+        if (!window.AdminApp) {
+            await new Promise(resolve => {
+                const checkInterval = setInterval(() => {
+                    if (window.AdminApp) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+        
         await this.loadUsers();
         this.setupEventListeners();
+        console.log('✅ AdminUsers initialized');
     }
     
     async loadUsers() {
         const container = document.getElementById('usersTableBody');
+        if (!container) return;
+        
         container.innerHTML = `
             <tr>
                 <td colspan="6" style="text-align: center; padding: 40px; color: var(--admin-gray);">
@@ -52,18 +71,21 @@ class AdminUsers {
             
         } catch (error) {
             console.error('Load users error:', error);
-            container.innerHTML = `
-                <tr>
-                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--admin-danger);">
-                        ❌ Failed to load users. <button onclick="AdminUsers.loadUsers()" style="cursor: pointer; color: var(--admin-primary);">Retry</button>
-                    </td>
-                </tr>
-            `;
+            if (container) {
+                container.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--admin-danger);">
+                            ❌ Failed to load users. <button onclick="AdminUsers.loadUsers()" style="cursor: pointer; color: var(--admin-primary);">Retry</button>
+                        </td>
+                    </tr>
+                `;
+            }
         }
     }
     
     renderUsers() {
         const container = document.getElementById('usersTableBody');
+        if (!container) return;
         
         if (!this.users || this.users.length === 0) {
             container.innerHTML = `
@@ -80,13 +102,11 @@ class AdminUsers {
             const status = user.isActive !== false ? 'active' : 'inactive';
             const statusLabel = status === 'active' ? '✅ Active' : '⛔ Inactive';
             
-            // Check if instructor needs approval
             let approvalBadge = '';
             if (user.userType === 'instructor' && !user.isApproved) {
                 approvalBadge = '<span class="status-badge pending">⏳ Pending</span>';
             }
             
-            // Admin badge
             let adminBadge = '';
             if (user.userType === 'admin') {
                 adminBadge = '<span class="status-badge" style="background: #e0e7ff; color: #4f46e5;">👑 Admin</span>';
@@ -126,6 +146,7 @@ class AdminUsers {
     renderPagination() {
         const container = document.getElementById('paginationButtons');
         const info = document.getElementById('pageInfo');
+        if (!container || !info) return;
         
         const start = (this.currentPage - 1) * 20 + 1;
         const end = Math.min(this.currentPage * 20, this.totalUsers);
@@ -167,12 +188,15 @@ class AdminUsers {
     
     openApproveModal(userId, userName) {
         this.pendingUserId = userId;
-        document.getElementById('approveInstructorName').textContent = userName;
-        document.getElementById('approveModal').classList.add('active');
+        const nameEl = document.getElementById('approveInstructorName');
+        if (nameEl) nameEl.textContent = userName;
+        const modal = document.getElementById('approveModal');
+        if (modal) modal.classList.add('active');
     }
     
     closeModal(modalId) {
-        document.getElementById(modalId).classList.remove('active');
+        const modal = document.getElementById(modalId);
+        if (modal) modal.classList.remove('active');
         this.pendingUserId = null;
     }
     
@@ -192,7 +216,9 @@ class AdminUsers {
                 window.AdminApp.showToast('✅ Instructor approved successfully!', 'success');
                 this.closeModal('approveModal');
                 await this.loadUsers();
-                window.AdminApp.updateBadgeCounts();
+                if (window.AdminApp.updateBadgeCounts) {
+                    window.AdminApp.updateBadgeCounts();
+                }
             } else {
                 throw new Error(data.message || 'Failed to approve');
             }
@@ -220,7 +246,9 @@ class AdminUsers {
                 window.AdminApp.showToast('❌ Instructor rejected', 'info');
                 this.closeModal('approveModal');
                 await this.loadUsers();
-                window.AdminApp.updateBadgeCounts();
+                if (window.AdminApp.updateBadgeCounts) {
+                    window.AdminApp.updateBadgeCounts();
+                }
             } else {
                 throw new Error(data.message || 'Failed to reject');
             }
@@ -256,18 +284,37 @@ class AdminUsers {
     }
     
     setupEventListeners() {
-        // Enter key for search
-        document.getElementById('userSearch')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.filterUsers();
-            }
-        });
+        const searchInput = document.getElementById('userSearch');
+        if (searchInput) {
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.filterUsers();
+                }
+            });
+        }
     }
 }
 
-// ===== INITIALIZE =====
-document.addEventListener('DOMContentLoaded', () => {
-    if (document.querySelector('.admin-wrapper') && document.querySelector('#usersTableBody')) {
-        window.AdminUsers = new AdminUsers();
-    }
+// ===== CREATE GLOBAL INSTANCE =====
+let AdminUsers = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for AdminApp
+    const checkInterval = setInterval(() => {
+        if (window.AdminApp) {
+            clearInterval(checkInterval);
+            AdminUsers = new AdminUsersClass();
+            window.AdminUsers = AdminUsers;
+            console.log('✅ AdminUsers registered globally');
+        }
+    }, 100);
+    
+    // Fallback: if AdminApp doesn't load in 5 seconds, try anyway
+    setTimeout(() => {
+        if (!window.AdminApp) {
+            console.warn('⚠️ AdminApp not found, creating AdminUsers anyway');
+            AdminUsers = new AdminUsersClass();
+            window.AdminUsers = AdminUsers;
+        }
+    }, 5000);
 });

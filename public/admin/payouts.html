@@ -11,6 +11,9 @@
 </head>
 <body>
     <div class="admin-wrapper">
+        <!-- Sidebar Overlay (Mobile) -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
         <!-- Sidebar -->
         <aside class="admin-sidebar" id="adminSidebar">
             <div class="logo">
@@ -42,11 +45,14 @@
             <!-- Topbar -->
             <div class="admin-topbar">
                 <div class="page-title">
-                    <h1>💰 Payouts</h1>
-                    <p>Manage instructor withdrawal requests</p>
+                    <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+                    <div>
+                        <h1>💰 Payouts</h1>
+                        <p>Manage instructor withdrawal requests</p>
+                    </div>
                 </div>
                 <div class="topbar-actions">
-                    <button class="btn btn-outline" onclick="AdminPayouts.loadPayouts()">
+                    <button class="btn btn-outline" onclick="if(window.AdminPayouts) AdminPayouts.loadPayouts()">
                         🔄 Refresh
                     </button>
                 </div>
@@ -57,25 +63,27 @@
                 <h2 style="color: var(--admin-gray-dark); margin-bottom: 16px;">⏳ Pending Withdrawals</h2>
                 <div class="admin-table-container">
                     <div id="pendingPayoutsContainer">
-                        <table class="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>Instructor</th>
-                                    <th>Amount</th>
-                                    <th>Bank</th>
-                                    <th>Account</th>
-                                    <th>Requested</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pendingPayoutsBody">
-                                <tr>
-                                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--admin-gray);">
-                                        Loading pending payouts...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <div style="overflow-x: auto;">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Instructor</th>
+                                        <th>Amount</th>
+                                        <th>Bank</th>
+                                        <th>Account</th>
+                                        <th>Requested</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pendingPayoutsBody">
+                                    <tr>
+                                        <td colspan="6" style="text-align: center; padding: 40px; color: var(--admin-gray);">
+                                            Loading pending payouts...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -85,33 +93,35 @@
                 <h2 style="color: var(--admin-gray-dark); margin-bottom: 16px;">📋 All Transactions</h2>
                 <div class="admin-table-container">
                     <div id="allPaymentsContainer">
-                        <table class="admin-table">
-                            <thead>
-                                <tr>
-                                    <th>Student</th>
-                                    <th>Course</th>
-                                    <th>Amount</th>
-                                    <th>Instructor Earnings</th>
-                                    <th>Platform Fee</th>
-                                    <th>Date</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="allPaymentsBody">
-                                <tr>
-                                    <td colspan="7" style="text-align: center; padding: 40px; color: var(--admin-gray);">
-                                        Loading transactions...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <div style="overflow-x: auto;">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Student</th>
+                                        <th>Course</th>
+                                        <th>Amount</th>
+                                        <th>Instructor Earnings</th>
+                                        <th>Platform Fee</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="allPaymentsBody">
+                                    <tr>
+                                        <td colspan="7" style="text-align: center; padding: 40px; color: var(--admin-gray);">
+                                            Loading transactions...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                     <div class="admin-pagination">
                         <span class="page-info" id="paymentPageInfo">Showing 1-20 of 0</span>
                         <div class="page-buttons" id="paymentPaginationButtons">
-                            <button onclick="AdminPayouts.goToPaymentPage('prev')">←</button>
+                            <button onclick="if(window.AdminPayouts) AdminPayouts.goToPaymentPage('prev')">←</button>
                             <button class="active">1</button>
-                            <button onclick="AdminPayouts.goToPaymentPage('next')">→</button>
+                            <button onclick="if(window.AdminPayouts) AdminPayouts.goToPaymentPage('next')">→</button>
                         </div>
                     </div>
                 </div>
@@ -121,5 +131,52 @@
 
     <script src="js/admin.js"></script>
     <script src="js/admin-payouts.js"></script>
+    <script>
+        // ===== SIDEBAR TOGGLE FUNCTIONALITY =====
+        document.addEventListener('DOMContentLoaded', function() {
+            const toggleBtn = document.getElementById('sidebarToggle');
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    sidebar.classList.toggle('open');
+                    overlay.classList.toggle('active');
+                    document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : 'auto';
+                });
+            }
+
+            if (overlay) {
+                overlay.addEventListener('click', function() {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                    document.body.style.overflow = 'auto';
+                });
+            }
+
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                    document.body.style.overflow = 'auto';
+                }
+            });
+
+            document.querySelectorAll('.admin-nav a').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('open');
+                        overlay.classList.remove('active');
+                        document.body.style.overflow = 'auto';
+                    }
+                });
+            });
+
+            if (typeof AdminPayouts !== 'undefined') {
+                window.AdminPayouts = AdminPayouts;
+            }
+        });
+    </script>
 </body>
 </html>

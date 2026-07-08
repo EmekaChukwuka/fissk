@@ -1,21 +1,39 @@
 // ===== ADMIN CLASSES MANAGEMENT =====
-class AdminClasses {
+class AdminClassesClass {
     constructor() {
         this.currentPage = 1;
         this.totalPages = 1;
         this.totalClasses = 0;
         this.classes = [];
         this.deleteClassId = null;
+        this.isInitialized = false;
         this.init();
     }
     
     async init() {
+        if (this.isInitialized) return;
+        this.isInitialized = true;
+        
+        if (!window.AdminApp) {
+            await new Promise(resolve => {
+                const checkInterval = setInterval(() => {
+                    if (window.AdminApp) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+        
         await this.loadClasses();
         this.setupEventListeners();
+        console.log('✅ AdminClasses initialized');
     }
     
     async loadClasses() {
         const container = document.getElementById('classesTableBody');
+        if (!container) return;
+        
         container.innerHTML = `
             <tr>
                 <td colspan="7" style="text-align: center; padding: 40px; color: var(--admin-gray);">
@@ -49,18 +67,21 @@ class AdminClasses {
             
         } catch (error) {
             console.error('Load classes error:', error);
-            container.innerHTML = `
-                <tr>
-                    <td colspan="7" style="text-align: center; padding: 40px; color: var(--admin-danger);">
-                        ❌ Failed to load classes. <button onclick="AdminClasses.loadClasses()" style="cursor: pointer; color: var(--admin-primary);">Retry</button>
-                    </td>
-                </tr>
-            `;
+            if (container) {
+                container.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 40px; color: var(--admin-danger);">
+                            ❌ Failed to load classes. <button onclick="AdminClasses.loadClasses()" style="cursor: pointer; color: var(--admin-primary);">Retry</button>
+                        </td>
+                    </tr>
+                `;
+            }
         }
     }
     
     renderClasses() {
         const container = document.getElementById('classesTableBody');
+        if (!container) return;
         
         if (!this.classes || this.classes.length === 0) {
             container.innerHTML = `
@@ -105,6 +126,7 @@ class AdminClasses {
     renderPagination() {
         const container = document.getElementById('paginationButtons');
         const info = document.getElementById('pageInfo');
+        if (!container || !info) return;
         
         const start = (this.currentPage - 1) * 20 + 1;
         const end = Math.min(this.currentPage * 20, this.totalClasses);
@@ -146,12 +168,15 @@ class AdminClasses {
     
     openDeleteModal(classId, className) {
         this.deleteClassId = classId;
-        document.getElementById('deleteClassName').textContent = className;
-        document.getElementById('deleteClassModal').classList.add('active');
+        const nameEl = document.getElementById('deleteClassName');
+        if (nameEl) nameEl.textContent = className;
+        const modal = document.getElementById('deleteClassModal');
+        if (modal) modal.classList.add('active');
     }
     
     closeModal(modalId) {
-        document.getElementById(modalId).classList.remove('active');
+        const modal = document.getElementById(modalId);
+        if (modal) modal.classList.remove('active');
         this.deleteClassId = null;
     }
     
@@ -182,22 +207,39 @@ class AdminClasses {
     }
     
     showCreateModal() {
-        // Redirect to instructor dashboard to create class
         window.location.href = '../instructor-dashboard.html#classes';
     }
     
     setupEventListeners() {
-        document.getElementById('classSearch')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.filterClasses();
-            }
-        });
+        const searchInput = document.getElementById('classSearch');
+        if (searchInput) {
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.filterClasses();
+                }
+            });
+        }
     }
 }
 
-// ===== INITIALIZE =====
-document.addEventListener('DOMContentLoaded', () => {
-    if (document.querySelector('.admin-wrapper') && document.querySelector('#classesTableBody')) {
-        window.AdminClasses = new AdminClasses();
-    }
+// ===== CREATE GLOBAL INSTANCE =====
+let AdminClasses = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const checkInterval = setInterval(() => {
+        if (window.AdminApp) {
+            clearInterval(checkInterval);
+            AdminClasses = new AdminClassesClass();
+            window.AdminClasses = AdminClasses;
+            console.log('✅ AdminClasses registered globally');
+        }
+    }, 100);
+    
+    setTimeout(() => {
+        if (!window.AdminApp) {
+            console.warn('⚠️ AdminApp not found, creating AdminClasses anyway');
+            AdminClasses = new AdminClassesClass();
+            window.AdminClasses = AdminClasses;
+        }
+    }, 5000);
 });

@@ -1,12 +1,28 @@
 // ===== ADMIN SETTINGS MANAGEMENT =====
-class AdminSettings {
+class AdminSettingsClass {
     constructor() {
+        this.isInitialized = false;
         this.init();
     }
     
     async init() {
+        if (this.isInitialized) return;
+        this.isInitialized = true;
+        
+        if (!window.AdminApp) {
+            await new Promise(resolve => {
+                const checkInterval = setInterval(() => {
+                    if (window.AdminApp) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+        
         await this.loadSettings();
         this.setupEventListeners();
+        console.log('✅ AdminSettings initialized');
     }
     
     async loadSettings() {
@@ -32,37 +48,49 @@ class AdminSettings {
     populateSettings(settings) {
         if (!settings) return;
         
-        document.getElementById('platformName').value = settings.platformName || 'FISSK Online Academy';
-        document.getElementById('currency').value = settings.currency || 'NGN';
-        document.getElementById('commissionRate').value = settings.commissionRate || 30;
-        document.getElementById('minPrice').value = settings.minPrice || 1000;
+        const platformName = document.getElementById('platformName');
+        const currency = document.getElementById('currency');
+        const commissionRate = document.getElementById('commissionRate');
+        const minPrice = document.getElementById('minPrice');
+        
+        if (platformName) platformName.value = settings.platformName || 'FISSK Online Academy';
+        if (currency) currency.value = settings.currency || 'NGN';
+        if (commissionRate) commissionRate.value = settings.commissionRate || 30;
+        if (minPrice) minPrice.value = settings.minPrice || 1000;
         
         if (settings.emailNotifications) {
-            document.getElementById('welcomeEmail').checked = settings.emailNotifications.welcomeEmail !== false;
-            document.getElementById('paymentReceipt').checked = settings.emailNotifications.paymentReceipt !== false;
-            document.getElementById('classReminders').checked = settings.emailNotifications.classReminders !== false;
+            const welcomeEmail = document.getElementById('welcomeEmail');
+            const paymentReceipt = document.getElementById('paymentReceipt');
+            const classReminders = document.getElementById('classReminders');
+            
+            if (welcomeEmail) welcomeEmail.checked = settings.emailNotifications.welcomeEmail !== false;
+            if (paymentReceipt) paymentReceipt.checked = settings.emailNotifications.paymentReceipt !== false;
+            if (classReminders) classReminders.checked = settings.emailNotifications.classReminders !== false;
         }
         
-        document.getElementById('maintenanceMode').checked = settings.maintenanceMode || false;
+        const maintenanceMode = document.getElementById('maintenanceMode');
+        if (maintenanceMode) maintenanceMode.checked = settings.maintenanceMode || false;
     }
     
     getSettingsFromForm() {
         return {
-            platformName: document.getElementById('platformName').value,
-            currency: document.getElementById('currency').value,
-            commissionRate: parseFloat(document.getElementById('commissionRate').value) || 30,
-            minPrice: parseFloat(document.getElementById('minPrice').value) || 1000,
+            platformName: document.getElementById('platformName')?.value || 'FISSK Online Academy',
+            currency: document.getElementById('currency')?.value || 'NGN',
+            commissionRate: parseFloat(document.getElementById('commissionRate')?.value) || 30,
+            minPrice: parseFloat(document.getElementById('minPrice')?.value) || 1000,
             emailNotifications: {
-                welcomeEmail: document.getElementById('welcomeEmail').checked,
-                paymentReceipt: document.getElementById('paymentReceipt').checked,
-                classReminders: document.getElementById('classReminders').checked
+                welcomeEmail: document.getElementById('welcomeEmail')?.checked || false,
+                paymentReceipt: document.getElementById('paymentReceipt')?.checked || false,
+                classReminders: document.getElementById('classReminders')?.checked || false
             },
-            maintenanceMode: document.getElementById('maintenanceMode').checked
+            maintenanceMode: document.getElementById('maintenanceMode')?.checked || false
         };
     }
     
     async saveSettings() {
         const saveBtn = document.querySelector('.btn-primary');
+        if (!saveBtn) return;
+        
         const originalText = saveBtn.textContent;
         saveBtn.textContent = '💾 Saving...';
         saveBtn.disabled = true;
@@ -70,7 +98,6 @@ class AdminSettings {
         try {
             const settings = this.getSettingsFromForm();
             
-            // Validate commission rate
             if (settings.commissionRate < 0 || settings.commissionRate > 100) {
                 window.AdminApp.showToast('❌ Commission rate must be between 0 and 100', 'error');
                 saveBtn.textContent = originalText;
@@ -78,7 +105,6 @@ class AdminSettings {
                 return;
             }
             
-            // Validate min price
             if (settings.minPrice < 0) {
                 window.AdminApp.showToast('❌ Minimum price must be a positive number', 'error');
                 saveBtn.textContent = originalText;
@@ -110,14 +136,28 @@ class AdminSettings {
     }
     
     setupEventListeners() {
-        // Auto-save on checkbox change?
-        // For now, we'll let the user click Save button
+        // Nothing needed yet
     }
 }
 
-// ===== INITIALIZE =====
-document.addEventListener('DOMContentLoaded', () => {
-    if (document.querySelector('.admin-wrapper') && document.querySelector('#settingsForm')) {
-        window.AdminSettings = new AdminSettings();
-    }
+// ===== CREATE GLOBAL INSTANCE =====
+let AdminSettings = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const checkInterval = setInterval(() => {
+        if (window.AdminApp) {
+            clearInterval(checkInterval);
+            AdminSettings = new AdminSettingsClass();
+            window.AdminSettings = AdminSettings;
+            console.log('✅ AdminSettings registered globally');
+        }
+    }, 100);
+    
+    setTimeout(() => {
+        if (!window.AdminApp) {
+            console.warn('⚠️ AdminApp not found, creating AdminSettings anyway');
+            AdminSettings = new AdminSettingsClass();
+            window.AdminSettings = AdminSettings;
+        }
+    }, 5000);
 });
