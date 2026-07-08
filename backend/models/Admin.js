@@ -31,7 +31,7 @@ AdminSchema.index({ role: 1 });
 AdminSchema.index({ isActive: 1 });
 
 // Pre-save hook to set permissions based on role
-AdminSchema.pre('save', qsync function(next) {
+AdminSchema.pre('save', async function(next) {
     try {
     if (this.isModified('role')) {
     const rolePermissions = {
