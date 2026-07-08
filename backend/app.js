@@ -37,7 +37,7 @@ app.use('/users', Dashboardrouter);
 app.use('/register', Regisrouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api/payout', payoutRouter);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', adminRouter);
 
 // ===== LIVEKIT CONFIGURATION =====
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
