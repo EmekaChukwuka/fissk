@@ -168,22 +168,22 @@ export const isInstructor = async (req, res, next) => {
       });
     }
     
-    // Check if user type is instructor
-    if (req.user.user_type !== 'instructor') {
-      return res.status(403).json({ 
+   // Check if user is either instructor or admin
+if (!['instructor', 'admin'].includes(req.user.user_type)) {
+    return res.status(403).json({ 
         success: false, 
-        message: 'Access denied. Instructor only.' 
-      });
-    }
-    
-    // Get full user details to double-check
-    const user = await User.findById(req.user.id);
-    if (!user || user.userType !== 'instructor') {
-      return res.status(403).json({ 
+        message: 'Access denied. Instructor or Admin only.' 
+    });
+}
+
+// Get full user details to double-check
+const user = await User.findById(req.user.id);
+if (!user || !['instructor', 'admin'].includes(user.userType)) {
+    return res.status(403).json({ 
         success: false, 
-        message: 'Access denied. Instructor only.' 
-      });
-    }
+        message: 'Access denied. Instructor or Admin only.' 
+    });
+}
     
     req.userData = user;
     next();
