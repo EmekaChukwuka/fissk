@@ -33,40 +33,39 @@ AdminSchema.index({ isActive: 1 });
 // Pre-save hook to set permissions based on role
 AdminSchema.pre('save', async function(next) {
     try {
-    if (this.isModified('role')) {
-    const rolePermissions = {
-      super_admin: {
-        manageUsers: true,
-        manageClasses: true,
-        managePayments: true,
-        managePayouts: true,
-        manageSettings: true,
-        viewAnalytics: true
-      },
-      moderator: {
-        manageUsers: true,
-        manageClasses: true,
-        managePayments: false,
-        managePayouts: false,
-        manageSettings: false,
-        viewAnalytics: true
-      },
-      support: {
-        manageUsers: true,
-        manageClasses: false,
-        managePayments: false,
-        managePayouts: false,
-        manageSettings: false,
-        viewAnalytics: false
-      }
-    };
-    
-    this.permissions = rolePermissions[this.role] || rolePermissions.moderator;
-  }
-  next();
-   } catch (error) {
-    next(error); // Pass error to next
-  }
+        if (this.isModified('role')) {
+            const rolePermissions = {
+                super_admin: {
+                    manageUsers: true,
+                    manageClasses: true,
+                    managePayments: true,
+                    managePayouts: true,
+                    manageSettings: true,
+                    viewAnalytics: true
+                },
+                moderator: {
+                    manageUsers: true,
+                    manageClasses: true,
+                    managePayments: false,
+                    managePayouts: false,
+                    manageSettings: false,
+                    viewAnalytics: true
+                },
+                support: {
+                    manageUsers: true,
+                    manageClasses: false,
+                    managePayments: false,
+                    managePayouts: false,
+                    manageSettings: false,
+                    viewAnalytics: false
+                }
+            };
+            
+            this.permissions = rolePermissions[this.role] || rolePermissions.moderator;
+        }
+        return next(); 
+    } catch (error) {
+        return next(error);
+    }
 });
-
 export default mongoose.model('Admin', AdminSchema);
