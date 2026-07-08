@@ -31,8 +31,9 @@ AdminSchema.index({ role: 1 });
 AdminSchema.index({ isActive: 1 });
 
 // Pre-save hook to set permissions based on role
-AdminSchema.pre('save', function(next) {
-  if (this.isModified('role')) {
+AdminSchema.pre('save', qsync function(next) {
+    try {
+    if (this.isModified('role')) {
     const rolePermissions = {
       super_admin: {
         manageUsers: true,
@@ -63,6 +64,9 @@ AdminSchema.pre('save', function(next) {
     this.permissions = rolePermissions[this.role] || rolePermissions.moderator;
   }
   next();
+   } catch (error) {
+    next(error); // Pass error to next
+  }
 });
 
 export default mongoose.model('Admin', AdminSchema);
