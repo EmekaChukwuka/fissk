@@ -203,7 +203,7 @@ Regisrouter.post('/student-login', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ email, userType: 'student' });
+    const user = await User.findOne({ email,  userType: { $in: ['student', 'admin'] }});
 
     if (!user) {
       return res.status(401).json({
@@ -263,7 +263,7 @@ Regisrouter.post('/instructor-login', async (req, res) => {
   }
 
   try {
-    const user = await User.findOne({ email, userType: 'instructor' });
+    const user = await User.findOne({ email, userType: { $in: ['instructor', 'admin'] } });
 
     if (!user) {
       return res.status(401).json({

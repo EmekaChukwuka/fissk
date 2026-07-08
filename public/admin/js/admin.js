@@ -7,7 +7,8 @@ class AdminApp {
         
         // Check if user is logged in and is admin
         if (!this.token || !this.user || this.user.user_type !== 'admin') {
-            window.location.href = '../login.html';
+            console.log(this.user)
+            //window.location.href = '../login.html';
             return;
         }
         
