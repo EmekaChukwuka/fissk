@@ -12,7 +12,7 @@ async function createAdmin() {
     await connectDB();
     console.log('📦 Connected to database');
 
-    const adminEmail = process.env.ADMIN_EMAIL || '@gmail.com';
+    const adminEmail = process.env.ADMIN_EMAIL || 'ayenifavoureka@gmail.com';
     const adminPassword = process.env.ADMIN_PASSWORD || 'Mamatwins@73';
 
     // Check if user already exists
