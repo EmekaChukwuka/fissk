@@ -16,6 +16,7 @@ import LiveSession from './models/LiveSession.js';
 import paymentRouter from './routes/paymentRoutes.js';
 import payoutRouter from './routes/payoutRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
+import createAdmin from './scripts/createAdmin.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -745,6 +746,7 @@ app.get('/live/chat-history', (req, res) => {
 // ===== START SERVER =====
 const PORT = process.env.PORT || 3000;
 connectDB();
+createAdmin();
 
 server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
