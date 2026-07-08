@@ -12,8 +12,8 @@ export default async function createAdmin() {
     await connectDB();
     console.log('📦 Connected to database');
 
-    const adminEmail = process.env.ADMIN_EMAIL || 'ayenifavoureka@gmail.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'Mamatwins@73';
+    const adminEmail = process.env.ADMIN_EMAIL || 'emekachukwuka63@gmail.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'emeka001';
 
     // Check if user already exists
     let user = await User.findOne({ email: adminEmail });
