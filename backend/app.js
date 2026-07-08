@@ -15,6 +15,7 @@ import { AccessToken } from 'livekit-server-sdk';
 import LiveSession from './models/LiveSession.js';
 import paymentRouter from './routes/paymentRoutes.js';
 import payoutRouter from './routes/payoutRoutes.js';
+import adminRouter from './routes/adminRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,6 +36,7 @@ app.use('/users', Dashboardrouter);
 app.use('/register', Regisrouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api/payout', payoutRouter);
+app.use('/api/admin', adminRoutes);
 
 // ===== LIVEKIT CONFIGURATION =====
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;

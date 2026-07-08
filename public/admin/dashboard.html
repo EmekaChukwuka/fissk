@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - FISSK Online Academy</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="icon" href="../fissklogo.jpg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="admin-wrapper">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="logo">
+                <h2>FISSK <span>Admin</span></h2>
+                <span class="badge">v1.0</span>
+            </div>
+            <nav>
+                <ul class="admin-nav">
+                    <li><a href="dashboard.html" class="active"><span class="icon">📊</span> <span>Dashboard</span></a></li>
+                    <li><a href="users.html"><span class="icon">👥</span> <span>Users</span> <span class="badge-count" id="pendingUsersBadge">0</span></a></li>
+                    <li><a href="classes.html"><span class="icon">📚</span> <span>Classes</span></a></li>
+                    <li><a href="payouts.html"><span class="icon">💰</span> <span>Payouts</span> <span class="badge-count" id="pendingPayoutsBadge">0</span></a></li>
+                    <li><a href="settings.html"><span class="icon">⚙️</span> <span>Settings</span></a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://ui-avatars.com/api/?name=Admin&background=6C3CE1&color=fff" alt="Admin">
+                    <div>
+                        <div class="name" id="adminName">Admin</div>
+                        <div class="role" id="adminRole">Super Admin</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Topbar -->
+            <div class="admin-topbar">
+                <div class="page-title">
+                    <h1>Dashboard</h1>
+                    <p>Overview of your platform</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-outline" onclick="window.location.href='../index.html'">
+                        🏠 View Site
+                    </button>
+                    <button class="btn btn-outline" onclick="logout()">
+                        🚪 Logout
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="admin-stats" id="statsContainer">
+                <div class="stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-value" id="totalStudents">0</div>
+                    <div class="stat-label">Total Students</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">👨‍🏫</div>
+                    <div class="stat-value" id="totalInstructors">0</div>
+                    <div class="stat-label">Total Instructors</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📚</div>
+                    <div class="stat-value" id="totalClasses">0</div>
+                    <div class="stat-label">Total Classes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-value" id="totalRevenue">₦0</div>
+                    <div class="stat-label">Platform Revenue</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">⏳</div>
+                    <div class="stat-value" id="pendingWithdrawals">0</div>
+                    <div class="stat-label">Pending Withdrawals</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📝</div>
+                    <div class="stat-value" id="pendingInstructors">0</div>
+                    <div class="stat-label">Pending Approvals</div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="admin-table-container">
+                <div style="padding: 20px 20px 0;">
+                    <h3 style="margin: 0; color: var(--admin-gray-dark);">📋 Recent Activity</h3>
+                </div>
+                <div id="recentActivityContainer">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Action</th>
+                                <th>Target</th>
+                                <th>Admin</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentActivityBody">
+                            <tr>
+                                <td colspan="4" style="text-align: center; padding: 40px; color: var(--admin-gray);">
+                                    Loading activities...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/admin.js"></script>
+    <script>
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.AdminApp) {
+                window.AdminApp.initDashboard();
+            }
+        });
+    </script>
+</body>
+</html>

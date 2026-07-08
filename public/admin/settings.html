@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Admin Dashboard</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="icon" href="../fissklogo.jpg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="admin-wrapper">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="logo">
+                <h2>FISSK <span>Admin</span></h2>
+                <span class="badge">v1.0</span>
+            </div>
+            <nav>
+                <ul class="admin-nav">
+                    <li><a href="dashboard.html"><span class="icon">📊</span> <span>Dashboard</span></a></li>
+                    <li><a href="users.html"><span class="icon">👥</span> <span>Users</span></a></li>
+                    <li><a href="classes.html"><span class="icon">📚</span> <span>Classes</span></a></li>
+                    <li><a href="payouts.html"><span class="icon">💰</span> <span>Payouts</span></a></li>
+                    <li><a href="settings.html" class="active"><span class="icon">⚙️</span> <span>Settings</span></a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://ui-avatars.com/api/?name=Admin&background=6C3CE1&color=fff" alt="Admin">
+                    <div>
+                        <div class="name" id="adminName">Admin</div>
+                        <div class="role" id="adminRole">Super Admin</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Topbar -->
+            <div class="admin-topbar">
+                <div class="page-title">
+                    <h1>⚙️ Settings</h1>
+                    <p>Configure platform settings</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-primary" onclick="AdminSettings.saveSettings()">
+                        💾 Save Changes
+                    </button>
+                </div>
+            </div>
+
+            <!-- Settings Form -->
+            <div style="background: white; border-radius: var(--admin-radius); padding: 32px; box-shadow: var(--admin-shadow);">
+                <form id="settingsForm">
+                    <!-- General Settings -->
+                    <h3 style="margin-bottom: 16px;">General Settings</h3>
+                    <div class="form-group">
+                        <label for="platformName">Platform Name</label>
+                        <input type="text" id="platformName" value="FISSK Online Academy">
+                    </div>
+                    <div class="form-group">
+                        <label for="currency">Currency</label>
+                        <select id="currency">
+                            <option value="NGN">NGN - Nigerian Naira</option>
+                            <option value="USD">USD - US Dollar</option>
+                            <option value="EUR">EUR - Euro</option>
+                            <option value="GBP">GBP - British Pound</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="commissionRate">Commission Rate (%)</label>
+                        <input type="number" id="commissionRate" value="30" min="0" max="100">
+                        <small style="color: var(--admin-gray);">Percentage taken from each sale</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="minPrice">Minimum Course Price</label>
+                        <input type="number" id="minPrice" value="1000" min="0">
+                        <small style="color: var(--admin-gray);">Minimum price instructors can set for courses</small>
+                    </div>
+
+                    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--admin-gray-light);">
+
+                    <!-- Email Settings -->
+                    <h3 style="margin-bottom: 16px;">Email Notifications</h3>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="welcomeEmail" checked>
+                            Welcome Email
+                        </label>
+                        <small style="color: var(--admin-gray);">Send welcome emails to new students</small>
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="paymentReceipt" checked>
+                            Payment Receipt
+                        </label>
+                        <small style="color: var(--admin-gray);">Send payment receipts to students</small>
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="classReminders" checked>
+                            Class Reminders
+                        </label>
+                        <small style="color: var(--admin-gray);">Send reminders for upcoming classes</small>
+                    </div>
+
+                    <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--admin-gray-light);">
+
+                    <!-- Maintenance -->
+                    <h3 style="margin-bottom: 16px;">Maintenance</h3>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="maintenanceMode">
+                            Maintenance Mode
+                        </label>
+                        <small style="color: var(--admin-gray);">When enabled, the platform will show a maintenance message</small>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/admin.js"></script>
+    <script src="js/admin-settings.js"></script>
+</body>
+</html>

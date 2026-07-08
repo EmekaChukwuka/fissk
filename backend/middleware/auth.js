@@ -1,6 +1,7 @@
 // backend/middleware/auth.js
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import Admin from '../models/Admin.js';
 
 // ===== JWT HELPER FUNCTIONS =====
 
@@ -196,9 +197,12 @@ export const isInstructor = async (req, res, next) => {
   }
 };
 
+// ===== ADMIN MIDDLEWARE (FIXED) =====
+
 // Middleware to check if user is admin
 export const isAdmin = async (req, res, next) => {
   try {
+    // First ensure user is authenticated
     if (!req.user) {
       return res.status(401).json({ 
         success: false, 
@@ -206,15 +210,40 @@ export const isAdmin = async (req, res, next) => {
       });
     }
     
+    // Get full user details
     const user = await User.findById(req.user.id);
-    if (!user || user.userType !== 'admin') {
+    if (!user) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    // Check if user type is admin
+    if (user.userType !== 'admin') {
       return res.status(403).json({ 
         success: false, 
         message: 'Access denied. Admin only.' 
       });
     }
     
+    // Check if admin record exists and is active
+    const admin = await Admin.findOne({ 
+      userId: user._id, 
+      isActive: true 
+    });
+    
+    if (!admin) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Admin account not found or inactive. Please contact support.' 
+      });
+    }
+    
+    // Attach admin data to request
+    req.admin = admin;
     req.userData = user;
+    
     next();
     
   } catch (error) {
@@ -224,6 +253,38 @@ export const isAdmin = async (req, res, next) => {
       message: 'Authorization error' 
     });
   }
+};
+
+// ===== PERMISSION MIDDLEWARE =====
+
+// Check specific admin permission
+export const hasPermission = (permission) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.admin) {
+        return res.status(403).json({
+          success: false,
+          message: 'Admin access required'
+        });
+      }
+
+      const hasPerm = req.admin.permissions && req.admin.permissions[permission];
+      if (!hasPerm) {
+        return res.status(403).json({
+          success: false,
+          message: `Permission denied: ${permission}`
+        });
+      }
+
+      next();
+    } catch (error) {
+      console.error('Permission check error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Authorization error'
+      });
+    }
+  };
 };
 
 // ===== TOKEN REFRESH ENDPOINT HELPER =====
@@ -274,5 +335,31 @@ export const refreshToken = async (req, res) => {
       success: false,
       message: 'Failed to refresh token'
     });
+  }
+};
+
+// ===== LOG ACTIVITY HELPER =====
+// This can be used in admin controllers to log actions
+export const logAdminActivity = async (req, action, targetType, targetId, details = {}, targetName = null) => {
+  try {
+    // Import ActivityLog dynamically to avoid circular dependencies
+    const ActivityLog = await import('../models/ActivityLog.js').then(m => m.default);
+    
+    const log = new ActivityLog({
+      adminId: req.user.id,
+      adminName: `${req.user.firstname || ''} ${req.user.lastname || ''}`.trim() || req.user.email,
+      action,
+      targetType,
+      targetId,
+      targetName,
+      details,
+      ipAddress: req.ip || req.connection?.remoteAddress || req.headers['x-forwarded-for'],
+      userAgent: req.headers['user-agent']
+    });
+    await log.save();
+    return { success: true };
+  } catch (error) {
+    console.error('Activity log error:', error);
+    return { success: false, error: error.message };
   }
 };

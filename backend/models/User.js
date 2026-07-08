@@ -17,6 +17,12 @@ const UserSchema = new mongoose.Schema({
   bio: String,
   qualifications: String,
   experienceYears: { type: Number, default: 0 },
+  isApproved: {
+    type: Boolean,
+    default: false  // For instructors, admin needs to approve
+  },
+  approvedAt: { type: Date },
+  approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   
   // ===== PAYMENT FIELDS =====
   // For instructors

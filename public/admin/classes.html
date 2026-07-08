@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classes - Admin Dashboard</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="icon" href="../fissklogo.jpg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="admin-wrapper">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="logo">
+                <h2>FISSK <span>Admin</span></h2>
+                <span class="badge">v1.0</span>
+            </div>
+            <nav>
+                <ul class="admin-nav">
+                    <li><a href="dashboard.html"><span class="icon">📊</span> <span>Dashboard</span></a></li>
+                    <li><a href="users.html"><span class="icon">👥</span> <span>Users</span></a></li>
+                    <li><a href="classes.html" class="active"><span class="icon">📚</span> <span>Classes</span></a></li>
+                    <li><a href="payouts.html"><span class="icon">💰</span> <span>Payouts</span></a></li>
+                    <li><a href="settings.html"><span class="icon">⚙️</span> <span>Settings</span></a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://ui-avatars.com/api/?name=Admin&background=6C3CE1&color=fff" alt="Admin">
+                    <div>
+                        <div class="name" id="adminName">Admin</div>
+                        <div class="role" id="adminRole">Super Admin</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Topbar -->
+            <div class="admin-topbar">
+                <div class="page-title">
+                    <h1>📚 Classes</h1>
+                    <p>Manage all classes on the platform</p>
+                </div>
+                <div class="topbar-actions">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="classSearch" placeholder="Search classes..." onkeyup="AdminClasses.filterClasses()">
+                    </div>
+                    <button class="btn btn-primary" onclick="AdminClasses.showCreateModal()">
+                        ➕ New Class
+                    </button>
+                </div>
+            </div>
+
+            <!-- Classes Table -->
+            <div class="admin-table-container">
+                <div id="classesContainer">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Instructor</th>
+                                <th>Price</th>
+                                <th>Students</th>
+                                <th>Revenue</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="classesTableBody">
+                            <tr>
+                                <td colspan="7" style="text-align: center; padding: 40px; color: var(--admin-gray);">
+                                    Loading classes...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="admin-pagination">
+                    <span class="page-info" id="pageInfo">Showing 1-20 of 0</span>
+                    <div class="page-buttons" id="paginationButtons">
+                        <button onclick="AdminClasses.goToPage('prev')">←</button>
+                        <button class="active">1</button>
+                        <button onclick="AdminClasses.goToPage('next')">→</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Delete Class Modal -->
+    <div class="admin-modal" id="deleteClassModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🗑️ Delete Class</h2>
+                <button class="close-btn" onclick="AdminClasses.closeModal('deleteClassModal')">&times;</button>
+            </div>
+            <div id="deleteClassModalBody">
+                <p>Are you sure you want to delete <strong id="deleteClassName"></strong>?</p>
+                <p style="color: var(--admin-danger); font-size: 0.9rem;">⚠️ This action cannot be undone. All enrollments and related data will be deleted.</p>
+                <div class="form-actions">
+                    <button class="btn btn-secondary" onclick="AdminClasses.closeModal('deleteClassModal')">Cancel</button>
+                    <button class="btn btn-danger" onclick="AdminClasses.confirmDelete()">🗑️ Delete Class</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/admin.js"></script>
+    <script src="js/admin-classes.js"></script>
+</body>
+</html>

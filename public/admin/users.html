@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Users - Admin Dashboard</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="icon" href="../fissklogo.jpg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="admin-wrapper">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="logo">
+                <h2>FISSK <span>Admin</span></h2>
+                <span class="badge">v1.0</span>
+            </div>
+            <nav>
+                <ul class="admin-nav">
+                    <li><a href="dashboard.html"><span class="icon">📊</span> <span>Dashboard</span></a></li>
+                    <li><a href="users.html" class="active"><span class="icon">👥</span> <span>Users</span></a></li>
+                    <li><a href="classes.html"><span class="icon">📚</span> <span>Classes</span></a></li>
+                    <li><a href="payouts.html"><span class="icon">💰</span> <span>Payouts</span></a></li>
+                    <li><a href="settings.html"><span class="icon">⚙️</span> <span>Settings</span></a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://ui-avatars.com/api/?name=Admin&background=6C3CE1&color=fff" alt="Admin">
+                    <div>
+                        <div class="name" id="adminName">Admin</div>
+                        <div class="role" id="adminRole">Super Admin</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Topbar -->
+            <div class="admin-topbar">
+                <div class="page-title">
+                    <h1>👥 Users</h1>
+                    <p>Manage all users on the platform</p>
+                </div>
+                <div class="topbar-actions">
+                    <div class="search-box">
+                        <span class="search-icon">🔍</span>
+                        <input type="text" id="userSearch" placeholder="Search users..." onkeyup="AdminUsers.filterUsers()">
+                    </div>
+                    <select id="userTypeFilter" onchange="AdminUsers.filterUsers()" style="padding: 10px 14px; border-radius: 10px; border: 1px solid var(--admin-gray-light);">
+                        <option value="all">All Types</option>
+                        <option value="student">Students</option>
+                        <option value="instructor">Instructors</option>
+                        <option value="admin">Admins</option>
+                    </select>
+                    <select id="userStatusFilter" onchange="AdminUsers.filterUsers()" style="padding: 10px 14px; border-radius: 10px; border: 1px solid var(--admin-gray-light);">
+                        <option value="all">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="pending">Pending</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Users Table -->
+            <div class="admin-table-container">
+                <div id="usersContainer">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 40px; color: var(--admin-gray);">
+                                    Loading users...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="admin-pagination">
+                    <span class="page-info" id="pageInfo">Showing 1-20 of 0</span>
+                    <div class="page-buttons" id="paginationButtons">
+                        <button onclick="AdminUsers.goToPage('prev')">←</button>
+                        <button class="active">1</button>
+                        <button onclick="AdminUsers.goToPage('next')">→</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Approve Instructor Modal -->
+    <div class="admin-modal" id="approveModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Approve Instructor</h2>
+                <button class="close-btn" onclick="AdminUsers.closeModal('approveModal')">&times;</button>
+            </div>
+            <div id="approveModalBody">
+                <p>Are you sure you want to approve <strong id="approveInstructorName"></strong> as an instructor?</p>
+                <div class="form-actions">
+                    <button class="btn btn-secondary" onclick="AdminUsers.closeModal('approveModal')">Cancel</button>
+                    <button class="btn btn-primary" onclick="AdminUsers.confirmApprove()">✅ Approve</button>
+                    <button class="btn btn-danger" onclick="AdminUsers.confirmReject()">❌ Reject</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/admin.js"></script>
+    <script src="js/admin-users.js"></script>
+</body>
+</html>

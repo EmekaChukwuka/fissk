@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payouts - Admin Dashboard</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="icon" href="../fissklogo.jpg">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="admin-wrapper">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <div class="logo">
+                <h2>FISSK <span>Admin</span></h2>
+                <span class="badge">v1.0</span>
+            </div>
+            <nav>
+                <ul class="admin-nav">
+                    <li><a href="dashboard.html"><span class="icon">📊</span> <span>Dashboard</span></a></li>
+                    <li><a href="users.html"><span class="icon">👥</span> <span>Users</span></a></li>
+                    <li><a href="classes.html"><span class="icon">📚</span> <span>Classes</span></a></li>
+                    <li><a href="payouts.html" class="active"><span class="icon">💰</span> <span>Payouts</span></a></li>
+                    <li><a href="settings.html"><span class="icon">⚙️</span> <span>Settings</span></a></li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <img src="https://ui-avatars.com/api/?name=Admin&background=6C3CE1&color=fff" alt="Admin">
+                    <div>
+                        <div class="name" id="adminName">Admin</div>
+                        <div class="role" id="adminRole">Super Admin</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Topbar -->
+            <div class="admin-topbar">
+                <div class="page-title">
+                    <h1>💰 Payouts</h1>
+                    <p>Manage instructor withdrawal requests</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-outline" onclick="AdminPayouts.loadPayouts()">
+                        🔄 Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Pending Withdrawals -->
+            <div style="margin-bottom: 32px;">
+                <h2 style="color: var(--admin-gray-dark); margin-bottom: 16px;">⏳ Pending Withdrawals</h2>
+                <div class="admin-table-container">
+                    <div id="pendingPayoutsContainer">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Instructor</th>
+                                    <th>Amount</th>
+                                    <th>Bank</th>
+                                    <th>Account</th>
+                                    <th>Requested</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pendingPayoutsBody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; padding: 40px; color: var(--admin-gray);">
+                                        Loading pending payouts...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- All Transactions -->
+            <div>
+                <h2 style="color: var(--admin-gray-dark); margin-bottom: 16px;">📋 All Transactions</h2>
+                <div class="admin-table-container">
+                    <div id="allPaymentsContainer">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Course</th>
+                                    <th>Amount</th>
+                                    <th>Instructor Earnings</th>
+                                    <th>Platform Fee</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allPaymentsBody">
+                                <tr>
+                                    <td colspan="7" style="text-align: center; padding: 40px; color: var(--admin-gray);">
+                                        Loading transactions...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="admin-pagination">
+                        <span class="page-info" id="paymentPageInfo">Showing 1-20 of 0</span>
+                        <div class="page-buttons" id="paymentPaginationButtons">
+                            <button onclick="AdminPayouts.goToPaymentPage('prev')">←</button>
+                            <button class="active">1</button>
+                            <button onclick="AdminPayouts.goToPaymentPage('next')">→</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/admin.js"></script>
+    <script src="js/admin-payouts.js"></script>
+</body>
+</html>
