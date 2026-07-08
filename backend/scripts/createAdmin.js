@@ -7,7 +7,7 @@ import connectDB from '../config/db.js';
 
 dotenv.config();
 
-async function createAdmin() {
+export default async function createAdmin() {
   try {
     await connectDB();
     console.log('📦 Connected to database');
@@ -75,5 +75,3 @@ async function createAdmin() {
     process.exit(1);
   }
 }
-
-export default createAdmin();
