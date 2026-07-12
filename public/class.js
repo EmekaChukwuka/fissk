@@ -31,8 +31,11 @@ class ClassManager {
         this.showLoadingState();
         
         try {
+            // Load class data first
+            await this.loadClassData();
+            
+            // Then load everything else
             await Promise.all([
-                this.loadClassData(),
                 this.checkEnrollment(),
                 this.loadClassVideos(),
                 this.loadClassRecordings(),
@@ -47,7 +50,7 @@ class ClassManager {
             this.setupEventListeners();
         } catch (error) {
             console.error('Initialization error:', error);
-            this.showError('Failed to load class data. Please refresh the page.');
+            // Error is already shown in loadClassData
         } finally {
             this.isLoading = false;
             this.hideLoadingState();
@@ -85,22 +88,60 @@ class ClassManager {
 
     async loadClassData() {
         try {
+            console.log('Loading class data for ID:', this.classId);
+            
             const response = await fetch(`https://fissk-backend.onrender.com/register/class/${this.classId}`);
             
+            console.log('Class data response status:', response.status);
+            
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: Class not found`);
+                if (response.status === 404) {
+                    throw new Error('Class not found. Please check the URL or go back to classes.');
+                }
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             
             const data = await response.json();
+            console.log('Class data received:', data);
             
+            // Handle different response formats
             if (data.classA && data.classA.length > 0) {
                 this.classData = data.classA[0];
+            } else if (data.class && data.class._id) {
+                this.classData = data.class;
+            } else if (data._id) {
+                this.classData = data;
+            } else if (Array.isArray(data) && data.length > 0) {
+                this.classData = data[0];
             } else {
-                throw new Error('Class not found');
+                throw new Error('Class data not found in response');
             }
+            
+            console.log('Class data loaded:', this.classData.title);
+            return this.classData;
+            
         } catch (error) {
             console.error('Error loading class data:', error);
-            this.showError('Could not load class information. Please try again.');
+            
+            // Show error in the UI
+            const classNameEl = document.getElementById('className');
+            if (classNameEl) {
+                classNameEl.innerHTML = '⚠️ Class not found';
+            }
+            
+            const container = document.querySelector('.class-container') || document.querySelector('.container');
+            if (container) {
+                container.innerHTML = `
+                    <div class="error-message" style="text-align: center; padding: 50px;">
+                        <p style="color: #e74c3c; font-size: 18px;">⚠️ ${error.message}</p>
+                        <div style="margin-top: 20px;">
+                            <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                            <a href="classes.html" class="btn btn-outline">Back to Classes</a>
+                        </div>
+                    </div>
+                `;
+            }
+            
             throw error;
         }
     }
@@ -137,14 +178,27 @@ class ClassManager {
 
     async loadClassVideos() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/by-class/${this.classId}`);
+            const userId = this.userId || '';
+            const response = await fetch(`https://fissk-backend.onrender.com/api/by-class/${this.classId}?userId=${userId}`);
             
             if (!response.ok) {
                 throw new Error('Failed to load videos');
             }
             
-            this.videos = await response.json();
-            console.log('Videos loaded:', this.videos);
+            const data = await response.json();
+            console.log('Videos response:', data);
+            
+            if (data.success && data.videos) {
+                this.videos = data.videos;
+                this.hasPaidAccess = data.hasAccess || false;
+                this.enrollmentPaymentStatus = data.accessType || 'none';
+            } else if (Array.isArray(data)) {
+                this.videos = data;
+            } else {
+                this.videos = [];
+            }
+            
+            console.log('Videos loaded:', this.videos.length);
             
             if (this.userId && this.isEnrolled) {
                 await this.loadUserProgress();
@@ -161,13 +215,22 @@ class ClassManager {
     async loadClassRecordings() {
         try {
             console.log('Loading recordings for class:', this.classId);
-            const response = await fetch(`https://fissk-backend.onrender.com/api/by-class/${this.classId}`);
+            const userId = this.userId || '';
+            const response = await fetch(`https://fissk-backend.onrender.com/api/by-class/${this.classId}?userId=${userId}`);
             
             if (!response.ok) {
                 throw new Error('Failed to load recordings');
             }
             
-            const allVideos = await response.json();
+            const data = await response.json();
+            console.log('Recordings response:', data);
+            
+            let allVideos = [];
+            if (data.success && data.videos) {
+                allVideos = data.videos;
+            } else if (Array.isArray(data)) {
+                allVideos = data;
+            }
             
             this.recordings = allVideos.filter(video => 
                 video.cloudinaryUrl || video.hlsUrl || video.url || video.muxPlaybackId
@@ -184,25 +247,34 @@ class ClassManager {
         if (!this.user || !this.user.id) return;
         
         try {
-            const response = await fetch(`/api/payment/status/${this.classId}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (!response.ok) {
-                console.warn('Payment status check failed, using fallback');
+            if (this.classData && (this.classData.isFree || this.classData.price === 0)) {
+                this.enrollmentPaymentStatus = 'free';
+                this.hasPaidAccess = true;
                 return;
             }
             
-            const data = await response.json();
-            
-            if (data.success) {
-                this.enrollmentPaymentStatus = data.paymentStatus || 'free';
-                this.hasPaidAccess = data.paid || false;
-                console.log('Payment status:', this.enrollmentPaymentStatus, 'Paid:', this.hasPaidAccess);
+            if (this.isEnrolled) {
+                const response = await fetch('https://fissk-backend.onrender.com/register/get-user-classes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: this.user.email })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.classes && data.classes.length) {
+                        const classEnrollment = data.classes.find(c => 
+                            (c.class_id?.toString() === this.classId) || (c._id?.toString() === this.classId)
+                        );
+                        if (classEnrollment) {
+                            this.enrollmentPaymentStatus = classEnrollment.paymentStatus || 'free';
+                            this.hasPaidAccess = classEnrollment.paymentStatus === 'paid' || classEnrollment.accessType === 'paid';
+                        }
+                    }
+                }
             }
+            
+            console.log('Payment status:', this.enrollmentPaymentStatus, 'Paid:', this.hasPaidAccess);
         } catch (error) {
             console.error('Check payment status error:', error);
         }
@@ -408,16 +480,13 @@ class ClassManager {
         `;
     }
 
-    // ===== RENDER PRICE AND PAYMENT SECTION =====
     renderPriceAndPayment() {
         const price = this.classData?.price || 0;
         const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
         const currency = this.classData?.currency || 'NGN';
         
-        // Check if user has paid
         const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
         
-        // Find or create payment section
         let paymentSection = document.getElementById('paymentSection');
         if (!paymentSection) {
             paymentSection = document.createElement('div');
@@ -478,7 +547,6 @@ class ClassManager {
         }
     }
 
-    // ===== INITIATE PAYMENT =====
     async initiatePayment() {
         if (!this.user) {
             window.showToast('Please login to purchase this course', 'error');
@@ -528,7 +596,6 @@ class ClassManager {
         }
     }
 
-    // ===== RENDER CLASS FORUM =====
     async renderClassForum() {
         const container = document.getElementById('classForumContainer');
         if (!container) {
@@ -799,7 +866,6 @@ class ClassManager {
         await this.renderClassForum();
     }
 
-    // ===== REVIEWS METHODS =====
     async renderClassReviews() {
         const container = document.getElementById('classReviewsContainer');
         if (!container) return;
@@ -1236,7 +1302,6 @@ class ClassManager {
         }
     }
 
-    // ===== RENDER VIDEOS =====
     renderVideos() {
         const videosContainer = document.getElementById('videosContainer');
         const noVideos = document.getElementById('noVideos');
@@ -1256,18 +1321,29 @@ class ClassManager {
             videosContainer.innerHTML = this.videos.map((video, index) => {
                 const thumbnailUrl = video.thumbnailUrl || 
                     (video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` : '');
+                const isLocked = video.locked === true;
+                const title = video.videoDetails?.title || video.title || 'Untitled';
+                const description = video.videoDetails?.description || video.description || 'No description';
+                const duration = video.videoDetails?.duration || video.duration || 'Unknown';
+                const price = video.price || this.classData?.price || 0;
                 
                 return `
-                    <div class="video-card" data-video-index="${index}" data-video-id="${video._id || video.id}">
+                    <div class="video-card ${isLocked ? 'locked' : ''}" 
+                         data-video-index="${index}" 
+                         data-video-id="${video._id || video.id}"
+                         data-locked="${isLocked}">
                         <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
-                            <span class="play-icon">▶</span>
+                            <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
                             ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
+                            ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
+                            ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
                         </div>
                         <div class="video-info">
-                            <h4>${this.escapeHtml(video.videoDetails?.title || video.title || 'Untitled')}</h4>
-                            <p>${this.escapeHtml(video.videoDetails?.description || video.description || 'No description')}</p>
+                            <h4>${isLocked ? '🔒 ' : ''}${this.escapeHtml(title)}</h4>
+                            <p>${this.escapeHtml(description)}</p>
                             <div class="video-meta">
-                                <span>⏱️ ${video.videoDetails?.duration || video.duration || 'Unknown'}</span>
+                                <span>⏱️ ${duration}</span>
+                                ${isLocked ? '<span class="locked-badge">🔒 Purchase Required</span>' : ''}
                             </div>
                         </div>
                     </div>
@@ -1277,6 +1353,22 @@ class ClassManager {
             videosContainer.querySelectorAll('.video-card').forEach((card) => {
                 card.addEventListener('click', () => {
                     const videoIndex = parseInt(card.dataset.videoIndex);
+                    const isLocked = card.dataset.locked === 'true';
+                    
+                    if (isLocked) {
+                        const price = this.videos[videoIndex]?.price || this.classData?.price || 0;
+                        if (price > 0) {
+                            window.showToast(`💳 This video requires payment. Price: ₦${price.toLocaleString()}`, true);
+                            const paymentSection = document.getElementById('paymentSection');
+                            if (paymentSection) {
+                                paymentSection.scrollIntoView({ behavior: 'smooth' });
+                            }
+                        } else {
+                            window.showToast('🔒 Please enroll in this class to access this video', true);
+                        }
+                        return;
+                    }
+                    
                     console.log('Video card clicked, index:', videoIndex);
                     this.playVideo(videoIndex);
                 });
@@ -1284,7 +1376,6 @@ class ClassManager {
         }
     }
 
-    // ===== RENDER RECORDINGS =====
     renderRecordings() {
         const recordingsContainer = document.getElementById('recordingsContainer');
         const noRecordings = document.getElementById('noRecordings');
@@ -1302,6 +1393,7 @@ class ClassManager {
         if (recordingsContainer) {
             recordingsContainer.style.display = 'grid';
             recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
+                const isLocked = recording.locked === true;
                 const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url || 
                     (recording.muxPlaybackId ? `https://stream.mux.com/${recording.muxPlaybackId}.m3u8` : null);
                 const thumbnailUrl = recording.thumbnailUrl || 
@@ -1313,6 +1405,7 @@ class ClassManager {
                 const muxStatus = recording.muxStatus || 'preparing';
                 const isReady = muxStatus === 'ready';
                 const isPreparing = muxStatus === 'preparing' || muxStatus === 'uploading';
+                const price = recording.price || this.classData?.price || 0;
                 
                 const statusBadge = isPreparing 
                     ? '<span class="processing-badge">⏳ Processing...</span>' 
@@ -1321,24 +1414,28 @@ class ClassManager {
                         : '<span class="error-badge">⚠️ Error</span>';
                 
                 return `
-                    <div class="recording-card ${isReady ? 'ready' : 'processing'}" 
+                    <div class="recording-card ${isReady ? 'ready' : 'processing'} ${isLocked ? 'locked' : ''}" 
                          data-recording-index="${index}" 
                          data-recording-url="${videoUrl || ''}"
                          data-mux-playback-id="${recording.muxPlaybackId || ''}"
-                         data-mux-status="${muxStatus}">
+                         data-mux-status="${muxStatus}"
+                         data-locked="${isLocked}">
                         <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
-                            <span class="play-icon">▶</span>
+                            <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
                             ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
                             ${statusBadge}
                             ${!isReady ? '<div class="processing-overlay">⏳ Processing...</div>' : ''}
+                            ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
+                            ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
                         </div>
                         <div class="video-info">
-                            <h4>📹 ${this.escapeHtml(title)}</h4>
+                            <h4>${isLocked ? '🔒 ' : '📹 '}${this.escapeHtml(title)}</h4>
                             <p>${this.escapeHtml(description)}</p>
                             <div class="video-meta">
                                 <span>⏱️ ${duration}</span>
                                 ${date ? `<span>📅 ${new Date(date).toLocaleDateString()}</span>` : ''}
                                 ${isPreparing ? `<span class="status-text">⏳ Processing...</span>` : ''}
+                                ${isLocked ? '<span class="locked-badge">🔒 Purchase Required</span>' : ''}
                             </div>
                         </div>
                     </div>
@@ -1347,8 +1444,23 @@ class ClassManager {
 
             recordingsContainer.querySelectorAll('.recording-card').forEach((card) => {
                 card.addEventListener('click', () => {
+                    const isLocked = card.dataset.locked === 'true';
                     const recordingUrl = card.dataset.recordingUrl;
                     const muxStatus = card.dataset.muxStatus;
+                    
+                    if (isLocked) {
+                        const price = this.classData?.price || 0;
+                        if (price > 0) {
+                            window.showToast(`💳 This recording requires payment. Price: ₦${price.toLocaleString()}`, true);
+                            const paymentSection = document.getElementById('paymentSection');
+                            if (paymentSection) {
+                                paymentSection.scrollIntoView({ behavior: 'smooth' });
+                            }
+                        } else {
+                            window.showToast('🔒 Please enroll in this class to access this recording', true);
+                        }
+                        return;
+                    }
                     
                     console.log('Recording card clicked, URL:', recordingUrl);
                     
@@ -1367,7 +1479,6 @@ class ClassManager {
         }
     }
 
-    // ===== PLAY VIDEO =====
     playVideo(videoIndex) {
         const video = this.videos[videoIndex];
         if (!video) {

@@ -2125,7 +2125,7 @@
     // Modified start button click handler
     startBtn.addEventListener('click', async () => {
         const user = JSON.parse(localStorage.getItem('user'));
-        if (!user || user.user_type !== 'instructor') {
+        if (!user || user.user_type !== 'instructor' ) {
             showError('Only instructors can start livestreams', null);
             alert('Only instructors can start livestreams');
             return;
