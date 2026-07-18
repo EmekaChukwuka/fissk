@@ -4176,3 +4176,84 @@ body {
         justify-content: center;
     }
 }
+
+/* ============================================================
+   ACCESS LOCKED STYLES
+   ============================================================ */
+
+.access-locked {
+    text-align: center;
+    padding: 60px 20px;
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    border: 1px solid var(--border);
+}
+
+.access-locked .lock-icon {
+    font-size: 4rem;
+    margin-bottom: 16px;
+}
+
+.access-locked h3 {
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+}
+
+.access-locked p {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    font-size: 1rem;
+}
+
+.access-locked .btn-link {
+    color: var(--accent-blue);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.access-locked .btn-link:hover {
+    color: var(--accent-blue-hover);
+}
+
+.price-display-small {
+    margin: 16px 0;
+    padding: 16px;
+    background: var(--bg-elevated);
+    border-radius: 8px;
+}
+
+.price-display-small .price {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #FFD700;
+    display: block;
+}
+
+.price-display-small .label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.access-locked .btn {
+    margin-top: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .access-locked {
+        padding: 40px 16px;
+    }
+    
+    .access-locked .lock-icon {
+        font-size: 3rem;
+    }
+    
+    .access-locked h3 {
+        font-size: 1.2rem;
+    }
+    
+    .price-display-small .price {
+        font-size: 1.4rem;
+    }
+}

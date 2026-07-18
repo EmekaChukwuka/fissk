@@ -1488,182 +1488,336 @@ class ClassManager {
         }
     }
 
-    renderVideos() {
-        const videosContainer = document.getElementById('videosContainer');
-        const noVideos = document.getElementById('noVideos');
+   /**
+ * Render videos - ONLY for enrolled users
+ */
+renderVideos() {
+    const videosContainer = document.getElementById('videosContainer');
+    const noVideos = document.getElementById('noVideos');
 
-        if (!this.videos || this.videos.length === 0) {
-            if (videosContainer) videosContainer.style.display = 'none';
-            if (noVideos) {
-                noVideos.style.display = 'block';
-                noVideos.innerHTML = '<p>No videos available for this class yet.</p>';
-            }
-            return;
-        }
-        
-        if (noVideos) noVideos.style.display = 'none';
+    // ===== ACCESS CONTROL =====
+    // Check if user is logged in
+    if (!this.user) {
         if (videosContainer) {
-            videosContainer.style.display = 'grid';
-            videosContainer.innerHTML = this.videos.map((video, index) => {
-                const thumbnailUrl = video.thumbnailUrl || 
-                    (video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` : '');
-                const isLocked = video.locked === true;
-                const title = video.videoDetails?.title || video.title || 'Untitled';
-                const description = video.videoDetails?.description || video.description || 'No description';
-                const duration = video.videoDetails?.duration || video.duration || 'Unknown';
-                const price = video.price || this.classData?.price || 0;
-                
-                return `
-                    <div class="video-card ${isLocked ? 'locked' : ''}" 
-                         data-video-index="${index}" 
-                         data-video-id="${video._id || video.id}"
-                         data-locked="${isLocked}">
-                        <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
-                            <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
-                            ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
-                            ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
-                            ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
-                        </div>
-                        <div class="video-info">
-                            <h4>${isLocked ? '🔒 ' : ''}${this.escapeHtml(title)}</h4>
-                            <p>${this.escapeHtml(description)}</p>
-                            <div class="video-meta">
-                                <span>⏱️ ${duration}</span>
-                                ${isLocked ? '<span class="locked-badge">🔒 Purchase Required</span>' : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            videosContainer.querySelectorAll('.video-card').forEach((card) => {
-                card.addEventListener('click', () => {
-                    const videoIndex = parseInt(card.dataset.videoIndex);
-                    const isLocked = card.dataset.locked === 'true';
-                    
-                    if (isLocked) {
-                        const price = this.videos[videoIndex]?.price || this.classData?.price || 0;
-                        if (price > 0) {
-                            window.showToast(`💳 This video requires payment. Price: ₦${price.toLocaleString()}`, true);
-                            const paymentSection = document.getElementById('paymentSection');
-                            if (paymentSection) {
-                                paymentSection.scrollIntoView({ behavior: 'smooth' });
-                            }
-                        } else {
-                            window.showToast('🔒 Please enroll in this class to access this video', true);
-                        }
-                        return;
-                    }
-                    
-                    console.log('Video card clicked, index:', videoIndex);
-                    this.playVideo(videoIndex);
-                });
-            });
+            videosContainer.style.display = 'block';
+            videosContainer.innerHTML = `
+                <div class="access-locked">
+                    <div class="lock-icon">🔒</div>
+                    <h3>Access Restricted</h3>
+                    <p>Please <a href="login.html" class="btn-link">login</a> to view class videos.</p>
+                    <a href="login.html" class="btn btn-primary">Login to Access</a>
+                </div>
+            `;
         }
+        if (noVideos) noVideos.style.display = 'none';
+        return;
     }
 
-    renderRecordings() {
-        const recordingsContainer = document.getElementById('recordingsContainer');
-        const noRecordings = document.getElementById('noRecordings');
-
-        if (!this.recordings || this.recordings.length === 0) {
-            if (recordingsContainer) recordingsContainer.style.display = 'none';
-            if (noRecordings) {
-                noRecordings.style.display = 'block';
-                noRecordings.innerHTML = '<p>No past livestream recordings available for this class yet.</p>';
+    // Check if user is enrolled
+    if (!this.isEnrolled) {
+        if (videosContainer) {
+            videosContainer.style.display = 'block';
+            videosContainer.innerHTML = `
+                <div class="access-locked">
+                    <div class="lock-icon">🔒</div>
+                    <h3>Enroll to Access Videos</h3>
+                    <p>You need to be enrolled in this class to view videos and materials.</p>
+                    <button class="btn btn-primary" id="enrollForVideosBtn">Enroll Now</button>
+                </div>
+            `;
+            const enrollBtn = videosContainer.querySelector('#enrollForVideosBtn');
+            if (enrollBtn) {
+                enrollBtn.addEventListener('click', () => {
+                    this.handleEnrollment();
+                });
             }
-            return;
         }
-        
-        if (noRecordings) noRecordings.style.display = 'none';
-        if (recordingsContainer) {
-            recordingsContainer.style.display = 'grid';
-            recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
-                const isLocked = recording.locked === true;
-                const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url || 
-                    (recording.muxPlaybackId ? `https://stream.mux.com/${recording.muxPlaybackId}.m3u8` : null);
-                const thumbnailUrl = recording.thumbnailUrl || 
-                    (recording.muxPlaybackId ? `https://image.mux.com/${recording.muxPlaybackId}/thumbnail.jpg?time=5` : '');
-                const title = recording.classTitle || recording.name || recording.filename || `Recording ${index + 1}`;
-                const description = recording.classDescription || recording.description || 'Past livestream recording';
-                const date = recording.uploadDate || recording.createdAt;
-                const duration = recording.duration || 'Unknown';
-                const muxStatus = recording.muxStatus || 'preparing';
-                const isReady = muxStatus === 'ready';
-                const isPreparing = muxStatus === 'preparing' || muxStatus === 'uploading';
-                const price = recording.price || this.classData?.price || 0;
-                
-                const statusBadge = isPreparing 
-                    ? '<span class="processing-badge">⏳ Processing...</span>' 
-                    : isReady 
-                        ? '<span class="ready-badge">✅ Ready</span>' 
-                        : '<span class="error-badge">⚠️ Error</span>';
-                
-                return `
-                    <div class="recording-card ${isReady ? 'ready' : 'processing'} ${isLocked ? 'locked' : ''}" 
-                         data-recording-index="${index}" 
-                         data-recording-url="${videoUrl || ''}"
-                         data-mux-playback-id="${recording.muxPlaybackId || ''}"
-                         data-mux-status="${muxStatus}"
-                         data-locked="${isLocked}">
-                        <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
-                            <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
-                            ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
-                            ${statusBadge}
-                            ${!isReady ? '<div class="processing-overlay">⏳ Processing...</div>' : ''}
-                            ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
-                            ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
-                        </div>
-                        <div class="video-info">
-                            <h4>${isLocked ? '🔒 ' : '📹 '}${this.escapeHtml(title)}</h4>
-                            <p>${this.escapeHtml(description)}</p>
-                            <div class="video-meta">
-                                <span>⏱️ ${duration}</span>
-                                ${date ? `<span>📅 ${new Date(date).toLocaleDateString()}</span>` : ''}
-                                ${isPreparing ? `<span class="status-text">⏳ Processing...</span>` : ''}
-                                ${isLocked ? '<span class="locked-badge">🔒 Purchase Required</span>' : ''}
-                            </div>
+        if (noVideos) noVideos.style.display = 'none';
+        return;
+    }
+
+    // Check if class requires payment and user has paid
+    const price = this.classData?.price || 0;
+    const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
+    const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
+
+    if (!isFree && price > 0 && !hasPaid) {
+        if (videosContainer) {
+            videosContainer.style.display = 'block';
+            videosContainer.innerHTML = `
+                <div class="access-locked">
+                    <div class="lock-icon">💰</div>
+                    <h3>Payment Required</h3>
+                    <p>This class requires payment to access videos and materials.</p>
+                    <div class="price-display-small">
+                        <span class="price">₦${price.toLocaleString()}</span>
+                        <span class="label">One-time payment • Lifetime access</span>
+                    </div>
+                    <button class="btn btn-primary" id="buyForVideosBtn">💳 Buy Course - ₦${price.toLocaleString()}</button>
+                </div>
+            `;
+            const buyBtn = videosContainer.querySelector('#buyForVideosBtn');
+            if (buyBtn) {
+                buyBtn.addEventListener('click', () => {
+                    this.initiatePayment();
+                });
+            }
+        }
+        if (noVideos) noVideos.style.display = 'none';
+        return;
+    }
+
+    // If no videos, show message
+    if (!this.videos || this.videos.length === 0) {
+        if (videosContainer) videosContainer.style.display = 'none';
+        if (noVideos) {
+            noVideos.style.display = 'block';
+            noVideos.innerHTML = '<p>No videos available for this class yet.</p>';
+        }
+        return;
+    }
+    
+    // User has access - show videos
+    if (noVideos) noVideos.style.display = 'none';
+    if (videosContainer) {
+        videosContainer.style.display = 'grid';
+        videosContainer.innerHTML = this.videos.map((video, index) => {
+            const thumbnailUrl = video.thumbnailUrl || 
+                (video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` : '');
+            const isLocked = video.locked === true;
+            const title = video.videoDetails?.title || video.title || 'Untitled';
+            const description = video.videoDetails?.description || video.description || 'No description';
+            const duration = video.videoDetails?.duration || video.duration || 'Unknown';
+            const price = video.price || this.classData?.price || 0;
+            
+            return `
+                <div class="video-card ${isLocked ? 'locked' : ''}" 
+                     data-video-index="${index}" 
+                     data-video-id="${video._id || video.id}"
+                     data-locked="${isLocked}">
+                    <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
+                        <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
+                        ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
+                        ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
+                        ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
+                    </div>
+                    <div class="video-info">
+                        <h4>${isLocked ? '🔒 ' : ''}${this.escapeHtml(title)}</h4>
+                        <p>${this.escapeHtml(description)}</p>
+                        <div class="video-meta">
+                            <span>⏱️ ${duration}</span>
+                            ${isLocked ? '<span class="locked-badge">🔒 Purchase Required</span>' : ''}
                         </div>
                     </div>
-                `;
-            }).join('');
+                </div>
+            `;
+        }).join('');
 
-            recordingsContainer.querySelectorAll('.recording-card').forEach((card) => {
-                card.addEventListener('click', () => {
-                    const isLocked = card.dataset.locked === 'true';
-                    const recordingUrl = card.dataset.recordingUrl;
-                    const muxStatus = card.dataset.muxStatus;
-                    
-                    if (isLocked) {
-                        const price = this.classData?.price || 0;
-                        if (price > 0) {
-                            window.showToast(`💳 This recording requires payment. Price: ₦${price.toLocaleString()}`, true);
-                            const paymentSection = document.getElementById('paymentSection');
-                            if (paymentSection) {
-                                paymentSection.scrollIntoView({ behavior: 'smooth' });
-                            }
-                        } else {
-                            window.showToast('🔒 Please enroll in this class to access this recording', true);
+        videosContainer.querySelectorAll('.video-card').forEach((card) => {
+            card.addEventListener('click', () => {
+                const videoIndex = parseInt(card.dataset.videoIndex);
+                const isLocked = card.dataset.locked === 'true';
+                
+                if (isLocked) {
+                    const price = this.videos[videoIndex]?.price || this.classData?.price || 0;
+                    if (price > 0) {
+                        window.showToast(`💳 This video requires payment. Price: ₦${price.toLocaleString()}`, true);
+                        const paymentSection = document.getElementById('paymentSection');
+                        if (paymentSection) {
+                            paymentSection.scrollIntoView({ behavior: 'smooth' });
                         }
-                        return;
+                    } else {
+                        window.showToast('🔒 Please enroll in this class to access this video', true);
                     }
-                    
-                    console.log('Recording card clicked, URL:', recordingUrl);
-                    
-                    if (!recordingUrl) {
-                        window.showToast('Video URL not available', true);
-                        return;
-                    }
-                    
-                    if (muxStatus === 'preparing' || muxStatus === 'uploading') {
-                        window.showToast('⏳ This video is still processing. Please wait a few minutes.', true);
-                    }
-                    
-                    this.playRecording(recordingUrl, card);
-                });
+                    return;
+                }
+                
+                console.log('Video card clicked, index:', videoIndex);
+                this.playVideo(videoIndex);
             });
-        }
+        });
     }
+}
+
+   /**
+ * Render recordings - ONLY for enrolled users with paid access
+ */
+renderRecordings() {
+    const recordingsContainer = document.getElementById('recordingsContainer');
+    const noRecordings = document.getElementById('noRecordings');
+
+    // ===== ACCESS CONTROL =====
+    // Check if user is logged in
+    if (!this.user) {
+        if (recordingsContainer) {
+            recordingsContainer.style.display = 'block';
+            recordingsContainer.innerHTML = `
+                <div class="access-locked">
+                    <div class="lock-icon">🔒</div>
+                    <h3>Access Restricted</h3>
+                    <p>Please <a href="login.html" class="btn-link">login</a> to view class recordings.</p>
+                    <a href="login.html" class="btn btn-primary">Login to Access</a>
+                </div>
+            `;
+        }
+        if (noRecordings) noRecordings.style.display = 'none';
+        return;
+    }
+
+    // Check if user is enrolled
+    if (!this.isEnrolled) {
+        if (recordingsContainer) {
+            recordingsContainer.style.display = 'block';
+            recordingsContainer.innerHTML = `
+                <div class="access-locked">
+                    <div class="lock-icon">🔒</div>
+                    <h3>Enroll to Access Recordings</h3>
+                    <p>You need to be enrolled in this class to view recordings and materials.</p>
+                    <button class="btn btn-primary" id="enrollForRecordingsBtn">Enroll Now</button>
+                </div>
+            `;
+            const enrollBtn = recordingsContainer.querySelector('#enrollForRecordingsBtn');
+            if (enrollBtn) {
+                enrollBtn.addEventListener('click', () => {
+                    this.handleEnrollment();
+                });
+            }
+        }
+        if (noRecordings) noRecordings.style.display = 'none';
+        return;
+    }
+
+    // Check if class requires payment and user has paid
+    const price = this.classData?.price || 0;
+    const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
+    const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
+
+    if (!isFree && price > 0 && !hasPaid) {
+        if (recordingsContainer) {
+            recordingsContainer.style.display = 'block';
+            recordingsContainer.innerHTML = `
+                <div class="access-locked">
+                    <div class="lock-icon">💰</div>
+                    <h3>Payment Required</h3>
+                    <p>This class requires payment to access recordings and materials.</p>
+                    <div class="price-display-small">
+                        <span class="price">₦${price.toLocaleString()}</span>
+                        <span class="label">One-time payment • Lifetime access</span>
+                    </div>
+                    <button class="btn btn-primary" id="buyForRecordingsBtn">💳 Buy Course - ₦${price.toLocaleString()}</button>
+                </div>
+            `;
+            const buyBtn = recordingsContainer.querySelector('#buyForRecordingsBtn');
+            if (buyBtn) {
+                buyBtn.addEventListener('click', () => {
+                    this.initiatePayment();
+                });
+            }
+        }
+        if (noRecordings) noRecordings.style.display = 'none';
+        return;
+    }
+
+    // If no recordings, show message
+    if (!this.recordings || this.recordings.length === 0) {
+        if (recordingsContainer) recordingsContainer.style.display = 'none';
+        if (noRecordings) {
+            noRecordings.style.display = 'block';
+            noRecordings.innerHTML = '<p>No past livestream recordings available for this class yet.</p>';
+        }
+        return;
+    }
+    
+    // User has access - show recordings
+    if (noRecordings) noRecordings.style.display = 'none';
+    if (recordingsContainer) {
+        recordingsContainer.style.display = 'grid';
+        recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
+            const isLocked = recording.locked === true;
+            const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url || 
+                (recording.muxPlaybackId ? `https://stream.mux.com/${recording.muxPlaybackId}.m3u8` : null);
+            const thumbnailUrl = recording.thumbnailUrl || 
+                (recording.muxPlaybackId ? `https://image.mux.com/${recording.muxPlaybackId}/thumbnail.jpg?time=5` : '');
+            const title = recording.classTitle || recording.name || recording.filename || `Recording ${index + 1}`;
+            const description = recording.classDescription || recording.description || 'Past livestream recording';
+            const date = recording.uploadDate || recording.createdAt;
+            const duration = recording.duration || 'Unknown';
+            const muxStatus = recording.muxStatus || 'preparing';
+            const isReady = muxStatus === 'ready';
+            const isPreparing = muxStatus === 'preparing' || muxStatus === 'uploading';
+            const price = recording.price || this.classData?.price || 0;
+            
+            const statusBadge = isPreparing 
+                ? '<span class="processing-badge">⏳ Processing...</span>' 
+                : isReady 
+                    ? '<span class="ready-badge">✅ Ready</span>' 
+                    : '<span class="error-badge">⚠️ Error</span>';
+            
+            return `
+                <div class="recording-card ${isReady ? 'ready' : 'processing'} ${isLocked ? 'locked' : ''}" 
+                     data-recording-index="${index}" 
+                     data-recording-url="${videoUrl || ''}"
+                     data-mux-playback-id="${recording.muxPlaybackId || ''}"
+                     data-mux-status="${muxStatus}"
+                     data-locked="${isLocked}">
+                    <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
+                        <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
+                        ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
+                        ${statusBadge}
+                        ${!isReady ? '<div class="processing-overlay">⏳ Processing...</div>' : ''}
+                        ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
+                        ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
+                    </div>
+                    <div class="video-info">
+                        <h4>${isLocked ? '🔒 ' : '📹 '}${this.escapeHtml(title)}</h4>
+                        <p>${this.escapeHtml(description)}</p>
+                        <div class="video-meta">
+                            <span>⏱️ ${duration}</span>
+                            ${date ? `<span>📅 ${new Date(date).toLocaleDateString()}</span>` : ''}
+                            ${isPreparing ? `<span class="status-text">⏳ Processing...</span>` : ''}
+                            ${isLocked ? '<span class="locked-badge">🔒 Purchase Required</span>' : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        recordingsContainer.querySelectorAll('.recording-card').forEach((card) => {
+            card.addEventListener('click', () => {
+                const isLocked = card.dataset.locked === 'true';
+                const recordingUrl = card.dataset.recordingUrl;
+                const muxStatus = card.dataset.muxStatus;
+                
+                if (isLocked) {
+                    const price = this.classData?.price || 0;
+                    if (price > 0) {
+                        window.showToast(`💳 This recording requires payment. Price: ₦${price.toLocaleString()}`, true);
+                        const paymentSection = document.getElementById('paymentSection');
+                        if (paymentSection) {
+                            paymentSection.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    } else {
+                        window.showToast('🔒 Please enroll in this class to access this recording', true);
+                    }
+                    return;
+                }
+                
+                console.log('Recording card clicked, URL:', recordingUrl);
+                
+                if (!recordingUrl) {
+                    window.showToast('Video URL not available', true);
+                    return;
+                }
+                
+                if (muxStatus === 'preparing' || muxStatus === 'uploading') {
+                    window.showToast('⏳ This video is still processing. Please wait a few minutes.', true);
+                }
+                
+                this.playRecording(recordingUrl, card);
+            });
+        });
+    }
+}
 
     playVideo(videoIndex) {
         const video = this.videos[videoIndex];
