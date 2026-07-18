@@ -26,6 +26,12 @@ const ClassSchema = new mongoose.Schema({
   totalSales: { type: Number, default: 0 },
   minPrice: { type: Number, default: 1000 },     // Minimum price in NGN
   
+  // ===== QUIZ FIELDS =====
+  quizCount: { type: Number, default: 0 },          // Total published quizzes
+  totalQuizPoints: { type: Number, default: 0 },    // Sum of all quiz points
+  averageQuizScore: { type: Number, default: 0 },   // Average score across all quiz attempts
+  
+  // ===== OTHER FIELDS =====
   isActive: { type: Boolean, default: true },
   maxStudents: { type: Number, default: 100 },
   requirements: String,
@@ -43,5 +49,24 @@ ClassSchema.index({ isActive: 1 });
 ClassSchema.index({ isFree: 1 });
 ClassSchema.index({ price: 1 });
 ClassSchema.index({ title: 'text', description: 'text', shortDescription: 'text' });
+ClassSchema.index({ quizCount: 1 });
+
+// ===== VIRTUAL FIELDS =====
+ClassSchema.virtual('studentCount').get(function() {
+  return this.enrolledStudents || 0;
+});
+
+// ===== METHODS =====
+ClassSchema.methods.incrementQuizCount = async function() {
+  this.quizCount += 1;
+  return this.save();
+};
+
+ClassSchema.methods.updateQuizStats = async function(averageScore) {
+  if (averageScore !== undefined) {
+    this.averageQuizScore = averageScore;
+  }
+  return this.save();
+};
 
 export default mongoose.model("Class", ClassSchema);

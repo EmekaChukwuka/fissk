@@ -13,6 +13,9 @@ import Class from "../models/Class.js";
 import Enrollment from "../models/Enrollment.js";
 import LiveSession from "../models/LiveSession.js";
 import Assignment from "../models/Assignment.js";
+import Quiz from "../models/Quiz.js";
+import QuizAttempt from "../models/QuizAttempt.js";
+import QuizService from "../services/quizService.js";
 
 // Import Email Service
 import emailService from "../services/emailService.js";
@@ -242,7 +245,7 @@ Regisrouter.post('/student-login', async (req, res) => {
       success: true,
       message: 'Login successful',
       sessionUser,
-      token  // ← Include token in response
+      token
     });
 
   } catch (error) {
@@ -302,7 +305,7 @@ Regisrouter.post('/instructor-login', async (req, res) => {
       success: true,
       message: 'Login successful',
       sessionUser,
-      token  // ← Include token in response
+      token
     });
 
   } catch (error) {
@@ -420,13 +423,15 @@ Regisrouter.post('/create-class', async (req, res) => {
       level: payload.level,
       duration: payload.duration,
       instructorId: user._id,
-      // ===== NEW PAYMENT FIELDS =====
       price: price,
       isFree: isFree,
       currency: payload.currency || 'NGN',
       totalRevenue: 0,
       totalSales: 0,
-      enrolledStudents: 0
+      enrolledStudents: 0,
+      quizCount: 0,
+      totalQuizPoints: 0,
+      averageQuizScore: 0
     });
     
     await newClass.save();
@@ -509,14 +514,19 @@ Regisrouter.post('/join-class', async (req, res) => {
     const accessType = classData.isFree || classData.price === 0 ? 'free' : 'paid';
     const paymentStatus = classData.isFree || classData.price === 0 ? 'free' : 'paid';
     
-    // Create enrollment
+    // Create enrollment with quiz progress fields
     const enrollment = new Enrollment({
       userId: user._id,
       classId: classData._id,
       accessType: accessType,
       paymentStatus: paymentStatus,
       paymentReference: paidEnrollment?.paymentReference || null,
-      amountPaid: accessType === 'paid' ? classData.price : 0
+      amountPaid: accessType === 'paid' ? classData.price : 0,
+      quizProgress: [],
+      totalQuizzesTaken: 0,
+      averageQuizScore: 0,
+      quizzesPassed: 0,
+      bestQuizScore: 0
     });
     
     await enrollment.save();
@@ -569,6 +579,7 @@ Regisrouter.get('/classes', async (req, res) => {
       enrolledStudents: cls.enrolledStudents || 0,
       rating: cls.rating || 0,
       totalRatings: cls.totalRatings || 0,
+      quizCount: cls.quizCount || 0,
       createdAt: cls.createdAt,
       thumbnailUrl: cls.thumbnailUrl
     }));
@@ -662,6 +673,7 @@ Regisrouter.get('/class/:classId', async (req, res) => {
       thumbnailUrl: classData.thumbnailUrl,
       isActive: classData.isActive,
       maxStudents: classData.maxStudents,
+      quizCount: classData.quizCount || 0,
       createdAt: classData.createdAt,
       updatedAt: classData.updatedAt
     };
@@ -721,6 +733,11 @@ Regisrouter.post('/get-user-classes', async (req, res) => {
       last_accessed: enrollment.lastAccessed,
       paymentStatus: enrollment.paymentStatus,
       accessType: enrollment.accessType,
+      quizProgress: enrollment.quizProgress || [],
+      totalQuizzesTaken: enrollment.totalQuizzesTaken || 0,
+      averageQuizScore: enrollment.averageQuizScore || 0,
+      quizzesPassed: enrollment.quizzesPassed || 0,
+      bestQuizScore: enrollment.bestQuizScore || 0,
       ...enrollment.classId
     }));
     
@@ -754,6 +771,432 @@ Regisrouter.post('/progress/update', async (req, res) => {
   } catch (error) {
     console.error('Progress update error:', error);
     res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+// ============================================================
+// QUIZ ENDPOINTS
+// ============================================================
+
+// Get quizzes for a class (Student)
+Regisrouter.get('/quizzes/class/:classId', async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const userId = req.session.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // Check enrollment
+    const enrollment = await Enrollment.findOne({ userId, classId });
+    if (!enrollment) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You must be enrolled in this class to view quizzes' 
+      });
+    }
+
+    const quizzes = await Quiz.find({ classId, status: 'published' })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Get user's attempts for each quiz
+    const quizzesWithStatus = await Promise.all(quizzes.map(async (quiz) => {
+      const attempts = await QuizAttempt.find({ quizId: quiz._id, userId })
+        .sort({ attemptNumber: -1 })
+        .lean();
+
+      const completedAttempts = attempts.filter(a => a.status === 'completed' || a.status === 'graded');
+      const inProgressAttempt = attempts.find(a => a.status === 'in-progress');
+
+      return {
+        ...quiz,
+        userAttempts: completedAttempts.length,
+        userScore: completedAttempts.length > 0 ? completedAttempts[0].score : null,
+        userPassed: completedAttempts.length > 0 ? completedAttempts[0].passed : false,
+        canAttempt: inProgressAttempt ? true : completedAttempts.length < (quiz.settings?.maxAttempts || 1),
+        inProgress: !!inProgressAttempt,
+        attemptId: inProgressAttempt?._id || null,
+        totalPoints: quiz.totalPoints || 0
+      };
+    }));
+
+    res.json({
+      success: true,
+      quizzes: quizzesWithStatus
+    });
+
+  } catch (error) {
+    console.error('Get class quizzes error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get single quiz details (Student)
+Regisrouter.get('/quizzes/:quizId', async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const userId = req.session.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const quiz = await Quiz.findById(quizId).lean();
+    if (!quiz) {
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
+    }
+
+    // Check enrollment
+    const enrollment = await Enrollment.findOne({ userId, classId: quiz.classId });
+    if (!enrollment) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You must be enrolled in this class to view this quiz' 
+      });
+    }
+
+    // Get user's attempts
+    const attempts = await QuizAttempt.find({ quizId, userId })
+      .sort({ attemptNumber: -1 })
+      .lean();
+
+    const completedAttempts = attempts.filter(a => a.status === 'completed' || a.status === 'graded');
+    const inProgressAttempt = attempts.find(a => a.status === 'in-progress');
+
+    res.json({
+      success: true,
+      quiz: {
+        ...quiz,
+        userAttempts: completedAttempts.length,
+        userScore: completedAttempts.length > 0 ? completedAttempts[0].score : null,
+        userPassed: completedAttempts.length > 0 ? completedAttempts[0].passed : false,
+        canAttempt: inProgressAttempt ? true : completedAttempts.length < (quiz.settings?.maxAttempts || 1),
+        inProgress: !!inProgressAttempt,
+        attemptId: inProgressAttempt?._id || null,
+        totalPoints: quiz.totalPoints || 0
+      }
+    });
+
+  } catch (error) {
+    console.error('Get quiz error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Start quiz attempt (Student)
+Regisrouter.post('/quizzes/:quizId/start', async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const userId = req.session.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // Validate attempt
+    const quiz = await QuizService.validateAttempt(quizId, userId);
+
+    // Check enrollment
+    const enrollment = await Enrollment.findOne({ userId, classId: quiz.classId });
+    if (!enrollment) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You must be enrolled in this class to take the quiz' 
+      });
+    }
+
+    // Check for existing in-progress attempt
+    const existingAttempt = await QuizAttempt.findOne({
+      quizId,
+      userId,
+      status: 'in-progress'
+    });
+
+    if (existingAttempt) {
+      return res.json({
+        success: true,
+        attempt: existingAttempt,
+        message: 'Resuming existing attempt'
+      });
+    }
+
+    // Get attempt number
+    const attemptsCount = await QuizAttempt.countDocuments({ quizId, userId });
+    const attemptNumber = attemptsCount + 1;
+
+    // Create new attempt
+    const attempt = new QuizAttempt({
+      quizId,
+      userId,
+      classId: quiz.classId,
+      attemptNumber,
+      answers: quiz.questions.map((_, index) => ({
+        questionIndex: index,
+        answer: null
+      })),
+      status: 'in-progress',
+      startedAt: new Date()
+    });
+
+    await attempt.save();
+
+    res.status(201).json({
+      success: true,
+      attempt,
+      message: 'Quiz started successfully'
+    });
+
+  } catch (error) {
+    console.error('Start attempt error:', error);
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+// Save answer (Student)
+Regisrouter.put('/quizzes/:quizId/answer', async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const { questionIndex, answer } = req.body;
+    const userId = req.session.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const attempt = await QuizAttempt.findOne({
+      quizId,
+      userId,
+      status: 'in-progress'
+    });
+
+    if (!attempt) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No active attempt found' 
+      });
+    }
+
+    const answerIndex = attempt.answers.findIndex(a => a.questionIndex === questionIndex);
+    if (answerIndex === -1) {
+      return res.status(400).json({ success: false, message: 'Invalid question index' });
+    }
+
+    attempt.answers[answerIndex].answer = answer;
+    attempt.answers[answerIndex].isCorrect = null;
+    attempt.answers[answerIndex].pointsEarned = null;
+
+    await attempt.save();
+
+    res.json({
+      success: true,
+      message: 'Answer saved successfully'
+    });
+
+  } catch (error) {
+    console.error('Save answer error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Submit quiz (Student)
+Regisrouter.post('/quizzes/:quizId/submit', async (req, res) => {
+  try {
+    const { quizId } = req.params;
+    const userId = req.session.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const attempt = await QuizAttempt.findOne({
+      quizId,
+      userId,
+      status: 'in-progress'
+    });
+
+    if (!attempt) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'No active attempt found' 
+      });
+    }
+
+    // Calculate time spent
+    const timeSpent = Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000);
+    attempt.timeSpent = timeSpent;
+    attempt.submittedAt = new Date();
+
+    await attempt.save();
+
+    // Auto-grade the attempt
+    const gradedAttempt = await QuizService.autoGradeAttempt(attempt._id);
+
+    // ===== UPDATE CLASS STATS =====
+    const quiz = await Quiz.findById(quizId);
+    if (quiz) {
+      // Update class quiz count
+      await Class.findByIdAndUpdate(quiz.classId, {
+        $inc: { quizCount: 1 }
+      });
+      
+      // Update class average quiz score
+      const allAttempts = await QuizAttempt.find({ 
+        classId: quiz.classId,
+        status: { $in: ['completed', 'graded'] }
+      });
+      
+      const scores = allAttempts.map(a => a.score || 0);
+      const avgScore = scores.length > 0 
+        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) 
+        : 0;
+      
+      await Class.findByIdAndUpdate(quiz.classId, {
+        averageQuizScore: avgScore
+      });
+    }
+
+    // ===== UPDATE ENROLLMENT QUIZ PROGRESS =====
+    const enrollment = await Enrollment.findOne({
+      userId: userId,
+      classId: attempt.classId
+    });
+
+    if (enrollment) {
+      // Check if quiz already exists in progress
+      const existingIndex = enrollment.quizProgress.findIndex(
+        q => q.quizId.toString() === quizId.toString()
+      );
+      
+      const quizData = {
+        quizId: quizId,
+        attemptId: gradedAttempt._id,
+        score: gradedAttempt.score,
+        passed: gradedAttempt.passed,
+        completedAt: new Date(),
+        attemptNumber: enrollment.quizProgress.filter(q => q.quizId.toString() === quizId.toString()).length + 1,
+        timeSpent: gradedAttempt.timeSpent || 0
+      };
+      
+      if (existingIndex !== -1) {
+        const existing = enrollment.quizProgress[existingIndex];
+        if (gradedAttempt.score > existing.score) {
+          enrollment.quizProgress[existingIndex] = quizData;
+        }
+      } else {
+        enrollment.quizProgress.push(quizData);
+      }
+      
+      // Update enrollment quiz stats
+      const completedQuizzes = enrollment.quizProgress.filter(q => q.completedAt);
+      enrollment.totalQuizzesTaken = completedQuizzes.length;
+      
+      if (completedQuizzes.length > 0) {
+        const scores = completedQuizzes.map(q => q.score);
+        enrollment.averageQuizScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        enrollment.bestQuizScore = Math.max(...scores);
+        enrollment.quizzesPassed = completedQuizzes.filter(q => q.passed).length;
+      }
+      
+      await enrollment.save();
+    }
+
+    // ===== UPDATE USER QUIZ STATS =====
+    const user = await User.findById(userId);
+    if (user) {
+      const allAttempts = await QuizAttempt.find({ 
+        userId: userId,
+        status: { $in: ['completed', 'graded'] }
+      });
+      
+      if (allAttempts.length > 0) {
+        const scores = allAttempts.map(a => a.score || 0);
+        const passed = allAttempts.filter(a => a.passed).length;
+        
+        user.quizStats = {
+          totalQuizzesTaken: allAttempts.length,
+          averageScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+          bestScore: Math.max(...scores),
+          quizzesPassed: passed,
+          totalQuizzesCreated: user.quizStats?.totalQuizzesCreated || 0
+        };
+        
+        await user.save();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Quiz submitted successfully',
+      attempt: gradedAttempt,
+      results: await QuizService.getDetailedResults(gradedAttempt._id)
+    });
+
+  } catch (error) {
+    console.error('Submit attempt error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get attempt results (Student)
+Regisrouter.get('/quizzes/attempt/:attemptId', async (req, res) => {
+  try {
+    const { attemptId } = req.params;
+    const userId = req.session.user?.id;
+
+    const attempt = await QuizAttempt.findById(attemptId).lean();
+    if (!attempt) {
+      return res.status(404).json({ success: false, message: 'Attempt not found' });
+    }
+
+    if (attempt.userId.toString() !== userId) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You do not have permission to view these results' 
+      });
+    }
+
+    const results = await QuizService.getDetailedResults(attemptId);
+
+    res.json({
+      success: true,
+      attempt,
+      results
+    });
+
+  } catch (error) {
+    console.error('Get attempt results error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get user's quiz attempts (Student)
+Regisrouter.get('/quizzes/attempts/user', async (req, res) => {
+  try {
+    const userId = req.session.user?.id;
+    const { classId } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const query = { userId };
+    if (classId) query.classId = classId;
+
+    const attempts = await QuizAttempt.find(query)
+      .populate('quizId', 'title description category')
+      .sort({ submittedAt: -1 })
+      .lean();
+
+    res.json({
+      success: true,
+      attempts
+    });
+
+  } catch (error) {
+    console.error('Get user attempts error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -908,15 +1351,41 @@ Regisrouter.post('/dashboard/learning-time', async (req, res) => {
   }
 });
 
-// Load dashboard stats
+// Load dashboard stats (UPDATED with quiz stats)
 Regisrouter.post('/dashboard/load-stats', async (req, res) => {
   const { id } = req.body;
   
   try {
     const notifications = [];
     
+    // Get quiz stats
+    const quizAttempts = await QuizAttempt.find({ 
+      userId: id, 
+      status: { $in: ['completed', 'graded'] } 
+    });
+    
+    const quizStats = {
+      totalQuizzes: quizAttempts.length,
+      averageScore: quizAttempts.length > 0 
+        ? Math.round(quizAttempts.reduce((sum, a) => sum + a.score, 0) / quizAttempts.length) 
+        : 0,
+      passedQuizzes: quizAttempts.filter(a => a.passed).length,
+      bestScore: quizAttempts.length > 0 
+        ? Math.max(...quizAttempts.map(a => a.score)) 
+        : 0
+    };
+    
+    // Get class progress
+    const enrollments = await Enrollment.find({ userId: id });
+    const totalProgress = enrollments.reduce((sum, e) => sum + e.progress, 0);
+    const avgProgress = enrollments.length > 0 ? Math.round(totalProgress / enrollments.length) : 0;
+    
     const stats = {
       notifications: notifications,
+      quizStats,
+      avgProgress,
+      enrolledClasses: enrollments.length,
+      completedClasses: enrollments.filter(e => e.completed).length
     };
     
     res.json(stats);
@@ -972,7 +1441,7 @@ Regisrouter.post('/classes/instructor', async (req, res) => {
   }
 });
 
-// Get instructor's classes (with payment stats)
+// Get instructor's classes (with payment stats and quiz count)
 Regisrouter.post('/instructor/classes', async (req, res) => {
   const { id } = req.body;
   
@@ -998,6 +1467,12 @@ Regisrouter.post('/instructor/classes', async (req, res) => {
           ? enrollments.reduce((sum, e) => sum + e.progress, 0) / enrollments.length 
           : 0;
         
+        // Get quiz count for this class
+        const quizCount = await Quiz.countDocuments({ 
+          classId: cls._id,
+          status: 'published' 
+        });
+        
         return {
           ...cls,
           enrolled_students: enrolledStudents,
@@ -1008,7 +1483,8 @@ Regisrouter.post('/instructor/classes', async (req, res) => {
           isFree: cls.isFree !== undefined ? cls.isFree : true,
           currency: cls.currency || 'NGN',
           totalRevenue: cls.totalRevenue || 0,
-          totalSales: cls.totalSales || 0
+          totalSales: cls.totalSales || 0,
+          quizCount: quizCount
         };
       })
     );
@@ -1049,6 +1525,12 @@ Regisrouter.post('/instructor/classes/:id', async (req, res) => {
       paymentStatus: 'free' 
     });
     
+    // Get quiz count
+    const quizCount = await Quiz.countDocuments({ 
+      classId, 
+      status: 'published' 
+    });
+    
     const result = {
       ...classData.toObject(),
       student_count: studentCount,
@@ -1057,7 +1539,8 @@ Regisrouter.post('/instructor/classes/:id', async (req, res) => {
       price: classData.price || 0,
       isFree: classData.isFree !== undefined ? classData.isFree : true,
       totalRevenue: classData.totalRevenue || 0,
-      totalSales: classData.totalSales || 0
+      totalSales: classData.totalSales || 0,
+      quizCount: quizCount
     };
     
     res.json(result);
@@ -1093,7 +1576,7 @@ Regisrouter.get('/instructor/classes/:id/students', async (req, res) => {
   }
 });
 
-// Get instructor stats (with earnings)
+// Get instructor stats (with earnings and quiz stats)
 Regisrouter.post('/instructor/stats', async (req, res) => {
   const instructorId = req.body.id;
   
@@ -1121,6 +1604,9 @@ Regisrouter.post('/instructor/stats', async (req, res) => {
     // Get instructor earnings
     const instructor = await User.findById(instructorId);
     
+    // Get total quizzes created
+    const totalQuizzes = await Quiz.countDocuments({ instructorId });
+    
     const stats = {
       totalClasses,
       totalStudents,
@@ -1128,7 +1614,8 @@ Regisrouter.post('/instructor/stats', async (req, res) => {
       avgRating,
       earnings: instructor?.earnings || 0,
       totalRevenue: instructor?.totalRevenue || 0,
-      totalSales: instructor?.totalSales || 0
+      totalSales: instructor?.totalSales || 0,
+      totalQuizzes
     };
     
     res.json([stats]);
@@ -1308,8 +1795,11 @@ Regisrouter.delete('/instructor/classes/:id', async (req, res) => {
       });
     }
 
+    // Delete associated data
     await Enrollment.deleteMany({ classId: classId });
     await LiveSession.deleteMany({ classId: classId });
+    await Quiz.deleteMany({ classId: classId });
+    await QuizAttempt.deleteMany({ classId: classId });
     await Class.deleteOne({ _id: classId });
     
     res.json({ 

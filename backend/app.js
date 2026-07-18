@@ -17,6 +17,7 @@ import paymentRouter from './routes/paymentRoutes.js';
 import payoutRouter from './routes/payoutRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
 import createAdmin from './scripts/createAdmin.js';
+import quizRouter from './routes/quizRoutes.js';
 import axios from "axios";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -26,7 +27,11 @@ const app = express();
 const server = http.createServer(app);
 
 // ===== MIDDLEWARE =====
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(bodyParser.json());
 app.use('/uploads', express.static('uploads'));
 app.use(express.json());
@@ -39,6 +44,7 @@ app.use('/register', Regisrouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api/payout', payoutRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/quizzes', quizRouter);
 
 // ===== LIVEKIT CONFIGURATION =====
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
