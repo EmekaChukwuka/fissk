@@ -17,6 +17,7 @@ import paymentRouter from './routes/paymentRoutes.js';
 import payoutRouter from './routes/payoutRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
 import createAdmin from './scripts/createAdmin.js';
+import axios from "axios";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
