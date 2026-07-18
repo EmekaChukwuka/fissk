@@ -293,7 +293,7 @@ class ClassManager {
      */
     async loadQuizzes() {
         try {
-            const response = await fetch(`/api/quizzes/class/${this.classId}`, {
+            const response = await fetch(`https://fissk-backend.onrender.com/api/class/${this.classId}`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
                 }
@@ -426,7 +426,7 @@ class ClassManager {
     async viewQuizResults(quizId) {
         try {
             // Get the latest attempt
-            const response = await fetch(`/api/quizzes/${quizId}`, {
+            const response = await fetch(`https://fissk-backend.onrender.com/api/${quizId}`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`
                 }
