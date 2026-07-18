@@ -295,7 +295,8 @@ class ClassManager {
         try {
             const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/class/${this.classId}`, {
                 headers: {
-                    'Authorization': `Bearer ${this.token}`
+                    'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
                 }
             });
             
@@ -428,7 +429,8 @@ class ClassManager {
             // Get the latest attempt
             const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${quizId}`, {
                 headers: {
-                    'Authorization': `Bearer ${this.token}`
+                    'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
                 }
             });
             
