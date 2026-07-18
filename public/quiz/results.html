@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Results - FISSK Online Academy</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../css/quiz/quiz-results.css">
+    <link rel="icon" href="../fissklogo.jpg">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Online Academy</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="../index.html" class="nav-link">Home</a></li>
+                <li><a href="../classes.html" class="nav-link">Classes</a></li>
+                <li><a href="../dashboard.html" class="nav-link">Dashboard</a></li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <section class="results-section">
+        <div class="container">
+            <!-- Results Summary -->
+            <div class="results-summary" id="resultsSummary">
+                <div class="results-header">
+                    <h1 id="quizTitle">Quiz Results</h1>
+                    <p id="quizDescription"></p>
+                </div>
+                <div class="results-score">
+                    <div class="score-circle" id="scoreCircle">
+                        <span class="score-number" id="scoreNumber">0%</span>
+                        <span class="score-label">Score</span>
+                    </div>
+                    <div class="score-details">
+                        <div class="score-detail">
+                            <span class="label">Points Earned</span>
+                            <span class="value" id="earnedPoints">0 / 0</span>
+                        </div>
+                        <div class="score-detail">
+                            <span class="label">Status</span>
+                            <span class="value" id="passStatus">—</span>
+                        </div>
+                        <div class="score-detail">
+                            <span class="label">Time Spent</span>
+                            <span class="value" id="timeSpent">--:--</span>
+                        </div>
+                        <div class="score-detail">
+                            <span class="label">Attempt</span>
+                            <span class="value" id="attemptNumber">1</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Review Questions -->
+            <div class="results-questions">
+                <h2>Review Answers</h2>
+                <div id="questionsReview">
+                    <!-- Questions will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="results-actions">
+                <a href="../classes.html" class="btn btn-outline">← Back to Classes</a>
+                <a href="../dashboard.html" class="btn btn-primary">📊 Dashboard</a>
+                <button class="btn btn-secondary" id="retakeBtn" style="display:none;">🔄 Retake Quiz</button>
+            </div>
+        </div>
+    </section>
+
+    <script src="../js/quiz/quiz-core.js"></script>
+    <script src="../js/quiz/quiz-results.js"></script>
+</body>
+</html>

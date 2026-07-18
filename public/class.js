@@ -9,6 +9,7 @@ class ClassManager {
         this.progressInterval = null;
         this.videos = [];
         this.recordings = [];
+        this.quizzes = [];
         this.isEnrolled = false;
         this.isLoading = true;
         this.hlsInstance = null;
@@ -40,7 +41,8 @@ class ClassManager {
                 this.checkEnrollment(),
                 this.loadClassVideos(),
                 this.loadClassRecordings(),
-                this.checkPaymentStatus()
+                this.checkPaymentStatus(),
+                this.loadQuizzes() // Load quizzes
             ]);
             
             this.renderClassData();
@@ -48,6 +50,7 @@ class ClassManager {
             this.renderClassReviews();
             this.renderRecordings();
             this.renderPriceAndPayment();
+            this.renderQuizzes(); // Render quizzes
             this.setupEventListeners();
         } catch (error) {
             console.error('Initialization error:', error);
@@ -281,6 +284,166 @@ class ClassManager {
         }
     }
 
+    // ============================================================
+    // QUIZ METHODS
+    // ============================================================
+
+    /**
+     * Load quizzes for this class
+     */
+    async loadQuizzes() {
+        try {
+            const response = await fetch(`/api/quizzes/class/${this.classId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to load quizzes');
+            }
+            
+            const data = await response.json();
+            this.quizzes = data.quizzes || [];
+            console.log('Quizzes loaded:', this.quizzes.length);
+            
+        } catch (error) {
+            console.error('Error loading quizzes:', error);
+            this.quizzes = [];
+        }
+    }
+
+    /**
+     * Render quizzes in the quizzes tab
+     */
+    renderQuizzes() {
+        const container = document.getElementById('quizzesContainer');
+        if (!container) return;
+        
+        if (!this.quizzes || this.quizzes.length === 0) {
+            container.innerHTML = `
+                <div class="no-quizzes">
+                    <p>📝 No quizzes available for this class yet.</p>
+                    ${this.user?.user_type === 'instructor' ? 
+                        `<a href="instructor/quizzes/create.html?classId=${this.classId}" class="btn btn-primary">Create First Quiz</a>` : 
+                        '<p class="no-quizzes-sub">Check back later for new quizzes.</p>'
+                    }
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = `
+            <div class="quizzes-grid">
+                ${this.quizzes.map(quiz => this.renderQuizCard(quiz)).join('')}
+            </div>
+        `;
+        
+        // Add event listeners for quiz cards
+        container.querySelectorAll('.quiz-card .quiz-action-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const quizId = btn.dataset.quizId;
+                const action = btn.dataset.action;
+                
+                if (action === 'start' || action === 'resume') {
+                    this.startQuiz(quizId);
+                } else if (action === 'review') {
+                    this.viewQuizResults(quizId);
+                }
+            });
+        });
+    }
+
+    /**
+     * Render a single quiz card
+     */
+    renderQuizCard(quiz) {
+        const isCompleted = quiz.userAttempts > 0;
+        const isInProgress = quiz.inProgress;
+        const canAttempt = quiz.canAttempt;
+        const status = isCompleted ? 'completed' : isInProgress ? 'in-progress' : 'available';
+        
+        let statusBadge = '';
+        let actionButton = '';
+        
+        if (isCompleted) {
+            statusBadge = `<span class="quiz-status completed">✅ Completed</span>`;
+            actionButton = `<button class="btn btn-outline quiz-action-btn" data-quiz-id="${quiz._id}" data-action="review">📊 Review</button>`;
+        } else if (isInProgress) {
+            statusBadge = `<span class="quiz-status in-progress">⏳ In Progress</span>`;
+            actionButton = `<button class="btn btn-primary quiz-action-btn" data-quiz-id="${quiz._id}" data-action="resume">▶️ Resume</button>`;
+        } else if (canAttempt) {
+            statusBadge = `<span class="quiz-status available">✅ Available</span>`;
+            actionButton = `<button class="btn btn-primary quiz-action-btn" data-quiz-id="${quiz._id}" data-action="start">🚀 Start Quiz</button>`;
+        } else {
+            statusBadge = `<span class="quiz-status locked">🔒 Attempts Used</span>`;
+            actionButton = `<button class="btn btn-secondary quiz-action-btn" disabled>Max Attempts Reached</button>`;
+        }
+        
+        const timeLimit = quiz.settings?.timeLimit || 0;
+        const timeDisplay = timeLimit > 0 ? `⏱️ ${timeLimit} min` : '⏱️ No time limit';
+        const questionsCount = quiz.questionCount || 0;
+        
+        return `
+            <div class="quiz-card ${status}">
+                <div class="quiz-card-header">
+                    <h3>${this.escapeHtml(quiz.title)}</h3>
+                    ${statusBadge}
+                </div>
+                <div class="quiz-card-body">
+                    <p>${this.escapeHtml(quiz.description || 'No description')}</p>
+                    <div class="quiz-meta">
+                        <span>📝 ${questionsCount} questions</span>
+                        <span>${timeDisplay}</span>
+                        ${quiz.totalPoints > 0 ? `<span>⭐ ${quiz.totalPoints} points</span>` : ''}
+                        ${quiz.userScore !== null ? `<span>📊 Score: ${quiz.userScore}%</span>` : ''}
+                    </div>
+                </div>
+                <div class="quiz-card-footer">
+                    ${actionButton}
+                    ${isCompleted ? `<span class="quiz-attempts">Attempts: ${quiz.userAttempts}</span>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * Start or resume a quiz
+     */
+    async startQuiz(quizId) {
+        try {
+            window.location.href = `quiz/take.html?quizId=${quizId}`;
+        } catch (error) {
+            console.error('Start quiz error:', error);
+            window.showToast('Failed to start quiz. Please try again.', 'error');
+        }
+    }
+
+    /**
+     * View quiz results
+     */
+    async viewQuizResults(quizId) {
+        try {
+            // Get the latest attempt
+            const response = await fetch(`/api/quizzes/${quizId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            
+            const data = await response.json();
+            if (data.success && data.quiz && data.quiz.attemptId) {
+                window.location.href = `quiz/results.html?attemptId=${data.quiz.attemptId}`;
+            } else {
+                window.showToast('No results available for this quiz.', 'info');
+            }
+        } catch (error) {
+            console.error('View results error:', error);
+            window.showToast('Failed to load results.', 'error');
+        }
+    }
+
     async loadUserProgress() {
         try {
             const response = await fetch('https://fissk-backend.onrender.com/register/user-progress', {
@@ -396,7 +559,18 @@ class ClassManager {
         }
         
         if (tabName === 'reviews') {
-            this.renderClassReviews(); 
+            this.renderClassReviews();
+        }
+        
+        // ===== QUIZ TAB =====
+        if (tabName === 'quizzes') {
+            if (!this.quizzes || this.quizzes.length === 0) {
+                this.loadQuizzes().then(() => {
+                    this.renderQuizzes();
+                });
+            } else {
+                this.renderQuizzes();
+            }
         }
     }
 
@@ -436,22 +610,31 @@ class ClassManager {
                 }
             }
 
-            if (this.classData.instructor.id) {
+            if (this.classData.instructorId) {
                 try {
-                   /*const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json','Authorization': `Bearer ${this.token}` },
-                        body: JSON.stringify({ instructor_id: this.classData.instructor.id }),
-                    });
-                    const dataA = await response.json();
-                    console.log(dataA)*/
                     const instructorNameEl = document.getElementById('instructorName');
                     const instructorBioEl = document.getElementById('instructorBio');
                     
-                    if (instructorNameEl) {
-                       //const name = `${dataA.instructorData.firstName || ''} ${dataA.instructorData.lastName || ''}`.trim();
-                        instructorNameEl.textContent = this.classData.instructor.name || 'Staff';
+                    // Try to get instructor name from class data
+                    if (this.classData.instructorId) {
+                        if (typeof this.classData.instructorId === 'object' && this.classData.instructorId.firstName) {
+                            const name = `${this.classData.instructorId.firstName || ''} ${this.classData.instructorId.lastName || ''}`.trim();
+                            if (instructorNameEl) instructorNameEl.textContent = name || 'Staff';
+                        } else {
+                            // Fetch instructor details
+                            const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ instructor_id: this.classData.instructorId })
+                            });
+                            const dataA = await response.json();
+                            if (instructorNameEl && dataA.instructorData) {
+                                const name = `${dataA.instructorData.firstName || ''} ${dataA.instructorData.lastName || ''}`.trim();
+                                instructorNameEl.textContent = name || 'Staff';
+                            }
+                        }
                     }
+                    
                     if (instructorBioEl) {
                         instructorBioEl.textContent = `Certified ${this.classData.title} Instructor`;
                     }

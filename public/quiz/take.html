@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take Quiz - FISSK Online Academy</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../css/quiz/quiz-take.css">
+    <link rel="icon" href="../fissklogo.jpg">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Online Academy</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="../index.html" class="nav-link">Home</a></li>
+                <li><a href="../classes.html" class="nav-link">Classes</a></li>
+                <li><a href="../dashboard.html" class="nav-link">Dashboard</a></li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <section class="quiz-section">
+        <div class="container">
+            <!-- Quiz Header -->
+            <div class="quiz-header" id="quizHeader">
+                <div class="quiz-title-area">
+                    <h1 id="quizTitle">Loading Quiz...</h1>
+                    <p id="quizDescription"></p>
+                </div>
+                <div class="quiz-stats-area">
+                    <div class="quiz-timer" id="quizTimer">
+                        <span class="timer-icon">⏱️</span>
+                        <span class="timer-display" id="timerDisplay">--:--</span>
+                    </div>
+                    <div class="quiz-progress-text">
+                        <span id="questionCounter">0 / 0</span>
+                        <span id="answeredCounter">0 answered</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="quiz-progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+
+            <!-- Question Area -->
+            <div class="quiz-question-container" id="questionContainer">
+                <div class="question-number" id="questionNumber">Question 1</div>
+                <div class="question-text" id="questionText">Loading question...</div>
+                <div class="question-options" id="questionOptions">
+                    <!-- Options will be rendered here -->
+                </div>
+                <div class="question-actions">
+                    <button class="btn btn-outline" id="prevBtn" disabled>← Previous</button>
+                    <button class="btn btn-primary" id="nextBtn">Next →</button>
+                </div>
+            </div>
+
+            <!-- Submit Area -->
+            <div class="quiz-submit-area">
+                <button class="btn btn-success" id="submitQuizBtn">📤 Submit Quiz</button>
+                <span class="submit-info" id="submitInfo">You have answered <span id="answeredCount">0</span> of <span id="totalCount">0</span> questions</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <h2>Submit Quiz?</h2>
+            <p>You are about to submit your quiz. This action cannot be undone.</p>
+            <div class="submit-summary">
+                <p>📊 <span id="confirmAnswered">0</span> of <span id="confirmTotal">0</span> questions answered</p>
+                <p>⏱️ Time spent: <span id="confirmTime">--:--</span></p>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-outline" id="cancelSubmitBtn">Cancel</button>
+                <button class="btn btn-success" id="confirmSubmitBtn">✅ Yes, Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="quiz-loading">
+        <div class="spinner"></div>
+        <p>Loading quiz...</p>
+    </div>
+
+    <script src="../js/quiz/quiz-core.js"></script>
+    <script src="../js/quiz/quiz-take.js"></script>
+</body>
+</html>
