@@ -14,6 +14,7 @@ class ClassManager {
         this.hlsInstance = null;
         this.enrollmentPaymentStatus = 'free';
         this.hasPaidAccess = false;
+        this.token = localStorage.getItem('token');
         this.init();
     }
 
@@ -435,21 +436,21 @@ class ClassManager {
                 }
             }
 
-            if (this.classData.instructorId) {
+            if (this.classData.instructor.id) {
                 try {
-                    const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
+                   /*const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ instructor_id: this.classData.instructorId }),
+                        headers: { 'Content-Type': 'application/json','Authorization': `Bearer ${this.token}` },
+                        body: JSON.stringify({ instructor_id: this.classData.instructor.id }),
                     });
                     const dataA = await response.json();
-                    
+                    console.log(dataA)*/
                     const instructorNameEl = document.getElementById('instructorName');
                     const instructorBioEl = document.getElementById('instructorBio');
                     
-                    if (instructorNameEl && dataA.instructorData) {
-                        const name = `${dataA.instructorData.firstName || ''} ${dataA.instructorData.lastName || ''}`.trim();
-                        instructorNameEl.textContent = name || 'Staff';
+                    if (instructorNameEl) {
+                       //const name = `${dataA.instructorData.firstName || ''} ${dataA.instructorData.lastName || ''}`.trim();
+                        instructorNameEl.textContent = this.classData.instructor.name || 'Staff';
                     }
                     if (instructorBioEl) {
                         instructorBioEl.textContent = `Certified ${this.classData.title} Instructor`;
