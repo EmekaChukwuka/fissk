@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Quiz - FISSK Online Academy</title>
+    <link rel="stylesheet" href="../../styles.css">
+    <link rel="stylesheet" href="../../css/quiz/quiz-builder.css">
+    <link rel="icon" href="../../fissklogo.jpg">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Quiz Builder</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="../../dashboard.html" class="nav-link">Dashboard</a></li>
+                <li><a href="../../classes.html" class="nav-link">Classes</a></li>
+                <li class="nav-user">
+                    <div class="user-dropdown" id="user-dropdown"></div>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <section class="quiz-builder">
+        <div class="container">
+            <div class="builder-header">
+                <h1>📝 Create New Quiz</h1>
+                <div class="builder-actions">
+                    <button class="btn btn-outline" id="previewQuizBtn">👁️ Preview</button>
+                    <button class="btn btn-success" id="saveQuizBtn">💾 Save Quiz</button>
+                </div>
+            </div>
+
+            <!-- Quiz Info -->
+            <div class="builder-section quiz-info">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="quizTitle">Quiz Title *</label>
+                        <input type="text" id="quizTitle" placeholder="e.g., French Vocabulary Quiz 1">
+                    </div>
+                    <div class="form-group">
+                        <label for="quizCategory">Category</label>
+                        <select id="quizCategory">
+                            <option value="practice">Practice</option>
+                            <option value="exam">Exam</option>
+                            <option value="homework">Homework</option>
+                            <option value="project">Project</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="quizDescription">Description</label>
+                    <textarea id="quizDescription" rows="2" placeholder="Describe what this quiz covers..."></textarea>
+                </div>
+            </div>
+
+            <!-- Quiz Settings -->
+            <div class="builder-section quiz-settings">
+                <h3>⚙️ Quiz Settings</h3>
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label for="timeLimit">Time Limit (minutes)</label>
+                        <input type="number" id="timeLimit" value="30" min="0">
+                        <small>0 = No time limit</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="passingScore">Passing Score (%)</label>
+                        <input type="number" id="passingScore" value="70" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="maxAttempts">Max Attempts</label>
+                        <input type="number" id="maxAttempts" value="1" min="1">
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="allowRetake"> Allow Retake
+                        </label>
+                        <label>
+                            <input type="checkbox" id="randomizeQuestions"> Randomize Questions
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showResults" checked> Show Results
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Questions -->
+            <div class="builder-section questions-section">
+                <div class="questions-header">
+                    <h3>📋 Questions</h3>
+                    <button class="btn btn-primary" id="addQuestionBtn">+ Add Question</button>
+                </div>
+                <div id="questionsList" class="questions-list">
+                    <!-- Questions will be added here -->
+                </div>
+            </div>
+
+            <!-- Save/Discard -->
+            <div class="builder-footer">
+                <button class="btn btn-outline" id="discardBtn">🗑️ Discard</button>
+                <div>
+                    <button class="btn btn-outline" id="previewBtn">👁️ Preview</button>
+                    <button class="btn btn-success" id="saveBtn">💾 Save Quiz</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Question Modal -->
+    <div id="questionModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-modal" onclick="document.getElementById('questionModal').style.display='none'">&times;</span>
+            <h2 id="questionModalTitle">Add Question</h2>
+            <form id="questionForm">
+                <div class="form-group">
+                    <label>Question Type *</label>
+                    <select id="questionType" required>
+                        <option value="multiple-choice">Multiple Choice</option>
+                        <option value="true-false">True/False</option>
+                        <option value="multiple-answer">Multiple Answer</option>
+                        <option value="fill-in">Fill in the Blank</option>
+                        <option value="essay">Essay</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Question *</label>
+                    <textarea id="questionText" rows="3" required></textarea>
+                </div>
+                <div class="form-group" id="optionsGroup">
+                    <label>Options (one per line) *</label>
+                    <textarea id="questionOptions" rows="4" placeholder="Option 1&#10;Option 2&#10;Option 3&#10;Option 4"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Correct Answer *</label>
+                    <input type="text" id="correctAnswer" placeholder="e.g., 0 for first option, or 'true' for True/False">
+                </div>
+                <div class="form-group">
+                    <label>Points</label>
+                    <input type="number" id="questionPoints" value="1" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Explanation (optional)</label>
+                    <textarea id="questionExplanation" rows="2" placeholder="Explain why this is the correct answer..."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('questionModal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveQuestionBtn">Add Question</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <span class="close-modal" onclick="document.getElementById('previewModal').style.display='none'">&times;</span>
+            <h2>👁️ Quiz Preview</h2>
+            <div id="previewContent">
+                <p>Loading preview...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/quiz/quiz-core.js"></script>
+    <script src="../../js/quiz/quiz-builder.js"></script>
+</body>
+</html>

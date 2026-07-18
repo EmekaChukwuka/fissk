@@ -164,6 +164,126 @@
         .withdrawal-item .status.failed {
             color: #EF4444;
         }
+
+        /* ===== QUIZ STYLES FOR CLASS CARDS ===== */
+        .class-quizzes-section {
+            margin: 12px 0;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .no-quizzes-small {
+            text-align: center;
+            padding: 8px;
+            color: #6B7280;
+            font-size: 0.85rem;
+        }
+        .class-quizzes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .class-quiz-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background: white;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            flex-wrap: wrap;
+        }
+        .class-quiz-item .quiz-title {
+            font-weight: 500;
+            color: #1A1A2E;
+            flex: 1;
+            min-width: 100px;
+        }
+        .class-quiz-item .quiz-stats {
+            color: #6B7280;
+            font-size: 0.75rem;
+        }
+        .class-quiz-item .quiz-status-badge {
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .class-quiz-item .quiz-status-badge.published {
+            background: #d4edda;
+            color: #155724;
+        }
+        .class-quiz-item .quiz-status-badge.draft {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .class-quiz-item .quiz-status-badge.archived {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+        .class-quiz-item .quiz-actions {
+            display: flex;
+            gap: 4px;
+        }
+        .class-quiz-item .btn-sm {
+            padding: 2px 8px;
+            font-size: 0.7rem;
+        }
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-sm.btn-outline {
+            background: transparent;
+            border: 1px solid #8B5FBF;
+            color: #8B5FBF;
+        }
+        .btn-sm.btn-outline:hover {
+            background: #8B5FBF;
+            color: white;
+        }
+        .btn-sm.btn-danger {
+            background: #EF4444;
+            color: white;
+        }
+        .btn-sm.btn-danger:hover {
+            background: #dc2626;
+        }
+        .btn-sm.btn-primary {
+            background: #8B5FBF;
+            color: white;
+        }
+        .btn-sm.btn-primary:hover {
+            background: #7A4BA6;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .class-quiz-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            .class-quiz-item .quiz-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+            .class-stats {
+                flex-wrap: wrap;
+            }
+            .class-actions {
+                flex-wrap: wrap;
+            }
+            .class-actions .btn {
+                flex: 1;
+                min-width: 80px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -192,10 +312,10 @@
         </div>
     </nav>
 
-    <div class="dashboard-header">
+    <div class="page-hero2">
         <div class="container">
             <h1>Instructor Dashboard</h1>
-            <p>Manage your classes, live streams, and earnings</p>
+            <p>Manage your classes, live streams, quizzes, and earnings</p>
             <br>
             <div class="instructor-stats">
                 <div class="stat-card">
@@ -400,7 +520,7 @@
                     <input type="text" id="classDuration" name="duration" placeholder="e.g., 8 weeks" required>
                 </div>
                 
-                <!-- ===== NEW: PRICE FIELDS ===== -->
+                <!-- ===== PRICE FIELDS ===== -->
                 <div class="form-group">
                     <label>Course Price</label>
                     <div class="price-input-group">

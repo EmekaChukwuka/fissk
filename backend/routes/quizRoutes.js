@@ -1,7 +1,7 @@
 import express from 'express';
 import * as quizController from '../controllers/quizController.js';
 import * as quizAttemptController from '../controllers/quizAttemptController.js';
-import { auth } from '../middleware/auth.js';
+import { auth, isInstructor } from '../middleware/auth.js';
 import { checkEnrollment } from '../middleware/quizAuth.js';
 
 const quizRouter = express.Router();
@@ -17,7 +17,7 @@ quizRouter.get('/class/:classId', auth, quizController.getClassQuizzes);
 quizRouter.get('/:quizId', auth, quizController.getQuiz);
 
 // Create quiz
-quizRouter.post('/', auth, quizController.createQuiz);
+quizRouter.post('/', isInstructor, quizController.createQuiz);
 
 // Update quiz
 quizRouter.put('/:quizId', auth, quizController.updateQuiz);
