@@ -150,7 +150,6 @@ export const getQuiz = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-// backend/controllers/quizController.js - Updated createQuiz with more debug
 
 /**
  * Create a new quiz
@@ -171,7 +170,8 @@ export const createQuiz = async (req, res) => {
     console.log('========================================');
     console.log('📝 CREATE QUIZ DEBUG');
     console.log('========================================');
-    console.log('userId:', userId);
+    console.log('userId (ObjectId):', userId);
+    console.log('userId as string:', userId.toString());
     console.log('classId received:', classId);
     console.log('title:', title);
     console.log('questions count:', questions?.length || 0);
@@ -201,15 +201,18 @@ export const createQuiz = async (req, res) => {
     }
 
     console.log('✅ Class found:', classData.title);
-    console.log('Class instructorId:', classData.instructorId.toString());
-    console.log('Current user ID:', userId);
-    console.log('Are they the same?', classData.instructorId.toString() === userId);
+    console.log('Class instructorId (string):', classData.instructorId.toString());
+    console.log('Current user ID (string):', userId.toString());
+    
+    // ===== FIX: Compare as strings =====
+    const isInstructor = classData.instructorId.toString() === userId.toString();
+    console.log('Are they the same?', isInstructor);
 
     // Verify the user is the instructor of this class
-    if (classData.instructorId.toString() !== userId) {
+    if (!isInstructor) {
       console.log('❌ User is NOT the instructor of this class');
       console.log('   Class instructor:', classData.instructorId.toString());
-      console.log('   Current user:', userId);
+      console.log('   Current user:', userId.toString());
       return res.status(403).json({ 
         success: false, 
         message: 'You can only create quizzes for your own classes' 
