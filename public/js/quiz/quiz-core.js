@@ -2,27 +2,30 @@
 // QUIZ CORE - Shared Utilities & API Calls
 // ============================================================
 
+// ===== BACKEND URL =====
+const BACKEND_URL = 'https://fissk-backend.onrender.com';
+
 const QUIZ_API = {
-    base: '/api/quizzes',
+    base: `${BACKEND_URL}/api/quizzes`,
     
     // ===== STUDENT ENDPOINTS =====
-    getClassQuizzes: (classId) => `/api/quizzes/class/${classId}`,
-    getQuiz: (quizId) => `/api/quizzes/${quizId}`,
-    startAttempt: (quizId) => `/api/quizzes/${quizId}/start`,
-    saveAnswer: (quizId) => `/api/quizzes/${quizId}/answer`,
-    submitQuiz: (quizId) => `/api/quizzes/${quizId}/submit`,
-    getAttemptResults: (attemptId) => `/api/quizzes/attempt/${attemptId}`,
-    getUserAttempts: () => `/api/quizzes/attempts/user`,
+    getClassQuizzes: (classId) => `${BACKEND_URL}/api/quizzes/class/${classId}`,
+    getQuiz: (quizId) => `${BACKEND_URL}/api/quizzes/${quizId}`,
+    startAttempt: (quizId) => `${BACKEND_URL}/api/quizzes/${quizId}/start`,
+    saveAnswer: (quizId) => `${BACKEND_URL}/api/quizzes/${quizId}/answer`,
+    submitQuiz: (quizId) => `${BACKEND_URL}/api/quizzes/${quizId}/submit`,
+    getAttemptResults: (attemptId) => `${BACKEND_URL}/api/quizzes/attempt/${attemptId}`,
+    getUserAttempts: () => `${BACKEND_URL}/api/quizzes/attempts/user`,
     
     // ===== INSTRUCTOR ENDPOINTS =====
-    createQuiz: () => `/api/quizzes`,
-    updateQuiz: (quizId) => `/api/quizzes/${quizId}`,
-    deleteQuiz: (quizId) => `/api/quizzes/${quizId}`,
-    publishQuiz: (quizId) => `/api/quizzes/${quizId}/publish`,
-    duplicateQuiz: (quizId) => `/api/quizzes/${quizId}/duplicate`,
-    getSubmissions: (quizId) => `/api/quizzes/${quizId}/submissions`,
-    getAnalytics: (quizId) => `/api/quizzes/${quizId}/analytics`,
-    gradeEssay: (attemptId) => `/api/quizzes/attempt/${attemptId}/grade`
+    createQuiz: () => `${BACKEND_URL}/api/quizzes`,
+    updateQuiz: (quizId) => `${BACKEND_URL}/api/quizzes/${quizId}`,
+    deleteQuiz: (quizId) => `${BACKEND_URL}/api/quizzes/${quizId}`,
+    publishQuiz: (quizId) => `${BACKEND_URL}/api/quizzes/${quizId}/publish`,
+    duplicateQuiz: (quizId) => `${BACKEND_URL}/api/quizzes/${quizId}/duplicate`,
+    getSubmissions: (quizId) => `${BACKEND_URL}/api/quizzes/${quizId}/submissions`,
+    getAnalytics: (quizId) => `${BACKEND_URL}/api/quizzes/${quizId}/analytics`,
+    gradeEssay: (attemptId) => `${BACKEND_URL}/api/quizzes/attempt/${attemptId}/grade`
 };
 
 // ===== API HELPERS =====
@@ -45,11 +48,12 @@ async function apiRequest(url, method = 'GET', data = null) {
     }
     
     try {
+        console.log(`🌐 API Request: ${method} ${url}`);
         const response = await fetch(url, options);
         const result = await response.json();
         
         if (!response.ok) {
-            throw new Error(result.message || 'API request failed');
+            throw new Error(result.message || `API request failed: ${response.status}`);
         }
         
         return result;
@@ -157,5 +161,6 @@ window.QuizUtils = {
     formatTime,
     getQueryParam,
     showToast,
-    QuizState
+    QuizState,
+    BACKEND_URL
 };

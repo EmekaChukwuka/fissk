@@ -175,38 +175,42 @@ class QuizService {
 
     await Quiz.findByIdAndUpdate(quizId, { 'stats': stats });
   }
+// backend/services/quizService.js
 
-  /**
-   * Validate quiz attempt
-   */
-  static async validateAttempt(quizId, userId) {
+/**
+ * Validate quiz attempt
+ */
+static async validateAttempt(quizId, userId) {
+    const Quiz = (await import('../models/Quiz.js')).default;
     const quiz = await Quiz.findById(quizId);
     if (!quiz) throw new Error('Quiz not found');
 
     // Check if quiz is published
     if (quiz.status !== 'published') {
-      throw new Error('Quiz is not available');
+        throw new Error('Quiz is not available. It has not been published yet.');
     }
 
     // Check if quiz is open
     const now = new Date();
     if (quiz.settings?.opensAt && new Date(quiz.settings.opensAt) > now) {
-      throw new Error('Quiz has not opened yet');
+        throw new Error('Quiz has not opened yet');
     }
     if (quiz.settings?.closesAt && new Date(quiz.settings.closesAt) < now) {
-      throw new Error('Quiz has closed');
+        throw new Error('Quiz has closed');
     }
 
     // Check max attempts
-    if (!quiz.settings?.allowRetake) {
-      const existingAttempts = await QuizAttempt.find({ quizId, userId });
-      if (existingAttempts.length >= (quiz.settings?.maxAttempts || 1)) {
-        throw new Error('Maximum attempts reached');
-      }
+    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
+    const existingAttempts = await QuizAttempt.find({ quizId, userId });
+    const completedAttempts = existingAttempts.filter(a => a.status !== 'in-progress');
+    const maxAttempts = quiz.settings?.maxAttempts || 1;
+    
+    if (completedAttempts.length >= maxAttempts && !quiz.settings?.allowRetake) {
+        throw new Error(`Maximum attempts (${maxAttempts}) reached.`);
     }
 
     return quiz;
-  }
+}
 
   /**
    * Shuffle array (Fisher-Yates)

@@ -58,80 +58,101 @@
             return;
         }
         
+        // Check for token
+        const token = localStorage.getItem('token');
+        if (!token) {
+            QuizUtils.showToast('Please login to take this quiz', 'error');
+            window.location.href = '../login.html';
+            return;
+        }
+        
         try {
             await loadQuiz();
             await startAttempt();
             setupEventListeners();
             renderQuestion();
             state.isLoading = false;
-            elements.loading.style.display = 'none';
+            if (elements.loading) elements.loading.style.display = 'none';
         } catch (error) {
             console.error('Init error:', error);
             QuizUtils.showToast(error.message || 'Failed to load quiz', 'error');
-            elements.loading.innerHTML = `
-                <p style="color: #EF4444;">❌ ${error.message}</p>
-                <button class="btn btn-primary" onclick="location.reload()">Retry</button>
-            `;
+            if (elements.loading) {
+                elements.loading.innerHTML = `
+                    <p style="color: #EF4444;">❌ ${error.message}</p>
+                    <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                `;
+            }
         }
     }
     
     // ===== LOAD QUIZ =====
     async function loadQuiz() {
-        const data = await QuizUtils.apiRequest(
-            QuizUtils.API.getQuiz(state.quizId)
-        );
-        
-        if (!data.success || !data.quiz) {
-            throw new Error('Quiz not found');
+        try {
+            console.log('Loading quiz:', state.quizId);
+            const data = await QuizUtils.apiRequest(
+                QuizUtils.API.getQuiz(state.quizId)
+            );
+            
+            if (!data.success || !data.quiz) {
+                throw new Error('Quiz not found');
+            }
+            
+            const quiz = data.quiz;
+            state.questions = quiz.questions || [];
+            state.totalQuestions = state.questions.length;
+            state.timeLimit = quiz.settings?.timeLimit || 0;
+            state.timeRemaining = state.timeLimit * 60; // Convert to seconds
+            
+            if (elements.title) elements.title.textContent = quiz.title || 'Untitled Quiz';
+            if (elements.description) elements.description.textContent = quiz.description || '';
+            if (elements.totalCount) elements.totalCount.textContent = state.totalQuestions;
+            if (elements.confirmTotal) elements.confirmTotal.textContent = state.totalQuestions;
+            
+            document.title = `${quiz.title} - FISSK Quiz`;
+            
+            // Check if there's an in-progress attempt
+            if (quiz.attemptId) {
+                state.attemptId = quiz.attemptId;
+                state.answers = quiz.answers || {};
+                // Calculate answered count
+                const answered = Object.keys(state.answers).length;
+                if (elements.answeredCount) elements.answeredCount.textContent = answered;
+                if (elements.confirmAnswered) elements.confirmAnswered.textContent = answered;
+                if (elements.answeredCounter) elements.answeredCounter.textContent = `${answered} answered`;
+            }
+            
+            // Update question counter
+            updateQuestionCounter();
+        } catch (error) {
+            console.error('Load quiz error:', error);
+            throw new Error(error.message || 'Failed to load quiz');
         }
-        
-        const quiz = data.quiz;
-        state.questions = quiz.questions || [];
-        state.totalQuestions = state.questions.length;
-        state.timeLimit = quiz.settings?.timeLimit || 0;
-        state.timeRemaining = state.timeLimit * 60; // Convert to seconds
-        
-        elements.title.textContent = quiz.title || 'Untitled Quiz';
-        elements.description.textContent = quiz.description || '';
-        elements.totalCount.textContent = state.totalQuestions;
-        elements.confirmTotal.textContent = state.totalQuestions;
-        
-        document.title = `${quiz.title} - FISSK Quiz`;
-        
-        // Check if there's an in-progress attempt
-        if (quiz.attemptId) {
-            state.attemptId = quiz.attemptId;
-            state.answers = quiz.answers || {};
-            // Calculate answered count
-            const answered = Object.keys(state.answers).length;
-            elements.answeredCount.textContent = answered;
-            elements.confirmAnswered.textContent = answered;
-            elements.answeredCounter.textContent = `${answered} answered`;
-        }
-        
-        // Update question counter
-        updateQuestionCounter();
     }
     
     // ===== START ATTEMPT =====
     async function startAttempt() {
-        const data = await QuizUtils.apiRequest(
-            QuizUtils.API.startAttempt(state.quizId),
-            'POST'
-        );
-        
-        if (!data.success) {
-            throw new Error(data.message || 'Failed to start quiz');
-        }
-        
-        state.attemptId = data.attempt._id;
-        state.startTime = new Date();
-        
-        // Start timer
-        if (state.timeLimit > 0) {
-            startTimer();
-        } else {
-            elements.timer.textContent = '∞';
+        try {
+            const data = await QuizUtils.apiRequest(
+                QuizUtils.API.startAttempt(state.quizId),
+                'POST'
+            );
+            
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to start quiz');
+            }
+            
+            state.attemptId = data.attempt._id;
+            state.startTime = new Date();
+            
+            // Start timer
+            if (state.timeLimit > 0) {
+                startTimer();
+            } else if (elements.timer) {
+                elements.timer.textContent = '∞';
+            }
+        } catch (error) {
+            console.error('Start attempt error:', error);
+            throw new Error(error.message || 'Failed to start quiz attempt');
         }
     }
     
@@ -157,6 +178,7 @@
     }
     
     function updateTimerDisplay() {
+        if (!elements.timer) return;
         elements.timer.textContent = QuizUtils.formatTime(state.timeRemaining);
         
         // Color change based on time remaining
@@ -176,41 +198,51 @@
         const question = state.questions[index];
         
         if (!question) {
-            elements.questionText.textContent = 'No questions available';
-            elements.questionOptions.innerHTML = '';
+            if (elements.questionText) elements.questionText.textContent = 'No questions available';
+            if (elements.questionOptions) elements.questionOptions.innerHTML = '';
             return;
         }
         
         // Question number
-        elements.questionNumber.textContent = `Question ${index + 1} of ${state.totalQuestions}`;
+        if (elements.questionNumber) {
+            elements.questionNumber.textContent = `Question ${index + 1} of ${state.totalQuestions}`;
+        }
         
         // Question text
-        elements.questionText.textContent = question.question || 'Question text missing';
-        if (question.imageUrl) {
-            elements.questionText.innerHTML += `<br><img src="${question.imageUrl}" alt="Question image" class="question-image">`;
+        if (elements.questionText) {
+            elements.questionText.textContent = question.question || 'Question text missing';
+            if (question.imageUrl) {
+                elements.questionText.innerHTML += `<br><img src="${question.imageUrl}" alt="Question image" class="question-image">`;
+            }
         }
         
         // Options
         renderOptions(question, index);
         
         // Update navigation buttons
-        elements.prevBtn.disabled = index === 0;
-        elements.nextBtn.textContent = index === state.totalQuestions - 1 ? '📝 Review' : 'Next →';
+        if (elements.prevBtn) elements.prevBtn.disabled = index === 0;
+        if (elements.nextBtn) {
+            elements.nextBtn.textContent = index === state.totalQuestions - 1 ? '📝 Review' : 'Next →';
+        }
         
         // Update progress
         const progress = ((index + 1) / state.totalQuestions) * 100;
-        elements.progressFill.style.width = `${Math.min(progress, 100)}%`;
+        if (elements.progressFill) {
+            elements.progressFill.style.width = `${Math.min(progress, 100)}%`;
+        }
         
         // Update question counter
         updateQuestionCounter();
         
         // Scroll to top of question
-        document.querySelector('.quiz-question-container').scrollIntoView({ behavior: 'smooth' });
+        const container = document.querySelector('.quiz-question-container');
+        if (container) container.scrollIntoView({ behavior: 'smooth' });
     }
     
     // ===== RENDER OPTIONS =====
     function renderOptions(question, index) {
         const container = elements.questionOptions;
+        if (!container) return;
         container.innerHTML = '';
         
         if (!question.options || question.options.length === 0) {
@@ -314,9 +346,9 @@
             key => state.answers[key] !== null && state.answers[key] !== undefined && state.answers[key] !== ''
         ).length;
         
-        elements.answeredCount.textContent = answered;
-        elements.confirmAnswered.textContent = answered;
-        elements.answeredCounter.textContent = `${answered} answered`;
+        if (elements.answeredCount) elements.answeredCount.textContent = answered;
+        if (elements.confirmAnswered) elements.confirmAnswered.textContent = answered;
+        if (elements.answeredCounter) elements.answeredCounter.textContent = `${answered} answered`;
     }
     
     function updateQuestionCounter() {
@@ -326,8 +358,8 @@
             key => state.answers[key] !== null && state.answers[key] !== undefined && state.answers[key] !== ''
         ).length;
         
-        elements.questionCounter.textContent = `${current} / ${total}`;
-        elements.answeredCounter.textContent = `${answered} answered`;
+        if (elements.questionCounter) elements.questionCounter.textContent = `${current} / ${total}`;
+        if (elements.answeredCounter) elements.answeredCounter.textContent = `${answered} answered`;
     }
     
     // ===== NAVIGATION =====
@@ -354,13 +386,13 @@
             key => state.answers[key] !== null && state.answers[key] !== undefined && state.answers[key] !== ''
         ).length;
         
-        elements.confirmAnswered.textContent = answered;
-        elements.confirmTotal.textContent = state.totalQuestions;
+        if (elements.confirmAnswered) elements.confirmAnswered.textContent = answered;
+        if (elements.confirmTotal) elements.confirmTotal.textContent = state.totalQuestions;
         
         const timeSpent = Math.floor((Date.now() - state.startTime.getTime()) / 1000);
-        elements.confirmTime.textContent = QuizUtils.formatTime(timeSpent);
+        if (elements.confirmTime) elements.confirmTime.textContent = QuizUtils.formatTime(timeSpent);
         
-        elements.confirmModal.style.display = 'flex';
+        if (elements.confirmModal) elements.confirmModal.style.display = 'flex';
     }
     
     // ===== SUBMIT QUIZ =====
@@ -368,9 +400,11 @@
         if (state.isSubmitted) return;
         state.isSubmitted = true;
         
-        elements.confirmModal.style.display = 'none';
-        elements.submitBtn.disabled = true;
-        elements.submitBtn.textContent = '⏳ Submitting...';
+        if (elements.confirmModal) elements.confirmModal.style.display = 'none';
+        if (elements.submitBtn) {
+            elements.submitBtn.disabled = true;
+            elements.submitBtn.textContent = '⏳ Submitting...';
+        }
         
         try {
             const data = await QuizUtils.apiRequest(
@@ -389,20 +423,24 @@
             console.error('Submit error:', error);
             QuizUtils.showToast(error.message || 'Failed to submit quiz', 'error');
             state.isSubmitted = false;
-            elements.submitBtn.disabled = false;
-            elements.submitBtn.textContent = '📤 Submit Quiz';
+            if (elements.submitBtn) {
+                elements.submitBtn.disabled = false;
+                elements.submitBtn.textContent = '📤 Submit Quiz';
+            }
         }
     }
     
     // ===== EVENT LISTENERS =====
     function setupEventListeners() {
-        elements.prevBtn.addEventListener('click', goToPrevious);
-        elements.nextBtn.addEventListener('click', goToNext);
-        elements.submitBtn.addEventListener('click', showSubmitConfirmation);
-        elements.cancelSubmit.addEventListener('click', () => {
-            elements.confirmModal.style.display = 'none';
-        });
-        elements.confirmSubmit.addEventListener('click', submitQuiz);
+        if (elements.prevBtn) elements.prevBtn.addEventListener('click', goToPrevious);
+        if (elements.nextBtn) elements.nextBtn.addEventListener('click', goToNext);
+        if (elements.submitBtn) elements.submitBtn.addEventListener('click', showSubmitConfirmation);
+        if (elements.cancelSubmit) {
+            elements.cancelSubmit.addEventListener('click', () => {
+                if (elements.confirmModal) elements.confirmModal.style.display = 'none';
+            });
+        }
+        if (elements.confirmSubmit) elements.confirmSubmit.addEventListener('click', submitQuiz);
         
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
@@ -410,17 +448,19 @@
                 goToPrevious();
             } else if (e.key === 'ArrowRight' && state.currentIndex < state.totalQuestions - 1) {
                 goToNext();
-            } else if (e.key === 'Enter' && elements.confirmModal.style.display === 'flex') {
+            } else if (e.key === 'Enter' && elements.confirmModal && elements.confirmModal.style.display === 'flex') {
                 submitQuiz();
             }
         });
         
         // Close modal on click outside
-        elements.confirmModal.addEventListener('click', (e) => {
-            if (e.target === elements.confirmModal) {
-                elements.confirmModal.style.display = 'none';
-            }
-        });
+        if (elements.confirmModal) {
+            elements.confirmModal.addEventListener('click', (e) => {
+                if (e.target === elements.confirmModal) {
+                    elements.confirmModal.style.display = 'none';
+                }
+            });
+        }
     }
     
     // ===== START =====

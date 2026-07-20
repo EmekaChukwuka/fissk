@@ -15,11 +15,17 @@ export const startAttempt = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    // Validate attempt
+    console.log('=== START ATTEMPT ===');
+    console.log('Quiz ID:', quizId);
+    console.log('User ID:', userId);
+
+    // Validate attempt - this will throw if not valid
     const quiz = await QuizService.validateAttempt(quizId, userId);
 
     // Check enrollment
+    const Enrollment = (await import('../models/Enrollment.js')).default;
     const enrollment = await Enrollment.findOne({ userId, classId: quiz.classId });
+    
     if (!enrollment) {
       return res.status(403).json({ 
         success: false, 
@@ -27,7 +33,8 @@ export const startAttempt = async (req, res) => {
       });
     }
 
-    // Check if there's an existing in-progress attempt
+    // Check for existing in-progress attempt
+    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
     const existingAttempt = await QuizAttempt.findOne({
       quizId,
       userId,
@@ -35,6 +42,7 @@ export const startAttempt = async (req, res) => {
     });
 
     if (existingAttempt) {
+      console.log('Resuming existing attempt:', existingAttempt._id);
       return res.json({
         success: true,
         attempt: existingAttempt,
@@ -61,6 +69,7 @@ export const startAttempt = async (req, res) => {
     });
 
     await attempt.save();
+    console.log('✅ New attempt created:', attempt._id);
 
     res.status(201).json({
       success: true,
@@ -70,7 +79,10 @@ export const startAttempt = async (req, res) => {
 
   } catch (error) {
     console.error('Start attempt error:', error);
-    res.status(400).json({ success: false, message: error.message });
+    res.status(400).json({ 
+      success: false, 
+      message: error.message || 'Failed to start quiz' 
+    });
   }
 };
 

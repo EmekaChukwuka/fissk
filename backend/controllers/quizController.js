@@ -136,6 +136,7 @@ export const getClassQuizzes = async (req, res) => {
     });
   }
 };
+// backend/controllers/quizController.js
 
 /**
  * Get single quiz details
@@ -145,6 +146,14 @@ export const getQuiz = async (req, res) => {
     const { quizId } = req.params;
     const userId = req.user?.id;
 
+    console.log('=== GET QUIZ ===');
+    console.log('Quiz ID:', quizId);
+    console.log('User ID:', userId);
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
     const quiz = await Quiz.findById(quizId)
       .populate('instructorId', 'firstName lastName')
       .lean();
@@ -153,7 +162,10 @@ export const getQuiz = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    // Check if user has access
+    console.log('Quiz found:', quiz.title);
+    console.log('Quiz status:', quiz.status);
+
+    // Check enrollment
     const enrollment = await Enrollment.findOne({ 
       userId, 
       classId: quiz.classId 
@@ -166,6 +178,7 @@ export const getQuiz = async (req, res) => {
       isInstructor = false;
     }
 
+    // If not enrolled and not instructor, deny access
     if (!enrollment && !isInstructor) {
       return res.status(403).json({ 
         success: false, 
@@ -176,34 +189,67 @@ export const getQuiz = async (req, res) => {
     // Get user's attempts
     let userAttempts = [];
     let canAttempt = false;
+    let inProgressAttempt = null;
 
     if (userId) {
       userAttempts = await QuizAttempt.find({ quizId, userId })
         .sort({ attemptNumber: -1 })
         .lean();
 
-      const attempts = userAttempts.filter(a => a.status !== 'in-progress').length;
-      canAttempt = attempts < (quiz.settings?.maxAttempts || 1);
+      inProgressAttempt = userAttempts.find(a => a.status === 'in-progress');
+      const completedAttempts = userAttempts.filter(a => a.status !== 'in-progress');
+      canAttempt = completedAttempts.length < (quiz.settings?.maxAttempts || 1);
+      
+      // If there's an in-progress attempt, use its answers
+      if (inProgressAttempt) {
+        const answers = {};
+        inProgressAttempt.answers.forEach(a => {
+          answers[a.questionIndex] = a.answer;
+        });
+        quiz.answers = answers;
+      }
     }
 
-    // If quiz is published or user is instructor, show full details
+    // Always show questions if user has access (enrolled or instructor)
+    // For students, only show if quiz is published or they have an in-progress attempt
     const isPublished = quiz.status === 'published';
-    const showDetails = isPublished || isInstructor;
+    const showQuestions = isPublished || isInstructor || inProgressAttempt;
+
+    console.log('Show questions:', showQuestions);
+    console.log('Is published:', isPublished);
+    console.log('Has in-progress:', !!inProgressAttempt);
+
+    // Prepare response
+    const responseQuiz = {
+      ...quiz,
+      questions: showQuestions ? quiz.questions : undefined,
+      questionCount: quiz.questions ? quiz.questions.length : 0,
+      userAttempts: userAttempts.length,
+      userScore: userAttempts.filter(a => a.status !== 'in-progress').length > 0 
+        ? userAttempts.find(a => a.status !== 'in-progress')?.score 
+        : null,
+      userPassed: userAttempts.filter(a => a.status !== 'in-progress').length > 0 
+        ? userAttempts.find(a => a.status !== 'in-progress')?.passed 
+        : false,
+      canAttempt: canAttempt && isPublished,
+      inProgress: !!inProgressAttempt,
+      attemptId: inProgressAttempt?._id || null,
+      totalPoints: quiz.totalPoints || 0,
+      // If there's an in-progress attempt, include the answers
+      answers: inProgressAttempt ? quiz.answers : {}
+    };
 
     res.json({
       success: true,
-      quiz: {
-        ...quiz,
-        questions: showDetails ? quiz.questions : undefined,
-        questionCount: quiz.questions.length,
-        userAttempts,
-        canAttempt
-      }
+      quiz: responseQuiz
     });
 
   } catch (error) {
     console.error('Get quiz error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to load quiz' 
+    });
   }
 };
 
