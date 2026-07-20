@@ -1,7 +1,7 @@
 import express from 'express';
 import * as quizController from '../controllers/quizController.js';
 import * as quizAttemptController from '../controllers/quizAttemptController.js';
-import { isInstructor } from '../middleware/auth.js';
+import { auth, isInstructor } from '../middleware/auth.js';
 import { checkEnrollment } from '../middleware/quizAuth.js';
 
 const quizRouter = express.Router();
@@ -11,60 +11,60 @@ const quizRouter = express.Router();
 // ============================================================
 
 // Get all quizzes for a class
-quizRouter.get('/class/:classId', isInstructor, quizController.getClassQuizzes);
+quizRouter.get('/class/:classId', auth, isInstructor, quizController.getClassQuizzes);
 
 // Get single quiz
-quizRouter.get('/:quizId', isInstructor, quizController.getQuiz);
+quizRouter.get('/:quizId', auth, isInstructor, quizController.getQuiz);
 
 // Create quiz
-quizRouter.post('/', isInstructor, quizController.createQuiz);
+quizRouter.post('/', auth, isInstructor, quizController.createQuiz);
 
 // Update quiz
-quizRouter.put('/:quizId', isInstructor, quizController.updateQuiz);
+quizRouter.put('/:quizId', auth, isInstructor, quizController.updateQuiz);
 
 // Delete quiz
-quizRouter.delete('/:quizId', isInstructor, quizController.deleteQuiz);
+quizRouter.delete('/:quizId', auth, isInstructor, quizController.deleteQuiz);
 
 // Toggle publish status
-quizRouter.patch('/:quizId/publish', isInstructor, quizController.togglePublish);
+quizRouter.patch('/:quizId/publish', auth, isInstructor, quizController.togglePublish);
 
 // Duplicate quiz
-quizRouter.post('/:quizId/duplicate', isInstructor, quizController.duplicateQuiz);
+quizRouter.post('/:quizId/duplicate', auth, isInstructor, quizController.duplicateQuiz);
 
 // ============================================================
 // QUIZ ATTEMPTS (Student)
 // ============================================================
 
 // Start a quiz attempt
-quizRouter.post('/:quizId/start', isInstructor, quizAttemptController.startAttempt);
+quizRouter.post('/:quizId/start', auth, quizAttemptController.startAttempt);
 
 // Save an answer
-quizRouter.put('/:quizId/answer', isInstructor, quizAttemptController.saveAnswer);
+quizRouter.put('/:quizId/answer', auth, quizAttemptController.saveAnswer);
 
 // Submit quiz
-quizRouter.post('/:quizId/submit', isInstructor, quizAttemptController.submitAttempt);
+quizRouter.post('/:quizId/submit', auth, quizAttemptController.submitAttempt);
 
 // Get attempt results
-quizRouter.get('/attempt/:attemptId', isInstructor, quizAttemptController.getAttemptResults);
+quizRouter.get('/attempt/:attemptId', auth, quizAttemptController.getAttemptResults);
 
 // Get user's attempts
-quizRouter.get('/attempts/user', isInstructor, quizAttemptController.getUserAttempts);
+quizRouter.get('/attempts/user', auth, quizAttemptController.getUserAttempts);
 
 // ============================================================
 // INSTRUCTOR SUBMISSION MANAGEMENT
 // ============================================================
 
 // Get all submissions for a quiz
-quizRouter.get('/:quizId/submissions', isInstructor, quizAttemptController.getQuizSubmissions);
+quizRouter.get('/:quizId/submissions', auth, quizAttemptController.getQuizSubmissions);
 
 // Grade essay question
-quizRouter.post('/attempt/:attemptId/grade', isInstructor, quizAttemptController.gradeEssay);
+quizRouter.post('/attempt/:attemptId/grade', auth, quizAttemptController.gradeEssay);
 
 // ============================================================
 // ANALYTICS
 // ============================================================
 
 // Get quiz analytics
-quizRouter.get('/:quizId/analytics', isInstructor, quizController.getQuizAnalytics);
+quizRouter.get('/:quizId/analytics', auth, quizController.getQuizAnalytics);
 
 export default quizRouter;
