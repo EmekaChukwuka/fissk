@@ -51,11 +51,15 @@ export const verifyToken = (token) => {
 // ===== MIDDLEWARE =====
 
 // Middleware to check if user is authenticated
+// backend/middleware/auth.js - Fix the auth middleware
+
+// Middleware to check if user is authenticated
 export const auth = async (req, res, next) => {
   try {
     // Check session first (for backward compatibility)
     if (req.session && req.session.user) {
       req.user = req.session.user;
+      console.log('Session user:', req.user);
       return next();
     }
     
@@ -69,9 +73,11 @@ export const auth = async (req, res, next) => {
     }
     
     const token = authHeader.split(' ')[1];
+    console.log('Token received:', token.substring(0, 20) + '...');
     
     // Verify token
     const result = verifyToken(token);
+    console.log('Token verification result:', result);
     
     if (!result.success) {
       if (result.expired) {
@@ -87,8 +93,12 @@ export const auth = async (req, res, next) => {
       });
     }
     
+    console.log('Decoded token data:', result.data);
+    
     // Get user from database to ensure they still exist
     const user = await User.findById(result.data.id).select('-password');
+    console.log('User from DB:', user ? user.email : 'Not found');
+    
     if (!user) {
       return res.status(401).json({ 
         success: false, 
@@ -96,16 +106,20 @@ export const auth = async (req, res, next) => {
       });
     }
     
-    // Attach user to request
+    // Attach user to request with consistent field names
     req.user = {
       id: user._id,
       firstname: user.firstName,
       lastname: user.lastName,
       email: user.email,
-      user_type: user.userType
+      user_type: user.userType,  // ← Make sure this is set
+      userType: user.userType    // ← Add both for compatibility
     };
     req.userData = user;
     req.token = token;
+    
+    console.log('req.user set:', req.user);
+    console.log('user_type:', req.user.user_type);
     
     next();
     
@@ -156,36 +170,50 @@ export const optionalAuth = async (req, res, next) => {
     next();
   }
 };
+// backend/middleware/auth.js - ADD THESE CONSOLE LOGS
 
 // Middleware to check if user is instructor
 export const isInstructor = async (req, res, next) => {
   try {
+    console.log('=== isInstructor Middleware Debug ===');
+    console.log('req.user:', req.user);
+    
     // First ensure user is authenticated
     if (!req.user) {
+      console.log('No req.user found');
       return res.status(401).json({ 
         success: false, 
         message: 'Authentication required' 
       });
     }
     
-   // Check if user is either instructor or admin
-if (!['instructor', 'admin'].includes(req.user.user_type)) {
-    return res.status(403).json({ 
+    console.log('req.user.user_type:', req.user.user_type);
+    console.log('req.user.id:', req.user.id);
+    
+    // Check if user is either instructor or admin
+    if (!['instructor', 'admin'].includes(req.user.user_type)) {
+      console.log('User type not instructor/admin:', req.user.user_type);
+      return res.status(403).json({ 
         success: false, 
         message: 'Access denied. Instructor or Admin only.' 
-    });
-}
+      });
+    }
 
-// Get full user details to double-check
-const user = await User.findById(req.user.id);
-if (!user || !['instructor', 'admin'].includes(user.userType)) {
-    return res.status(403).json({ 
+    // Get full user details to double-check
+    const user = await User.findById(req.user.id);
+    console.log('User from DB:', user);
+    console.log('User.userType:', user?.userType);
+    
+    if (!user || !['instructor', 'admin'].includes(user.userType)) {
+      console.log('DB user type not instructor/admin:', user?.userType);
+      return res.status(403).json({ 
         success: false, 
         message: 'Access denied. Instructor or Admin only.' 
-    });
-}
+      });
+    }
     
     req.userData = user;
+    console.log('✅ isInstructor passed');
     next();
     
   } catch (error) {
