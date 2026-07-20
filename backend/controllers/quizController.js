@@ -150,6 +150,7 @@ export const getQuiz = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+// backend/controllers/quizController.js - Updated createQuiz with more debug
 
 /**
  * Create a new quiz
@@ -161,14 +162,19 @@ export const createQuiz = async (req, res) => {
       questions, settings, status = 'draft' 
     } = req.body;
 
-    // Get userId from req.user (set by auth middleware)
     const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized - User ID not found' });
     }
 
-    console.log('Creating quiz with data:', { title, classId, userId });
+    console.log('========================================');
+    console.log('📝 CREATE QUIZ DEBUG');
+    console.log('========================================');
+    console.log('userId:', userId);
+    console.log('classId received:', classId);
+    console.log('title:', title);
+    console.log('questions count:', questions?.length || 0);
 
     // Validate required fields
     if (!title || !classId) {
@@ -185,21 +191,32 @@ export const createQuiz = async (req, res) => {
       });
     }
 
-    // Check if class exists and user is instructor of that class
+    // Check if class exists
     const Class = (await import('../models/Class.js')).default;
     const classData = await Class.findById(classId);
     
     if (!classData) {
+      console.log('❌ Class not found for ID:', classId);
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
+    console.log('✅ Class found:', classData.title);
+    console.log('Class instructorId:', classData.instructorId.toString());
+    console.log('Current user ID:', userId);
+    console.log('Are they the same?', classData.instructorId.toString() === userId);
+
     // Verify the user is the instructor of this class
     if (classData.instructorId.toString() !== userId) {
+      console.log('❌ User is NOT the instructor of this class');
+      console.log('   Class instructor:', classData.instructorId.toString());
+      console.log('   Current user:', userId);
       return res.status(403).json({ 
         success: false, 
         message: 'You can only create quizzes for your own classes' 
       });
     }
+
+    console.log('✅ User IS the instructor of this class');
 
     // Calculate total points
     let totalPoints = 0;
@@ -224,6 +241,7 @@ export const createQuiz = async (req, res) => {
 
     await quiz.save();
     console.log('✅ Quiz created successfully:', quiz._id);
+    console.log('========================================');
 
     res.status(201).json({
       success: true,
