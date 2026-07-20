@@ -85,30 +85,36 @@ class InstructorDashboard {
       }
     });
   }
-
-  async loadInstructorClasses() {
+  
+async loadInstructorClasses() {
     try {
-      const res = await fetch('https://fissk-backend.onrender.com/register/instructor/classes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: this.currentUser.id })
-      });
-      const json = await res.json();
-      const classes = Array.isArray(json?.classes) ? json.classes : [];
-      
-      // Load quizzes for each class
-      for (const cls of classes) {
-        const quizzes = await this.loadClassQuizzes(cls._id);
-        cls.quizzes = quizzes || [];
-        cls.quizCount = quizzes ? quizzes.length : 0;
-      }
-      
-      this.renderClasses(classes);
-      this.populateClassSelects(classes);
+        const res = await fetch('https://fissk-backend.onrender.com/register/instructor/classes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: this.currentUser.id })
+        });
+        const json = await res.json();
+        const classes = Array.isArray(json?.classes) ? json.classes : [];
+        
+        // Load quizzes for each class - with error handling
+        for (const cls of classes) {
+            try {
+                const quizzes = await this.loadClassQuizzes(cls._id);
+                cls.quizzes = quizzes || [];
+                cls.quizCount = quizzes ? quizzes.length : 0;
+            } catch (err) {
+                console.error(`Error loading quizzes for class ${cls._id}:`, err);
+                cls.quizzes = [];
+                cls.quizCount = 0;
+            }
+        }
+        
+        this.renderClasses(classes);
+        this.populateClassSelects(classes);
     } catch (err) {
-      console.error('loadInstructorClasses error', err);
+        console.error('loadInstructorClasses error', err);
     }
-  }
+}
 
   renderClasses(classes) {
     if (!this.el.classesList) return;
@@ -578,143 +584,188 @@ class InstructorDashboard {
 
   /**
    * Load quizzes for a class
-   */
-  async loadClassQuizzes(classId) {
+   */// ============================================================
+// QUIZ MANAGEMENT METHODS - FIXED
+// ============================================================
+
+/**
+ * Load quizzes for a class
+ */
+async loadClassQuizzes(classId) {
     try {
-      const token = this.token || localStorage.getItem('token');
-      
-      if (!token) {
-        console.log('No token found, skipping quiz load');
-        return [];
-      }
-
-      const res = await fetch(`https://fissk-backend.onrender.com/api/quizzes/class/${classId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+        // Get fresh token
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+            console.log('No token found, skipping quiz load');
+            return [];
         }
-      });
 
-      if (res.status === 401) {
-        console.log('Unauthorized - token expired');
-        return [];
-      }
+        console.log(`Loading quizzes for class ${classId}`);
 
-      if (!res.ok) {
-        throw new Error('Failed to load quizzes');
-      }
+        const res = await fetch(`https://fissk-backend.onrender.com/api/quizzes/class/${classId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-      const data = await res.json();
-      return data.quizzes || [];
+        console.log(`Quiz load response status: ${res.status}`);
+
+        if (res.status === 401) {
+            console.log('Unauthorized - token expired');
+            localStorage.removeItem('token');
+            // Don't redirect immediately, just return empty
+            return [];
+        }
+
+        if (res.status === 403) {
+            console.log('Forbidden - user may not be instructor or enrolled');
+            return [];
+        }
+
+        if (!res.ok) {
+            throw new Error(`Failed to load quizzes: ${res.status}`);
+        }
+
+        const data = await res.json();
+        console.log(`Loaded ${data.quizzes?.length || 0} quizzes for class ${classId}`);
+        return data.quizzes || [];
     } catch (error) {
-      console.error('Load class quizzes error:', error);
-      return [];
+        console.error('Load class quizzes error:', error);
+        return [];
     }
-  }
+}
 
-  /**
-   * Render quizzes for a class in the class card
-   */
-  renderClassQuizzes(container, quizzes, classId) {
+/**
+ * Render quizzes for a class in the class card
+ */
+renderClassQuizzes(container, quizzes, classId) {
     if (!container) return;
     
+    // Check if user is logged in
+    const token = localStorage.getItem('token');
+    if (!token) {
+        container.innerHTML = `
+            <div class="no-quizzes-small">
+                <p>🔒 <a href="login.html" style="color: #8B5FBF;">Login</a> to view quizzes</p>
+            </div>
+        `;
+        return;
+    }
+    
     if (!quizzes || quizzes.length === 0) {
-      container.innerHTML = `
-        <div class="no-quizzes-small">
-          <p>No quizzes yet</p>
-          <button class="btn btn-sm btn-primary create-quiz-btn" data-class-id="${classId}">
-            + Create Quiz
-          </button>
-        </div>
-      `;
-      // Add event listener for create quiz button
-      const createBtn = container.querySelector('.create-quiz-btn');
-      if (createBtn) {
-        createBtn.addEventListener('click', () => {
-          window.location.href = `instructor/quizzes/create.html?classId=${classId}`;
-        });
-      }
-      return;
+        container.innerHTML = `
+            <div class="no-quizzes-small">
+                <p>No quizzes yet</p>
+                <button class="btn btn-sm btn-primary create-quiz-btn" data-class-id="${classId}">
+                    + Create Quiz
+                </button>
+            </div>
+        `;
+        // Add event listener for create quiz button
+        const createBtn = container.querySelector('.create-quiz-btn');
+        if (createBtn) {
+            createBtn.addEventListener('click', () => {
+                window.location.href = `instructor/quizzes/create.html?classId=${classId}`;
+            });
+        }
+        return;
     }
 
     container.innerHTML = `
-      <div class="class-quizzes-list">
-        ${quizzes.map(quiz => `
-          <div class="class-quiz-item">
-            <span class="quiz-title">${this.escapeHtml(quiz.title)}</span>
-            <span class="quiz-stats">
-              ${quiz.questionCount || 0} questions • 
-              ${quiz.userAttempts || 0} attempts
-            </span>
-            <span class="quiz-status-badge ${quiz.status || 'draft'}">${quiz.status || 'draft'}</span>
-            <div class="quiz-actions">
-              <button class="btn btn-sm btn-outline edit-quiz-btn" data-quiz-id="${quiz._id}">✏️ Edit</button>
-              <button class="btn btn-sm btn-danger delete-quiz-btn" data-quiz-id="${quiz._id}">🗑️</button>
-            </div>
-          </div>
-        `).join('')}
-      </div>
+        <div class="class-quizzes-list">
+            ${quizzes.map(quiz => `
+                <div class="class-quiz-item">
+                    <span class="quiz-title">${this.escapeHtml(quiz.title)}</span>
+                    <span class="quiz-stats">
+                        ${quiz.questionCount || 0} questions • 
+                        ${quiz.userAttempts || 0} attempts
+                    </span>
+                    <span class="quiz-status-badge ${quiz.status || 'draft'}">${quiz.status || 'draft'}</span>
+                    <div class="quiz-actions">
+                        <button class="btn btn-sm btn-outline edit-quiz-btn" data-quiz-id="${quiz._id}">✏️ Edit</button>
+                        <button class="btn btn-sm btn-danger delete-quiz-btn" data-quiz-id="${quiz._id}">🗑️</button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+        <button class="btn btn-sm btn-primary create-quiz-btn" data-class-id="${classId}" style="margin-top: 8px;">
+            + Add Quiz
+        </button>
     `;
 
     // Add event listeners for quiz actions
     container.querySelectorAll('.edit-quiz-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const quizId = btn.dataset.quizId;
-        window.location.href = `instructor/quizzes/edit.html?quizId=${quizId}`;
-      });
+        btn.addEventListener('click', () => {
+            const quizId = btn.dataset.quizId;
+            window.location.href = `instructor/quizzes/edit.html?quizId=${quizId}`;
+        });
     });
 
     container.querySelectorAll('.delete-quiz-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const quizId = btn.dataset.quizId;
-        this.deleteQuiz(quizId);
-      });
+        btn.addEventListener('click', () => {
+            const quizId = btn.dataset.quizId;
+            this.deleteQuiz(quizId);
+        });
     });
-  }
 
-  /**
-   * Delete a quiz
-   */
-  async deleteQuiz(quizId) {
+    container.querySelectorAll('.create-quiz-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const classId = btn.dataset.classId;
+            window.location.href = `instructor/quizzes/create.html?classId=${classId}`;
+        });
+    });
+}
+
+/**
+ * Delete a quiz
+ */
+async deleteQuiz(quizId) {
     if (!confirm('Are you sure you want to delete this quiz? This action cannot be undone.')) {
-      return;
+        return;
     }
 
     try {
-      const token = this.token || localStorage.getItem('token');
-      
-      if (!token) {
-        alert('Please login to delete quizzes');
-        return;
-      }
-
-      const res = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${quizId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+            alert('Please login to delete quizzes');
+            return;
         }
-      });
 
-      if (res.status === 401) {
-        alert('Session expired. Please login again.');
-        window.location.href = 'login.html';
-        return;
-      }
+        const res = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${quizId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-      const data = await res.json();
+        if (res.status === 401) {
+            alert('Session expired. Please login again.');
+            window.location.href = 'login.html';
+            return;
+        }
 
-      if (data.success) {
-        this.showMessage('✅ Quiz deleted successfully!', 'success');
-        await this.loadInstructorClasses();
-      } else {
-        this.showMessage('❌ ' + (data.message || 'Failed to delete quiz'), 'error');
-      }
+        if (res.status === 403) {
+            alert('You do not have permission to delete this quiz.');
+            return;
+        }
+
+        const data = await res.json();
+
+        if (data.success) {
+            this.showMessage('✅ Quiz deleted successfully!', 'success');
+            await this.loadInstructorClasses();
+        } else {
+            this.showMessage('❌ ' + (data.message || 'Failed to delete quiz'), 'error');
+        }
     } catch (error) {
-      console.error('Delete quiz error:', error);
-      this.showMessage('Failed to delete quiz', 'error');
+        console.error('Delete quiz error:', error);
+        this.showMessage('Failed to delete quiz', 'error');
     }
-  }
+}
 
   /**
    * Toggle quiz publish status

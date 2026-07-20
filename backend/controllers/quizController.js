@@ -12,38 +12,71 @@ export const getClassQuizzes = async (req, res) => {
     const { classId } = req.params;
     const userId = req.user?.id;
 
-    console.log('Getting quizzes for class:', classId);
+    console.log('========================================');
+    console.log('📊 GET CLASS QUIZZES DEBUG');
+    console.log('========================================');
+    console.log('classId:', classId);
+    console.log('userId:', userId);
 
     if (!userId) {
+      console.log('❌ No userId found');
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    // Check if user is enrolled or is instructor
-    const Enrollment = (await import('../models/Enrollment.js')).default;
-    const Class = (await import('../models/Class.js')).default;
-    
+    // Check if class exists
     const classData = await Class.findById(classId);
     if (!classData) {
+      console.log('❌ Class not found');
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    // Check if user is enrolled OR is the instructor
-    const isInstructor = classData.instructorId.toString() === userId;
-    const enrollment = await Enrollment.findOne({ userId, classId });
-    
-    if (!isInstructor && !enrollment) {
+    console.log('✅ Class found:', classData.title);
+    console.log('Class instructorId:', classData.instructorId);
+    console.log('Current userId:', userId);
+
+    // ===== FIX: Safely compare ObjectIds =====
+    let isInstructor = false;
+    try {
+      const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
+      const userIdStr = userId ? userId.toString() : '';
+      isInstructor = instructorIdStr === userIdStr;
+      console.log('Instructor check result:', isInstructor);
+      console.log('Instructor ID string:', instructorIdStr);
+      console.log('User ID string:', userIdStr);
+    } catch (err) {
+      console.error('Error comparing IDs:', err);
+      isInstructor = false;
+    }
+
+    // Check enrollment
+    let isEnrolled = false;
+    try {
+      const enrollment = await Enrollment.findOne({ userId, classId });
+      isEnrolled = !!enrollment;
+      console.log('Enrollment found:', isEnrolled);
+    } catch (err) {
+      console.error('Error checking enrollment:', err);
+      isEnrolled = false;
+    }
+
+    // If not instructor and not enrolled, deny access
+    if (!isInstructor && !isEnrolled) {
+      console.log('❌ User not instructor and not enrolled');
       return res.status(403).json({ 
         success: false, 
         message: 'You must be enrolled in this class to view quizzes' 
       });
     }
 
-    const Quiz = (await import('../models/Quiz.js')).default;
-    
-    // If user is instructor, show all quizzes; if student, show only published
+    console.log('✅ User has access to quizzes');
+
+    // Build query
     const query = { classId };
     if (!isInstructor) {
       query.status = 'published';
+      console.log('Student view - only showing published quizzes');
+    } else {
+      console.log('Instructor view - showing all quizzes');
     }
 
     const quizzes = await Quiz.find(query)
@@ -53,27 +86,42 @@ export const getClassQuizzes = async (req, res) => {
     console.log(`Found ${quizzes.length} quizzes for class ${classId}`);
 
     // Get user's attempts for each quiz
-    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
-    
     const quizzesWithStatus = await Promise.all(quizzes.map(async (quiz) => {
-      const attempts = await QuizAttempt.find({ quizId: quiz._id, userId })
-        .sort({ attemptNumber: -1 })
-        .lean();
+      try {
+        const attempts = await QuizAttempt.find({ quizId: quiz._id, userId })
+          .sort({ attemptNumber: -1 })
+          .lean();
 
-      const completedAttempts = attempts.filter(a => a.status === 'completed' || a.status === 'graded');
-      const inProgressAttempt = attempts.find(a => a.status === 'in-progress');
+        const completedAttempts = attempts.filter(a => a.status === 'completed' || a.status === 'graded');
+        const inProgressAttempt = attempts.find(a => a.status === 'in-progress');
 
-      return {
-        ...quiz,
-        userAttempts: completedAttempts.length,
-        userScore: completedAttempts.length > 0 ? completedAttempts[0].score : null,
-        userPassed: completedAttempts.length > 0 ? completedAttempts[0].passed : false,
-        canAttempt: inProgressAttempt ? true : completedAttempts.length < (quiz.settings?.maxAttempts || 1),
-        inProgress: !!inProgressAttempt,
-        attemptId: inProgressAttempt?._id || null,
-        totalPoints: quiz.totalPoints || 0
-      };
+        return {
+          ...quiz,
+          userAttempts: completedAttempts.length,
+          userScore: completedAttempts.length > 0 ? completedAttempts[0].score : null,
+          userPassed: completedAttempts.length > 0 ? completedAttempts[0].passed : false,
+          canAttempt: inProgressAttempt ? true : completedAttempts.length < (quiz.settings?.maxAttempts || 1),
+          inProgress: !!inProgressAttempt,
+          attemptId: inProgressAttempt?._id || null,
+          totalPoints: quiz.totalPoints || 0
+        };
+      } catch (err) {
+        console.error(`Error processing quiz ${quiz._id}:`, err);
+        return {
+          ...quiz,
+          userAttempts: 0,
+          userScore: null,
+          userPassed: false,
+          canAttempt: true,
+          inProgress: false,
+          attemptId: null,
+          totalPoints: quiz.totalPoints || 0
+        };
+      }
     }));
+
+    console.log('✅ Successfully returned quizzes');
+    console.log('========================================');
 
     res.json({
       success: true,
@@ -82,7 +130,10 @@ export const getClassQuizzes = async (req, res) => {
 
   } catch (error) {
     console.error('Get class quizzes error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to load quizzes' 
+    });
   }
 };
 
@@ -108,7 +159,12 @@ export const getQuiz = async (req, res) => {
       classId: quiz.classId 
     });
 
-    const isInstructor = quiz.instructorId._id.toString() === userId;
+    let isInstructor = false;
+    try {
+      isInstructor = quiz.instructorId?._id?.toString() === userId?.toString();
+    } catch (err) {
+      isInstructor = false;
+    }
 
     if (!enrollment && !isInstructor) {
       return res.status(403).json({ 
@@ -170,8 +226,7 @@ export const createQuiz = async (req, res) => {
     console.log('========================================');
     console.log('📝 CREATE QUIZ DEBUG');
     console.log('========================================');
-    console.log('userId (ObjectId):', userId);
-    console.log('userId as string:', userId.toString());
+    console.log('userId:', userId);
     console.log('classId received:', classId);
     console.log('title:', title);
     console.log('questions count:', questions?.length || 0);
@@ -192,7 +247,6 @@ export const createQuiz = async (req, res) => {
     }
 
     // Check if class exists
-    const Class = (await import('../models/Class.js')).default;
     const classData = await Class.findById(classId);
     
     if (!classData) {
@@ -201,18 +255,24 @@ export const createQuiz = async (req, res) => {
     }
 
     console.log('✅ Class found:', classData.title);
-    console.log('Class instructorId (string):', classData.instructorId.toString());
-    console.log('Current user ID (string):', userId.toString());
     
-    // ===== FIX: Compare as strings =====
-    const isInstructor = classData.instructorId.toString() === userId.toString();
-    console.log('Are they the same?', isInstructor);
+    // ===== FIX: Safely compare ObjectIds =====
+    let isInstructor = false;
+    try {
+      const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
+      const userIdStr = userId ? userId.toString() : '';
+      isInstructor = instructorIdStr === userIdStr;
+      console.log('Class instructorId:', instructorIdStr);
+      console.log('Current user ID:', userIdStr);
+      console.log('Are they the same?', isInstructor);
+    } catch (err) {
+      console.error('Error comparing IDs:', err);
+      isInstructor = false;
+    }
 
     // Verify the user is the instructor of this class
     if (!isInstructor) {
       console.log('❌ User is NOT the instructor of this class');
-      console.log('   Class instructor:', classData.instructorId.toString());
-      console.log('   Current user:', userId.toString());
       return res.status(403).json({ 
         success: false, 
         message: 'You can only create quizzes for your own classes' 
@@ -227,8 +287,6 @@ export const createQuiz = async (req, res) => {
       totalPoints = questions.reduce((sum, q) => sum + (q.points || 1), 0);
     }
 
-    const Quiz = (await import('../models/Quiz.js')).default;
-    
     const quiz = new Quiz({
       title,
       description: description || '',
@@ -260,7 +318,6 @@ export const createQuiz = async (req, res) => {
     });
   }
 };
-// backend/controllers/quizController.js - FIXED
 
 /**
  * Update a quiz
@@ -271,15 +328,21 @@ export const updateQuiz = async (req, res) => {
     const updates = req.body;
     const userId = req.user?.id;
 
-    const Quiz = (await import('../models/Quiz.js')).default;
     const quiz = await Quiz.findById(quizId);
     
     if (!quiz) {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    // ===== FIX: Compare as strings =====
-    if (quiz.instructorId.toString() !== userId.toString()) {
+    // ===== FIX: Safely compare ObjectIds =====
+    let isInstructor = false;
+    try {
+      isInstructor = quiz.instructorId?.toString() === userId?.toString();
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    if (!isInstructor) {
       return res.status(403).json({ 
         success: false, 
         message: 'Only the quiz creator can update this quiz' 
@@ -318,15 +381,21 @@ export const deleteQuiz = async (req, res) => {
     const { quizId } = req.params;
     const userId = req.user?.id;
 
-    const Quiz = (await import('../models/Quiz.js')).default;
     const quiz = await Quiz.findById(quizId);
     
     if (!quiz) {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    // ===== FIX: Compare as strings =====
-    if (quiz.instructorId.toString() !== userId.toString()) {
+    // ===== FIX: Safely compare ObjectIds =====
+    let isInstructor = false;
+    try {
+      isInstructor = quiz.instructorId?.toString() === userId?.toString();
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    if (!isInstructor) {
       return res.status(403).json({ 
         success: false, 
         message: 'Only the quiz creator can delete this quiz' 
@@ -334,7 +403,6 @@ export const deleteQuiz = async (req, res) => {
     }
 
     // Delete all attempts for this quiz
-    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
     await QuizAttempt.deleteMany({ quizId });
 
     await Quiz.findByIdAndDelete(quizId);
@@ -363,7 +431,14 @@ export const togglePublish = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    if (quiz.instructorId.toString() !== userId) {
+    let isInstructor = false;
+    try {
+      isInstructor = quiz.instructorId?.toString() === userId?.toString();
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    if (!isInstructor) {
       return res.status(403).json({ 
         success: false, 
         message: 'Only the quiz creator can publish/unpublish this quiz' 
@@ -400,13 +475,27 @@ export const duplicateQuiz = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
+    let isInstructor = false;
+    try {
+      isInstructor = original.instructorId?.toString() === userId?.toString();
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    if (!isInstructor) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Only the quiz creator can duplicate this quiz' 
+      });
+    }
+
     const newQuiz = new Quiz({
       title: `${original.title} (Copy)`,
       description: original.description,
       classId: original.classId,
       instructorId: userId,
       category: original.category,
-      questions: original.questions.map(q => ({ ...q })), // Deep copy
+      questions: original.questions.map(q => ({ ...q })),
       settings: { ...original.settings },
       status: 'draft',
       totalPoints: original.totalPoints,
@@ -440,7 +529,14 @@ export const getQuizAnalytics = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    if (quiz.instructorId.toString() !== userId) {
+    let isInstructor = false;
+    try {
+      isInstructor = quiz.instructorId?.toString() === userId?.toString();
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    if (!isInstructor) {
       return res.status(403).json({ 
         success: false, 
         message: 'Only the quiz creator can view analytics' 

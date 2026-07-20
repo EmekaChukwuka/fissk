@@ -16,109 +16,41 @@ quizRouter.get('/class/:classId', auth, quizController.getClassQuizzes);
 quizRouter.get('/:quizId', auth, quizController.getQuiz);
 
 // ============================================================
-// QUIZ MANAGEMENT (Instructor only) - WITH DEBUG
+// QUIZ MANAGEMENT (Instructor only)
 // ============================================================
 
-// Create quiz - INSTRUCTOR ONLY with custom check
-quizRouter.post('/', auth, async (req, res, next) => {
-  console.log('=== CREATE QUIZ REQUEST ===');
-  console.log('req.user:', req.user);
-  
-  // Check if user is instructor
-  const User = (await import('../models/User.js')).default;
-  const user = await User.findById(req.user.id);
-  console.log('User from DB for quiz creation:', user);
-  console.log('User type:', user?.userType);
-  
-  if (!user || (user.userType !== 'instructor' && user.userType !== 'admin')) {
-    console.log('❌ User is not instructor/admin');
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Only instructors can create quizzes' 
-    });
-  }
-  
-  console.log('✅ User is instructor/admin, proceeding');
-  await quizController.createQuiz(req, res);
-});
+// Create quiz - INSTRUCTOR ONLY
+quizRouter.post('/', auth, isInstructor, quizController.createQuiz);
 
 // Update quiz - INSTRUCTOR ONLY
-quizRouter.put('/:quizId', auth, async (req, res, next) => {
-  const User = (await import('../models/User.js')).default;
-  const user = await User.findById(req.user.id);
-  
-  if (!user || (user.userType !== 'instructor' && user.userType !== 'admin')) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Only instructors can update quizzes' 
-    });
-  }
-  
-  await quizController.updateQuiz(req, res);
-});
+quizRouter.put('/:quizId', auth, isInstructor, quizController.updateQuiz);
 
 // Delete quiz - INSTRUCTOR ONLY
-quizRouter.delete('/:quizId', auth, async (req, res, next) => {
-  const User = (await import('../models/User.js')).default;
-  const user = await User.findById(req.user.id);
-  
-  if (!user || (user.userType !== 'instructor' && user.userType !== 'admin')) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Only instructors can delete quizzes' 
-    });
-  }
-  
-  await quizController.deleteQuiz(req, res);
-});
+quizRouter.delete('/:quizId', auth, isInstructor, quizController.deleteQuiz);
 
 // Toggle publish status - INSTRUCTOR ONLY
-quizRouter.patch('/:quizId/publish', auth, async (req, res, next) => {
-  const User = (await import('../models/User.js')).default;
-  const user = await User.findById(req.user.id);
-  
-  if (!user || (user.userType !== 'instructor' && user.userType !== 'admin')) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Only instructors can publish quizzes' 
-    });
-  }
-  
-  await quizController.togglePublish(req, res);
-});
+quizRouter.patch('/:quizId/publish', auth, isInstructor, quizController.togglePublish);
 
 // Duplicate quiz - INSTRUCTOR ONLY
-quizRouter.post('/:quizId/duplicate', auth, async (req, res, next) => {
-  const User = (await import('../models/User.js')).default;
-  const user = await User.findById(req.user.id);
-  
-  if (!user || (user.userType !== 'instructor' && user.userType !== 'admin')) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Only instructors can duplicate quizzes' 
-    });
-  }
-  
-  await quizController.duplicateQuiz(req, res);
-});
+quizRouter.post('/:quizId/duplicate', auth, isInstructor, quizController.duplicateQuiz);
 
 // ============================================================
 // QUIZ ATTEMPTS (Student)
 // ============================================================
 
-// Start a quiz attempt - STUDENTS only
+// Start a quiz attempt
 quizRouter.post('/:quizId/start', auth, quizAttemptController.startAttempt);
 
-// Save an answer - STUDENTS only
+// Save an answer
 quizRouter.put('/:quizId/answer', auth, quizAttemptController.saveAnswer);
 
-// Submit quiz - STUDENTS only
+// Submit quiz
 quizRouter.post('/:quizId/submit', auth, quizAttemptController.submitAttempt);
 
-// Get attempt results - STUDENTS only
+// Get attempt results
 quizRouter.get('/attempt/:attemptId', auth, quizAttemptController.getAttemptResults);
 
-// Get user's attempts - STUDENTS only
+// Get user's attempts
 quizRouter.get('/attempts/user', auth, quizAttemptController.getUserAttempts);
 
 // ============================================================
@@ -126,52 +58,16 @@ quizRouter.get('/attempts/user', auth, quizAttemptController.getUserAttempts);
 // ============================================================
 
 // Get all submissions for a quiz - INSTRUCTOR ONLY
-quizRouter.get('/:quizId/submissions', auth, async (req, res, next) => {
-  const User = (await import('../models/User.js')).default;
-  const user = await User.findById(req.user.id);
-  
-  if (!user || (user.userType !== 'instructor' && user.userType !== 'admin')) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Only instructors can view submissions' 
-    });
-  }
-  
-  await quizAttemptController.getQuizSubmissions(req, res);
-});
+quizRouter.get('/:quizId/submissions', auth, isInstructor, quizAttemptController.getQuizSubmissions);
 
 // Grade essay question - INSTRUCTOR ONLY
-quizRouter.post('/attempt/:attemptId/grade', auth, async (req, res, next) => {
-  const User = (await import('../models/User.js')).default;
-  const user = await User.findById(req.user.id);
-  
-  if (!user || (user.userType !== 'instructor' && user.userType !== 'admin')) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Only instructors can grade essays' 
-    });
-  }
-  
-  await quizAttemptController.gradeEssay(req, res);
-});
+quizRouter.post('/attempt/:attemptId/grade', auth, isInstructor, quizAttemptController.gradeEssay);
 
 // ============================================================
 // ANALYTICS (Instructor only)
 // ============================================================
 
 // Get quiz analytics - INSTRUCTOR ONLY
-quizRouter.get('/:quizId/analytics', auth, async (req, res, next) => {
-  const User = (await import('../models/User.js')).default;
-  const user = await User.findById(req.user.id);
-  
-  if (!user || (user.userType !== 'instructor' && user.userType !== 'admin')) {
-    return res.status(403).json({ 
-      success: false, 
-      message: 'Only instructors can view analytics' 
-    });
-  }
-  
-  await quizController.getQuizAnalytics(req, res);
-});
+quizRouter.get('/:quizId/analytics', auth, isInstructor, quizController.getQuizAnalytics);
 
 export default quizRouter;
