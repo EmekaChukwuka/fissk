@@ -15,7 +15,7 @@ const QuestionSchema = new mongoose.Schema({
     default: []
   },
   correctAnswer: {
-    type: mongoose.Schema.Types.Mixed, // Can be string, number, array
+    type: mongoose.Schema.Types.Mixed,
     default: null
   },
   points: {
@@ -31,18 +31,15 @@ const QuestionSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  // For matching questions
   matchingPairs: {
     type: Map,
     of: String,
     default: {}
   },
-  // For ordering questions
   correctOrder: {
     type: [String],
     default: []
   },
-  // For essay questions
   rubric: {
     type: String,
     default: ''
@@ -52,7 +49,7 @@ const QuestionSchema = new mongoose.Schema({
 const QuizSettingsSchema = new mongoose.Schema({
   timeLimit: {
     type: Number,
-    default: 0, // 0 = no time limit
+    default: 0,
     min: 0
   },
   passingScore: {
@@ -115,7 +112,7 @@ const QuizStatsSchema = new mongoose.Schema({
   },
   averageTimeSpent: {
     type: Number,
-    default: 0 // in seconds
+    default: 0
   }
 }, { _id: false });
 
@@ -181,13 +178,14 @@ QuizSchema.virtual('computedTotalPoints').get(function() {
   return 0;
 });
 
-// Pre-save middleware to update totalPoints and questionCount
+// ===== FIX: Pre-save middleware - Use regular function, not arrow function =====
+// Arrow functions don't have access to 'this' and don't work with 'next'
 QuizSchema.pre('save', function(next) {
   if (this.questions && this.questions.length > 0) {
     this.totalPoints = this.questions.reduce((sum, q) => sum + (q.points || 1), 0);
     this.questionCount = this.questions.length;
   }
-  next();
+  next(); // ← Make sure to call next()
 });
 
 export default mongoose.model('Quiz', QuizSchema);

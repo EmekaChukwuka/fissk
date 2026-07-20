@@ -260,6 +260,7 @@ export const createQuiz = async (req, res) => {
     });
   }
 };
+// backend/controllers/quizController.js - FIXED
 
 /**
  * Update a quiz
@@ -270,12 +271,15 @@ export const updateQuiz = async (req, res) => {
     const updates = req.body;
     const userId = req.user?.id;
 
+    const Quiz = (await import('../models/Quiz.js')).default;
     const quiz = await Quiz.findById(quizId);
+    
     if (!quiz) {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    if (quiz.instructorId.toString() !== userId) {
+    // ===== FIX: Compare as strings =====
+    if (quiz.instructorId.toString() !== userId.toString()) {
       return res.status(403).json({ 
         success: false, 
         message: 'Only the quiz creator can update this quiz' 
@@ -314,12 +318,15 @@ export const deleteQuiz = async (req, res) => {
     const { quizId } = req.params;
     const userId = req.user?.id;
 
+    const Quiz = (await import('../models/Quiz.js')).default;
     const quiz = await Quiz.findById(quizId);
+    
     if (!quiz) {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    if (quiz.instructorId.toString() !== userId) {
+    // ===== FIX: Compare as strings =====
+    if (quiz.instructorId.toString() !== userId.toString()) {
       return res.status(403).json({ 
         success: false, 
         message: 'Only the quiz creator can delete this quiz' 
@@ -327,6 +334,7 @@ export const deleteQuiz = async (req, res) => {
     }
 
     // Delete all attempts for this quiz
+    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
     await QuizAttempt.deleteMany({ quizId });
 
     await Quiz.findByIdAndDelete(quizId);
