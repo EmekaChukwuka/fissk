@@ -85,7 +85,7 @@ class InstructorDashboard {
       }
     });
   }
-  
+
 async loadInstructorClasses() {
     try {
         const res = await fetch('https://fissk-backend.onrender.com/register/instructor/classes', {
@@ -636,7 +636,6 @@ async loadClassQuizzes(classId) {
         return [];
     }
 }
-
 /**
  * Render quizzes for a class in the class card
  */
@@ -663,7 +662,6 @@ renderClassQuizzes(container, quizzes, classId) {
                 </button>
             </div>
         `;
-        // Add event listener for create quiz button
         const createBtn = container.querySelector('.create-quiz-btn');
         if (createBtn) {
             createBtn.addEventListener('click', () => {
@@ -685,6 +683,11 @@ renderClassQuizzes(container, quizzes, classId) {
                     <span class="quiz-status-badge ${quiz.status || 'draft'}">${quiz.status || 'draft'}</span>
                     <div class="quiz-actions">
                         <button class="btn btn-sm btn-outline edit-quiz-btn" data-quiz-id="${quiz._id}">✏️ Edit</button>
+                        ${quiz.status === 'published' ? `
+                            <button class="btn btn-sm btn-warning unpublish-quiz-btn" data-quiz-id="${quiz._id}" data-status="${quiz.status}">📥 Unpublish</button>
+                        ` : `
+                            <button class="btn btn-sm btn-success publish-quiz-btn" data-quiz-id="${quiz._id}" data-status="${quiz.status}">📤 Publish</button>
+                        `}
                         <button class="btn btn-sm btn-danger delete-quiz-btn" data-quiz-id="${quiz._id}">🗑️</button>
                     </div>
                 </div>
@@ -700,6 +703,15 @@ renderClassQuizzes(container, quizzes, classId) {
         btn.addEventListener('click', () => {
             const quizId = btn.dataset.quizId;
             window.location.href = `instructor/quizzes/edit.html?quizId=${quizId}`;
+        });
+    });
+
+    // Add event listeners for publish/unpublish buttons
+    container.querySelectorAll('.publish-quiz-btn, .unpublish-quiz-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const quizId = btn.dataset.quizId;
+            const currentStatus = btn.dataset.status;
+            this.toggleQuizPublish(quizId, currentStatus);
         });
     });
 
@@ -766,48 +778,53 @@ async deleteQuiz(quizId) {
         this.showMessage('Failed to delete quiz', 'error');
     }
 }
-
-  /**
-   * Toggle quiz publish status
-   */
-  async toggleQuizPublish(quizId, currentStatus) {
+/**
+ * Toggle quiz publish status
+ */
+async toggleQuizPublish(quizId, currentStatus) {
     try {
-      const token = this.token || localStorage.getItem('token');
-      
-      if (!token) {
-        alert('Please login to publish/unpublish quizzes');
-        return;
-      }
-
-      const newStatus = currentStatus === 'published' ? 'draft' : 'published';
-
-      const res = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${quizId}/publish`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+            alert('Please login to publish/unpublish quizzes');
+            return;
         }
-      });
 
-      if (res.status === 401) {
-        alert('Session expired. Please login again.');
-        window.location.href = 'login.html';
-        return;
-      }
+        const newStatus = currentStatus === 'published' ? 'draft' : 'published';
 
-      const data = await res.json();
+        const res = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${quizId}/publish`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
 
-      if (data.success) {
-        this.showMessage(`✅ Quiz ${newStatus === 'published' ? 'published' : 'unpublished'}!`, 'success');
-        await this.loadInstructorClasses();
-      } else {
-        this.showMessage('❌ ' + (data.message || 'Failed to update quiz'), 'error');
-      }
+        if (res.status === 401) {
+            alert('Session expired. Please login again.');
+            window.location.href = 'login.html';
+            return;
+        }
+
+        if (res.status === 403) {
+            alert('You do not have permission to publish/unpublish this quiz.');
+            return;
+        }
+
+        const data = await res.json();
+
+        if (data.success) {
+            this.showMessage(`✅ Quiz ${newStatus === 'published' ? 'published' : 'unpublished'}!`, 'success');
+            // Refresh the classes view
+            await this.loadInstructorClasses();
+        } else {
+            this.showMessage('❌ ' + (data.message || 'Failed to update quiz'), 'error');
+        }
     } catch (error) {
-      console.error('Toggle publish error:', error);
-      this.showMessage('Failed to update quiz', 'error');
+        console.error('Toggle publish error:', error);
+        this.showMessage('Failed to update quiz', 'error');
     }
-  }
+}
 
   // ===== REQUEST WITHDRAWAL =====
   async requestWithdrawal() {

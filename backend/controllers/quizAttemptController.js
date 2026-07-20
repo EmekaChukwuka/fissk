@@ -201,6 +201,7 @@ export const submitAttempt = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+// backend/controllers/quizAttemptController.js
 
 /**
  * Get attempt results
@@ -210,6 +211,14 @@ export const getAttemptResults = async (req, res) => {
     const { attemptId } = req.params;
     const userId = req.user?.id;
 
+    console.log('=== GET ATTEMPT RESULTS ===');
+    console.log('Attempt ID:', attemptId);
+    console.log('User ID:', userId);
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
     const attempt = await QuizAttempt.findById(attemptId)
       .populate('quizId')
       .lean();
@@ -218,17 +227,36 @@ export const getAttemptResults = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Attempt not found' });
     }
 
-    // Check if user owns this attempt or is instructor
-    const quiz = await Quiz.findById(attempt.quizId);
-    const isOwner = attempt.userId.toString() === userId;
-    const isInstructor = quiz?.instructorId?.toString() === userId;
+    console.log('Attempt found:', attempt._id);
+    console.log('Attempt userId:', attempt.userId);
+    console.log('Current userId:', userId);
+
+    // ===== FIX: Compare as strings =====
+    const isOwner = attempt.userId?.toString() === userId?.toString();
+    console.log('Is owner?', isOwner);
+
+    // Check if user is instructor of the class
+    let isInstructor = false;
+    try {
+      const Quiz = (await import('../models/Quiz.js')).default;
+      const quiz = await Quiz.findById(attempt.quizId);
+      if (quiz) {
+        isInstructor = quiz.instructorId?.toString() === userId?.toString();
+        console.log('Is instructor?', isInstructor);
+      }
+    } catch (err) {
+      console.error('Error checking instructor:', err);
+    }
 
     if (!isOwner && !isInstructor) {
+      console.log('❌ User does not have permission to view these results');
       return res.status(403).json({ 
         success: false, 
         message: 'You do not have permission to view these results' 
       });
     }
+
+    console.log('✅ User has permission to view results');
 
     // Get detailed results
     const results = await QuizService.getDetailedResults(attemptId);
@@ -241,7 +269,10 @@ export const getAttemptResults = async (req, res) => {
 
   } catch (error) {
     console.error('Get attempt results error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to load results' 
+    });
   }
 };
 
