@@ -180,12 +180,12 @@ QuizSchema.virtual('computedTotalPoints').get(function() {
 
 // ===== FIX: Pre-save middleware - Use regular function, not arrow function =====
 // Arrow functions don't have access to 'this' and don't work with 'next'
-QuizSchema.pre('save', function(next) {
+QuizSchema.pre('save', async function() {
   if (this.questions && this.questions.length > 0) {
     this.totalPoints = this.questions.reduce((sum, q) => sum + (q.points || 1), 0);
     this.questionCount = this.questions.length;
   }
-  next(); // ← Make sure to call next()
+  return;
 });
 
 export default mongoose.model('Quiz', QuizSchema);
