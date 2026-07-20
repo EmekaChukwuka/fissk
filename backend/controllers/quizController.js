@@ -10,47 +10,68 @@ import Enrollment from '../models/Enrollment.js';
 export const getClassQuizzes = async (req, res) => {
   try {
     const { classId } = req.params;
-    const { status = 'published' } = req.query;
+    const userId = req.user?.id;
+
+    console.log('Getting quizzes for class:', classId);
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
 
     // Check if user is enrolled or is instructor
-    const userId = req.user?.id;
-    const classData = await Class.findById(classId);
+    const Enrollment = (await import('../models/Enrollment.js')).default;
+    const Class = (await import('../models/Class.js')).default;
     
+    const classData = await Class.findById(classId);
     if (!classData) {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    // If user is not enrolled and not instructor, only show published quizzes
-    let query = { classId };
-    if (status) query.status = status;
+    // Check if user is enrolled OR is the instructor
+    const isInstructor = classData.instructorId.toString() === userId;
+    const enrollment = await Enrollment.findOne({ userId, classId });
+    
+    if (!isInstructor && !enrollment) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'You must be enrolled in this class to view quizzes' 
+      });
+    }
+
+    const Quiz = (await import('../models/Quiz.js')).default;
+    
+    // If user is instructor, show all quizzes; if student, show only published
+    const query = { classId };
+    if (!isInstructor) {
+      query.status = 'published';
+    }
 
     const quizzes = await Quiz.find(query)
       .sort({ createdAt: -1 })
       .lean();
 
-    // Check if user has completed each quiz
+    console.log(`Found ${quizzes.length} quizzes for class ${classId}`);
+
+    // Get user's attempts for each quiz
+    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
+    
     const quizzesWithStatus = await Promise.all(quizzes.map(async (quiz) => {
-      let userAttempt = null;
-      let canAttempt = true;
+      const attempts = await QuizAttempt.find({ quizId: quiz._id, userId })
+        .sort({ attemptNumber: -1 })
+        .lean();
 
-      if (userId) {
-        userAttempt = await QuizAttempt.findOne({ 
-          quizId: quiz._id, 
-          userId,
-          status: { $in: ['completed', 'graded'] }
-        }).sort({ attemptNumber: -1 });
-
-        const attempts = await QuizAttempt.countDocuments({ quizId: quiz._id, userId });
-        canAttempt = attempts < (quiz.settings?.maxAttempts || 1);
-      }
+      const completedAttempts = attempts.filter(a => a.status === 'completed' || a.status === 'graded');
+      const inProgressAttempt = attempts.find(a => a.status === 'in-progress');
 
       return {
         ...quiz,
-        userCompleted: !!userAttempt,
-        userScore: userAttempt?.score || null,
-        userPassed: userAttempt?.passed || false,
-        canAttempt,
-        attempts: userAttempt ? 1 : 0 // Simplified
+        userAttempts: completedAttempts.length,
+        userScore: completedAttempts.length > 0 ? completedAttempts[0].score : null,
+        userPassed: completedAttempts.length > 0 ? completedAttempts[0].passed : false,
+        canAttempt: inProgressAttempt ? true : completedAttempts.length < (quiz.settings?.maxAttempts || 1),
+        inProgress: !!inProgressAttempt,
+        attemptId: inProgressAttempt?._id || null,
+        totalPoints: quiz.totalPoints || 0
       };
     }));
 
@@ -140,22 +161,43 @@ export const createQuiz = async (req, res) => {
       questions, settings, status = 'draft' 
     } = req.body;
 
+    // Get userId from req.user (set by auth middleware)
     const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(401).json({ success: false, message: 'Unauthorized' });
+      return res.status(401).json({ success: false, message: 'Unauthorized - User ID not found' });
     }
 
-    // Check if class exists and user is instructor
+    console.log('Creating quiz with data:', { title, classId, userId });
+
+    // Validate required fields
+    if (!title || !classId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Title and classId are required' 
+      });
+    }
+
+    if (!questions || questions.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'At least one question is required' 
+      });
+    }
+
+    // Check if class exists and user is instructor of that class
+    const Class = (await import('../models/Class.js')).default;
     const classData = await Class.findById(classId);
+    
     if (!classData) {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
+    // Verify the user is the instructor of this class
     if (classData.instructorId.toString() !== userId) {
       return res.status(403).json({ 
         success: false, 
-        message: 'Only the class instructor can create quizzes' 
+        message: 'You can only create quizzes for your own classes' 
       });
     }
 
@@ -165,6 +207,8 @@ export const createQuiz = async (req, res) => {
       totalPoints = questions.reduce((sum, q) => sum + (q.points || 1), 0);
     }
 
+    const Quiz = (await import('../models/Quiz.js')).default;
+    
     const quiz = new Quiz({
       title,
       description: description || '',
@@ -179,6 +223,7 @@ export const createQuiz = async (req, res) => {
     });
 
     await quiz.save();
+    console.log('✅ Quiz created successfully:', quiz._id);
 
     res.status(201).json({
       success: true,
@@ -188,7 +233,10 @@ export const createQuiz = async (req, res) => {
 
   } catch (error) {
     console.error('Create quiz error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to create quiz' 
+    });
   }
 };
 
