@@ -347,10 +347,6 @@ export const getAttemptResults = async (req, res) => {
     const { attemptId } = req.params;
     const userId = req.user?.id;
 
-    console.log('=== GET ATTEMPT RESULTS ===');
-    console.log('Attempt ID:', attemptId);
-    console.log('User ID:', userId);
-
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
@@ -553,10 +549,6 @@ export const getQuizSubmissions = async (req, res) => {
     const { quizId } = req.params;
     const userId = req.user?.id;
 
-    console.log('=== GET QUIZ SUBMISSIONS ===');
-    console.log('Quiz ID:', quizId);
-    console.log('User ID:', userId);
-
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
@@ -582,7 +574,6 @@ export const getQuizSubmissions = async (req, res) => {
       });
     }
 
-    console.log('✅ User is the instructor, fetching submissions');
 
     const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
     const User = (await import('../models/User.js')).default;

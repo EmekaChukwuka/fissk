@@ -189,7 +189,7 @@
         document.querySelectorAll('.view-submission-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const attemptId = btn.dataset.attemptId;
-                window.open(`../quiz/results.html?attemptId=${attemptId}`, '_blank');
+                window.open(`../../quiz/results.html?attemptId=${attemptId}`, '_blank');
             });
         });
 
@@ -214,6 +214,38 @@
             const attempt = data.attempt;
             const results = data.results;
 
+            // Build essay questions HTML
+            let essayQuestionsHTML = '';
+            let hasEssayQuestions = false;
+
+            if (results && results.questions) {
+                results.questions.forEach((q, index) => {
+                    if (q.type === 'essay') {
+                        hasEssayQuestions = true;
+                        essayQuestionsHTML += `
+                            <div class="essay-grading-item" style="background: var(--gray-light); padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 1px solid var(--border);">
+                                <h4 style="margin-bottom: 8px;">Question ${index + 1}</h4>
+                                <p style="color: var(--text-dark); margin-bottom: 12px;">${escapeHtml(q.question || '')}</p>
+                                <div style="background: white; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
+                                    <strong>Student's Answer:</strong>
+                                    <p style="margin-top: 4px; color: var(--text-dark); white-space: pre-wrap;">${escapeHtml(q.userAnswer || 'No answer provided')}</p>
+                                </div>
+                                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                    <div style="flex: 1;">
+                                        <label style="display: block; font-weight: 500; font-size: 0.85rem; color: var(--text-dark);">Points (0-${q.points || 1})</label>
+                                        <input type="number" class="essay-points" data-index="${index}" value="${q.pointsEarned || 0}" min="0" max="${q.points || 1}" style="width: 80px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;">
+                                    </div>
+                                    <div style="flex: 2;">
+                                        <label style="display: block; font-weight: 500; font-size: 0.85rem; color: var(--text-dark);">Feedback</label>
+                                        <input type="text" class="essay-feedback" data-index="${index}" placeholder="Add feedback..." value="${escapeHtml(q.instructorFeedback || '')}" style="width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;">
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+            }
+
             // Create modal
             const modal = document.createElement('div');
             modal.className = 'modal';
@@ -223,40 +255,12 @@
                     <span class="close-modal" onclick="this.closest('.modal').remove()">&times;</span>
                     <h2>📝 Grade Essay Questions</h2>
                     <p style="color: var(--text-light); margin-bottom: 20px;">
-                        Student: <strong>${attempt.userId?.firstName || 'Unknown'} ${attempt.userId?.lastName || ''}</strong>
+                        Student: <strong>${escapeHtml(attempt.userId?.firstName || 'Unknown')} ${escapeHtml(attempt.userId?.lastName || '')}</strong>
                     </p>
                     
                     <div id="essayQuestions">
-                        ${results.questions.map((q, index) => {
-                            if (q.type === 'essay') {
-                                return `
-                                    <div class="essay-grading-item" style="background: var(--gray-light); padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 1px solid var(--border);">
-                                        <h4 style="margin-bottom: 8px;">Question ${index + 1}</h4>
-                                        <p style="color: var(--text-dark); margin-bottom: 12px;">${escapeHtml(q.question || '')}</p>
-                                        <div style="background: white; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-                                            <strong>Student's Answer:</strong>
-                                            <p style="margin-top: 4px; color: var(--text-dark); white-space: pre-wrap;">${escapeHtml(q.userAnswer || 'No answer provided')}</p>
-                                        </div>
-                                        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                                            <div style="flex: 1;">
-                                                <label style="display: block; font-weight: 500; font-size: 0.85rem; color: var(--text-dark);">Points (0-${q.points || 1})</label>
-                                                <input type="number" class="essay-points" data-index="${index}" value="${q.pointsEarned || 0}" min="0" max="${q.points || 1}" style="width: 80px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;">
-                                            </div>
-                                            <div style="flex: 2;">
-                                                <label style="display: block; font-weight: 500; font-size: 0.85rem; color: var(--text-dark);">Feedback</label>
-                                                <input type="text" class="essay-feedback" data-index="${index}" placeholder="Add feedback..." value="${escapeHtml(q.instructorFeedback || '')}" style="width: 100%; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px;">
-                                            </div>
-                                        </div>
-                                    </div>
-                                `;
-                            }
-                            return '';
-                        }).join('')}
+                        ${essayQuestionsHTML || '<p style="text-align: center; padding: 20px; color: var(--text-light);">No essay questions to grade.</p>'}
                     </div>
-
-                    ${document.querySelector('#essayQuestions').innerHTML.trim() === '' ? `
-                        <p style="text-align: center; padding: 20px; color: var(--text-light);">No essay questions to grade.</p>
-                    ` : ''}
 
                     <div class="form-actions" style="display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end;">
                         <button class="btn btn-outline" onclick="this.closest('.modal').remove()">Cancel</button>
@@ -275,7 +279,7 @@
 
         } catch (error) {
             console.error('Open grading modal error:', error);
-            QuizUtils.showToast('Failed to load attempt for grading', 'error');
+            QuizUtils.showToast('Failed to load attempt for grading: ' + error.message, 'error');
         }
     }
 
@@ -286,14 +290,20 @@
             const feedbackInputs = document.querySelectorAll('.essay-feedback');
 
             const grades = [];
-            pointsInputs.forEach((input, index) => {
-                const feedback = feedbackInputs[index] || { value: '' };
+            pointsInputs.forEach((input) => {
+                const index = parseInt(input.dataset.index);
+                const feedbackInput = document.querySelector(`.essay-feedback[data-index="${index}"]`);
                 grades.push({
-                    questionIndex: parseInt(input.dataset.index),
+                    questionIndex: index,
                     points: parseInt(input.value) || 0,
-                    feedback: feedback.value || ''
+                    feedback: feedbackInput ? feedbackInput.value : ''
                 });
             });
+
+            if (grades.length === 0) {
+                QuizUtils.showToast('No essay questions to grade', 'info');
+                return;
+            }
 
             const btn = document.getElementById('saveGradesBtn');
             btn.disabled = true;
@@ -315,7 +325,8 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to save grade');
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Failed to save grade');
                 }
             }
 
@@ -324,7 +335,13 @@
 
         } catch (error) {
             console.error('Save grades error:', error);
-            QuizUtils.showToast('Failed to save grades', 'error');
+            QuizUtils.showToast('Failed to save grades: ' + error.message, 'error');
+        } finally {
+            const btn = document.getElementById('saveGradesBtn');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '💾 Save Grades';
+            }
         }
     }
 
