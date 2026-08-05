@@ -762,7 +762,7 @@ renderClassQuizzes(container, quizzes, classId) {
         }
         return;
     }
-
+  
     container.innerHTML = `
         <div class="class-quizzes-list">
             ${quizzes.map(quiz => `
@@ -774,13 +774,15 @@ renderClassQuizzes(container, quizzes, classId) {
                     </span>
                     <span class="quiz-status-badge ${quiz.status || 'draft'}">${quiz.status || 'draft'}</span>
                     <div class="quiz-actions">
-                        <button class="btn btn-sm btn-outline edit-quiz-btn" data-quiz-id="${quiz._id}">✏️ Edit</button>
+                        <button class="btn btn-sm btn-outline edit-quiz-btn" data-quiz-id="${quiz._id}" title="Edit Quiz">✏️</button>
+                        <button class="btn btn-sm btn-primary submissions-btn" data-quiz-id="${quiz._id}" title="View Submissions">👥</button>
+                        <button class="btn btn-sm btn-info analytics-btn" data-quiz-id="${quiz._id}" title="Analytics">📊</button>
                         ${quiz.status === 'published' ? `
-                            <button class="btn btn-sm btn-warning unpublish-quiz-btn" data-quiz-id="${quiz._id}" data-status="${quiz.status}">📥 Unpublish</button>
+                            <button class="btn btn-sm btn-warning unpublish-quiz-btn" data-quiz-id="${quiz._id}" data-status="${quiz.status}" title="Unpublish Quiz">📥</button>
                         ` : `
-                            <button class="btn btn-sm btn-success publish-quiz-btn" data-quiz-id="${quiz._id}" data-status="${quiz.status}">📤 Publish</button>
+                            <button class="btn btn-sm btn-success publish-quiz-btn" data-quiz-id="${quiz._id}" data-status="${quiz.status}" title="Publish Quiz">📤</button>
                         `}
-                        <button class="btn btn-sm btn-danger delete-quiz-btn" data-quiz-id="${quiz._id}">🗑️</button>
+                        <button class="btn btn-sm btn-danger delete-quiz-btn" data-quiz-id="${quiz._id}" title="Delete Quiz">🗑️</button>
                     </div>
                 </div>
             `).join('')}
@@ -789,6 +791,21 @@ renderClassQuizzes(container, quizzes, classId) {
             + Add Quiz
         </button>
     `;
+
+    // Add event listeners for new buttons
+    container.querySelectorAll('.submissions-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const quizId = btn.dataset.quizId;
+            window.location.href = `instructor/quizzes/submissions.html?quizId=${quizId}`;
+        });
+    });
+
+    container.querySelectorAll('.analytics-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const quizId = btn.dataset.quizId;
+            window.location.href = `instructor/quizzes/analytics.html?quizId=${quizId}`;
+        });
+    });
 
     // Add event listeners for quiz actions
     container.querySelectorAll('.edit-quiz-btn').forEach(btn => {

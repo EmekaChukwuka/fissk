@@ -355,6 +355,110 @@
         white-space: nowrap;
     }
 
+    /* ===== QUIZ HISTORY SECTION ===== */
+    .quiz-history-container {
+        margin-top: 12px;
+    }
+
+    .quiz-history-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background: var(--gray-light);
+        border-radius: 10px;
+        margin-bottom: 8px;
+        border: 1px solid var(--border);
+        transition: all 0.2s ease;
+    }
+
+    .quiz-history-item:hover {
+        background: var(--white);
+        border-color: var(--primary-light);
+        transform: translateX(4px);
+    }
+
+    .quiz-history-item .quiz-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .quiz-history-item .quiz-title {
+        font-weight: 600;
+        color: var(--text-dark);
+    }
+
+    .quiz-history-item .quiz-date {
+        font-size: 0.8rem;
+        color: var(--text-light);
+    }
+
+    .quiz-history-item .quiz-score {
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin-right: 12px;
+    }
+
+    .quiz-history-item .quiz-score.high {
+        color: #10B981;
+    }
+
+    .quiz-history-item .quiz-score.medium {
+        color: #F59E0B;
+    }
+
+    .quiz-history-item .quiz-score.low {
+        color: #EF4444;
+    }
+
+    .quiz-history-item .quiz-status {
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .quiz-history-item .quiz-status.passed {
+        color: #10B981;
+    }
+
+    .quiz-history-item .quiz-status.failed {
+        color: #EF4444;
+    }
+
+    .no-quiz-history {
+        text-align: center;
+        padding: 30px 20px;
+        color: var(--text-light);
+        background: var(--gray-light);
+        border-radius: 12px;
+    }
+
+    .no-quiz-history::before {
+        content: "📝";
+        font-size: 36px;
+        display: block;
+        margin-bottom: 12px;
+    }
+
+    .view-all-link {
+        display: block;
+        text-align: center;
+        margin-top: 12px;
+        padding: 8px;
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.9rem;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .view-all-link:hover {
+        background: var(--gray-light);
+        color: var(--primary-dark);
+    }
+
     /* ===== EMPTY STATES ===== */
     .no-sessions {
         text-align: center;
@@ -517,6 +621,24 @@
             width: 100%;
         }
 
+        /* Quiz History */
+        .quiz-history-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 12px 14px;
+        }
+
+        .quiz-history-item .quiz-info {
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .quiz-history-item .quiz-score {
+            font-size: 1rem;
+            margin-right: 8px;
+        }
+
         /* Section Header */
         .section-header {
             flex-direction: column;
@@ -543,6 +665,16 @@
         .instructor-stats {
             grid-template-columns: repeat(2, 1fr);
             gap: 12px;
+        }
+
+        /* Overview Grid */
+        .overview-grid {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .overview-card.full-width {
+            grid-column: 1;
         }
     }
 
@@ -604,6 +736,23 @@
 
         .enrolled-class-card .class-meta span {
             font-size: 0.7rem;
+        }
+
+        /* Quiz History */
+        .quiz-history-item {
+            padding: 10px 12px;
+        }
+
+        .quiz-history-item .quiz-title {
+            font-size: 0.9rem;
+        }
+
+        .quiz-history-item .quiz-date {
+            font-size: 0.7rem;
+        }
+
+        .quiz-history-item .quiz-score {
+            font-size: 0.9rem;
         }
 
         /* Stats */
@@ -683,6 +832,33 @@
     .sessions-list {
         scrollbar-width: thin;
         scrollbar-color: var(--primary) var(--gray-light);
+    }
+
+    /* Activity list items */
+    .activity-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        background: var(--gray-light);
+        border-radius: 8px;
+        margin-bottom: 6px;
+        border-left: 3px solid var(--primary);
+    }
+
+    .activity-item .activity-icon {
+        font-size: 1.2rem;
+    }
+
+    .activity-item .activity-text {
+        flex: 1;
+        font-size: 0.9rem;
+        color: var(--text-dark);
+    }
+
+    .activity-item .activity-time {
+        font-size: 0.75rem;
+        color: var(--text-light);
     }
 </style>
     <link rel="icon" href="fissklogo.jpg">
@@ -817,6 +993,14 @@
                                 <h3>Upcoming Live Sessions</h3>
                                 <div class="live-sessions" id="overviewLiveSessions">
                                     <p>Loading upcoming sessions...</p>
+                                </div>
+                            </div>
+
+                            <!-- ===== NEW: QUIZ HISTORY SECTION ===== -->
+                            <div class="overview-card full-width">
+                                <h3>📝 Recent Quiz History</h3>
+                                <div class="quiz-history-container" id="quizHistoryContainer">
+                                    <p style="color: var(--text-light);">Loading your quiz history...</p>
                                 </div>
                             </div>
                         </div>

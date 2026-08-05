@@ -366,6 +366,73 @@ renderLiveSessions() {
         `;
     }).join('');
 }
+
+        // ===== QUIZ HISTORY =====
+        async loadQuizHistory() {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch('https://fissk-backend.onrender.com/api/quizzes/attempts/user', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load quiz history');
+
+                const data = await response.json();
+                const attempts = data.attempts || [];
+
+                this.renderQuizHistory(attempts);
+            } catch (error) {
+                console.error('Load quiz history error:', error);
+                // Silently fail - quiz history is optional
+            }
+        }
+
+        renderQuizHistory(attempts) {
+            const container = document.getElementById('quizHistoryContainer');
+            if (!container) return;
+
+            if (attempts.length === 0) {
+                container.innerHTML = `
+                    <div class="no-quiz-history">
+                        <p style="color: var(--text-light); text-align: center; padding: 20px;">
+                            📝 You haven't taken any quizzes yet. Start learning and test your knowledge!
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = attempts.slice(0, 5).map(attempt => {
+                const quizTitle = attempt.quizId?.title || 'Unknown Quiz';
+                const score = attempt.score || 0;
+                const passed = attempt.passed ? '✅ Passed' : '❌ Failed';
+                const date = attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleDateString() : 'Unknown';
+                
+                return `
+                    <div class="quiz-history-item" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--gray-light); border-radius: 10px; margin-bottom: 8px;">
+                        <div>
+                            <strong>${this.escapeHtml(quizTitle)}</strong>
+                            <span style="font-size: 0.85rem; color: var(--text-light); margin-left: 12px;">${date}</span>
+                        </div>
+                        <div>
+                            <span style="font-weight: 600; color: ${score >= 70 ? '#10B981' : score >= 40 ? '#F59E0B' : '#EF4444'}; margin-right: 12px;">${score}%</span>
+                            <span style="font-size: 0.85rem; font-weight: 500; color: ${passed ? '#10B981' : '#EF4444'};">
+                                ${passed}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (attempts.length > 5) {
+                container.innerHTML += `
+                    <div style="text-align: center; margin-top: 12px;">
+                        <a href="quiz/history.html" class="btn btn-outline" style="font-size: 0.85rem;">View All</a>
+                    </div>
+                `;
+            }
+        }
+
         filterSessions(type) {
             const upcomingSection = document.querySelector('.upcoming-sessions-section');
             const recordedSection = document.querySelector('.recorded-sessions-section');
