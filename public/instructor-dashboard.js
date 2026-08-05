@@ -167,12 +167,12 @@ async loadInstructorClasses() {
     });
 
     this.el.classesList.querySelectorAll('.view-students').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = e.currentTarget.dataset.id;
-        this.loadEnrollments(id);
-        this.switchSection('students');
-        if (this.el.classFilter) this.el.classFilter.value = id;
-      });
+        btn.addEventListener('click', async (e) => {
+            const id = e.currentTarget.dataset.id;
+            await this.loadEnrollments(id); // Make sure this is awaited
+            this.switchSection('students');
+            if (this.el.classFilter) this.el.classFilter.value = id;
+        });
     });
 
     this.el.classesList.querySelectorAll('.manage-quizzes').forEach(btn => {
@@ -198,9 +198,9 @@ async loadInstructorClasses() {
                 const classId = c._id || c.id;
                 return `<option value="${classId}">${this.escapeHtml(c.title)}</option>`;
             }).join('');
-        this.el.classFilter.addEventListener('change', () => {
+        this.el.classFilter.addEventListener('change', async () => {
             const v = this.el.classFilter.value;
-            this.loadEnrollments(v || '');
+            await this.loadEnrollments(v || '');
         });
     }
   }
@@ -232,57 +232,104 @@ async loadInstructorClasses() {
     }
   }
 
-  async loadEnrollments(classId = '') {
-    try {
-      const res = await fetch(`https://fissk-backend.onrender.com/register/instructor/enrollments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instructorId: this.currentUser.id })
-      });
-      const json = await res.json();
-      const enrollments = Array.isArray(json?.enrollments) ? json.enrollments : [];
-      this.renderEnrollments(enrollments);
-    } catch (err) {
-      console.error('loadEnrollments error', err);
-    }
-  }
+// instructor-dashboard.js - FIXED
 
-  renderEnrollments(items) {
+async loadEnrollments(classId = '') {
+    try {
+        const res = await fetch(`https://fissk-backend.onrender.com/register/instructor/enrollments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ instructorId: this.currentUser.id })
+        });
+        
+        if (!res.ok) {
+            console.error('Failed to load enrollments:', res.status);
+            return;
+        }
+        
+        const json = await res.json();
+        console.log('Enrollments response:', json);
+        
+         let enrollments = [];
+        
+        if (Array.isArray(json)) {
+            enrollments = json;
+        } else if (Array.isArray(json?.enrollments)) {
+            enrollments = json.enrollments;
+        } else if (json && typeof json === 'object') {
+            // Try to find any array property
+            for (const key in json) {
+                if (Array.isArray(json[key])) {
+                    enrollments = json[key];
+                    break;
+                }
+            }
+        }
+        
+        console.log('Processed enrollments:', enrollments);
+        this.renderEnrollments(enrollments);
+    } catch (err) {
+        console.error('loadEnrollments error:', err);
+        this.showMessage('Failed to load enrollments', 'error');
+    }
+}
+
+renderEnrollments(items) {
     const container = this.el.enrollmentsList;
     if (!container) return;
+    
     if (!items || items.length === 0) {
-      container.innerHTML = `<div class="no-content"><p>No students enrolled yet.</p></div>`;
-      return;
+        container.innerHTML = `<div class="no-content"><p>No students enrolled yet.</p></div>`;
+        return;
     }
 
     container.innerHTML = `
-      <table class="enrollments-table">
-        <thead>
-          <tr><th>Student</th><th>Email</th><th>Joined</th><th>Progress</th><th>Class</th><th>Payment</th><th>Last Accessed</th></tr>
-        </thead>
-        <tbody>
-          ${items.map(e => `
-            <tr>
-              <td>${this.escapeHtml(e.name|| (e.first_name + ' ' + e.last_name) || '—')}</td>
-              <td>${this.escapeHtml(e.email || '—')}</td>
-              <td>${e.enrolled_at ? new Date(e.enrolled_at).toLocaleDateString() : '—'}</td>
-              <td>
-                <div class="progress-bar small"><div class="progress-fill" style="width:${e.progress||0}%"></div></div>
-                <span>${e.progress||0}%</span>
-              </td>
-              <td>${e.title}</td>
-              <td>
-                ${e.paymentStatus === 'paid' ? '✅ Paid' : 
-                  e.paymentStatus === 'pending' ? '⏳ Pending' : 
-                  e.paymentStatus === 'free' ? '🎓 Free' : '—'}
-              </td>
-              <td>${e.last_accessed ? new Date(e.last_accessed).toLocaleDateString() : 'Never'}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+        <div style="overflow-x: auto;">
+            <table class="enrollments-table">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Email</th>
+                        <th>Joined</th>
+                        <th>Progress</th>
+                        <th>Class</th>
+                        <th>Payment</th>
+                        <th>Last Accessed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map(e => `
+                        <tr>
+                            <td>
+                                <strong>${this.escapeHtml(e.first_name || e.name || e.userName || '—')} 
+                                ${this.escapeHtml(e.last_name || '')}</strong>
+                            </td>
+                            <td>${this.escapeHtml(e.email || '—')}</td>
+                            <td>${e.enrolled_at ? new Date(e.enrolled_at).toLocaleDateString() : '—'}</td>
+                            <td>
+                                <div class="progress-bar small" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                                    <div class="progress-fill" style="width:${e.progress || 0}%; height: 100%; background: #8B5FBF; border-radius: 4px; transition: width 0.3s ease;"></div>
+                                </div>
+                                <span style="font-size: 0.8rem; color: #4a5568;">${e.progress || 0}%</span>
+                            </td>
+                            <td>${this.escapeHtml(e.title || e.class_title || '—')}</td>
+                            <td>
+                                ${e.paymentStatus === 'paid' ? '✅ Paid' : 
+                                  e.paymentStatus === 'pending' ? '⏳ Pending' : 
+                                  e.paymentStatus === 'free' || e.accessType === 'free' ? '🎓 Free' : 
+                                  e.amountPaid > 0 ? `💰 ₦${(e.amountPaid || 0).toLocaleString()}` : '—'}
+                            </td>
+                            <td>${e.last_accessed ? new Date(e.last_accessed).toLocaleDateString() : 'Never'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top: 12px; color: #6B7280; font-size: 0.85rem; text-align: right;">
+            Total: ${items.length} student${items.length > 1 ? 's' : ''}
+        </div>
     `;
-  }
+}
 
   // ===== CREATE CLASS API WITH PRICE =====
   async apiCreateClass(data) {
