@@ -27,6 +27,7 @@
             this.updateDate();
             this.setupSectionNavigation();
             await this.loadDashboardData();
+            await this.loadQuizHistory();
         }
 
         setupEventListeners() {
