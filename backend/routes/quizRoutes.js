@@ -56,9 +56,32 @@ quizRouter.get('/attempts/user', auth, quizAttemptController.getUserAttempts);
 // ============================================================
 // INSTRUCTOR SUBMISSION MANAGEMENT (Instructor only)
 // ============================================================
-
 // Get all submissions for a quiz - INSTRUCTOR ONLY
-quizRouter.get('/:quizId/submissions', auth, isInstructor, quizAttemptController.getQuizSubmissions);
+quizRouter.get('/:quizId/submissions', auth, async (req, res, next) => {
+  try {
+    const Quiz = (await import('../models/Quiz.js')).default;
+    const quiz = await Quiz.findById(req.params.quizId);
+    
+    if (!quiz) {
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
+    }
+    
+    // ===== FIX: Compare as strings =====
+    const isInstructor = quiz.instructorId?.toString() === req.user?.id?.toString();
+    
+    if (!isInstructor) {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Only the quiz instructor can view submissions' 
+      });
+    }
+    
+    await quizAttemptController.getQuizSubmissions(req, res);
+  } catch (error) {
+    console.error('Submissions auth error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // Grade essay question - INSTRUCTOR ONLY
 quizRouter.post('/attempt/:attemptId/grade', auth, isInstructor, quizAttemptController.gradeEssay);
@@ -69,5 +92,28 @@ quizRouter.post('/attempt/:attemptId/grade', auth, isInstructor, quizAttemptCont
 
 // Get quiz analytics - INSTRUCTOR ONLY
 quizRouter.get('/:quizId/analytics', auth, isInstructor, quizController.getQuizAnalytics);
+
+// backend/routes/quizRoutes.js - Add debug endpoint
+
+quizRouter.get('/debug/instructor-check/:quizId', auth, async (req, res) => {
+  try {
+    const Quiz = (await import('../models/Quiz.js')).default;
+    const quiz = await Quiz.findById(req.params.quizId);
+    
+    if (!quiz) {
+      return res.json({ success: false, message: 'Quiz not found' });
+    }
+    
+    res.json({
+      success: true,
+      quizInstructorId: quiz.instructorId?.toString(),
+      currentUserId: req.user?.id?.toString(),
+      isInstructor: quiz.instructorId?.toString() === req.user?.id?.toString(),
+      user: req.user
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 export default quizRouter;

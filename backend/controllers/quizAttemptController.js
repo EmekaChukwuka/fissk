@@ -355,6 +355,9 @@ export const getAttemptResults = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
+    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
+    const Quiz = (await import('../models/Quiz.js')).default;
+
     const attempt = await QuizAttempt.findById(attemptId)
       .populate('quizId')
       .lean();
@@ -363,9 +366,8 @@ export const getAttemptResults = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Attempt not found' });
     }
 
-    console.log('Attempt found:', attempt._id);
-    console.log('Attempt userId:', attempt.userId);
-    console.log('Current userId:', userId);
+    console.log('Attempt userId:', attempt.userId?.toString());
+    console.log('Current userId:', userId?.toString());
 
     // ===== FIX: Compare as strings =====
     const isOwner = attempt.userId?.toString() === userId?.toString();
@@ -374,7 +376,6 @@ export const getAttemptResults = async (req, res) => {
     // Check if user is instructor of the class
     let isInstructor = false;
     try {
-      const Quiz = (await import('../models/Quiz.js')).default;
       const quiz = await Quiz.findById(attempt.quizId);
       if (quiz) {
         isInstructor = quiz.instructorId?.toString() === userId?.toString();
@@ -444,7 +445,7 @@ export const getUserAttempts = async (req, res) => {
 };
 
 /**
- * Grade essay questions (Instructor)
+ * Grade essay question (Instructor)
  */
 export const gradeEssay = async (req, res) => {
   try {
@@ -452,15 +453,32 @@ export const gradeEssay = async (req, res) => {
     const { questionIndex, points, feedback } = req.body;
     const userId = req.user?.id;
 
-    const attempt = await QuizAttempt.findById(attemptId).populate('quizId');
+    console.log('=== GRADE ESSAY ===');
+    console.log('Attempt ID:', attemptId);
+    console.log('User ID:', userId);
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
+    const Quiz = (await import('../models/Quiz.js')).default;
+
+    const attempt = await QuizAttempt.findById(attemptId);
     if (!attempt) {
       return res.status(404).json({ success: false, message: 'Attempt not found' });
     }
 
-    const quiz = attempt.quizId;
-    
-    // Check if user is instructor
-    if (quiz.instructorId.toString() !== userId) {
+    const quiz = await Quiz.findById(attempt.quizId);
+    if (!quiz) {
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
+    }
+
+    // ===== FIX: Compare as strings =====
+    const isInstructor = quiz.instructorId?.toString() === userId?.toString();
+    console.log('Is instructor?', isInstructor);
+
+    if (!isInstructor) {
       return res.status(403).json({ 
         success: false, 
         message: 'Only the quiz instructor can grade essays' 
@@ -513,6 +531,8 @@ export const gradeEssay = async (req, res) => {
     // Update quiz stats
     await QuizService.updateQuizStats(quiz._id);
 
+    console.log('✅ Essay graded successfully');
+
     res.json({
       success: true,
       message: 'Essay graded successfully',
@@ -533,34 +553,64 @@ export const getQuizSubmissions = async (req, res) => {
     const { quizId } = req.params;
     const userId = req.user?.id;
 
+    console.log('=== GET QUIZ SUBMISSIONS ===');
+    console.log('Quiz ID:', quizId);
+    console.log('User ID:', userId);
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const Quiz = (await import('../models/Quiz.js')).default;
     const quiz = await Quiz.findById(quizId);
+    
     if (!quiz) {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    if (quiz.instructorId.toString() !== userId) {
+    // ===== FIX: Compare as strings =====
+    const isInstructor = quiz.instructorId?.toString() === userId?.toString();
+    console.log('Is instructor?', isInstructor);
+    console.log('Quiz instructor ID:', quiz.instructorId?.toString());
+    console.log('Current user ID:', userId?.toString());
+
+    if (!isInstructor) {
+      console.log('❌ User is not the instructor of this quiz');
       return res.status(403).json({ 
         success: false, 
         message: 'Only the quiz instructor can view submissions' 
       });
     }
 
+    console.log('✅ User is the instructor, fetching submissions');
+
+    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
+    const User = (await import('../models/User.js')).default;
+
     const submissions = await QuizAttempt.find({ quizId })
       .populate('userId', 'firstName lastName email')
       .sort({ submittedAt: -1 })
       .lean();
 
+    console.log(`Found ${submissions.length} submissions`);
+
+    // Format submissions for frontend
+    const formattedSubmissions = submissions.map(sub => ({
+      ...sub,
+      studentName: sub.userId ? `${sub.userId.firstName} ${sub.userId.lastName}`.trim() : 'Anonymous',
+      studentEmail: sub.userId?.email || 'Unknown'
+    }));
+
     res.json({
       success: true,
-      submissions: submissions.map(s => ({
-        ...s,
-        studentName: s.userId ? `${s.userId.firstName} ${s.userId.lastName}` : 'Unknown',
-        studentEmail: s.userId?.email || 'Unknown'
-      }))
+      submissions: formattedSubmissions
     });
 
   } catch (error) {
-    console.error('Get submissions error:', error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Get quiz submissions error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to load submissions' 
+    });
   }
 };
