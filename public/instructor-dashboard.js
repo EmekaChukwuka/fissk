@@ -214,7 +214,7 @@ async loadInstructorClasses() {
         body: JSON.stringify({ id })
       });
       const json = await res.json();
-      console.log(json)
+      console.log(isNaN(json.totalStudents))
       if (json) {
         const s = json;
         if (this.el.totalClasses) this.el.totalClasses.textContent = s.totalClasses || 0;
