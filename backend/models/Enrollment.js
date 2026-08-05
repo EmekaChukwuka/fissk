@@ -154,4 +154,56 @@ EnrollmentSchema.methods.getQuizScore = function(quizId) {
   return quiz ? quiz.score : null;
 };
 
+/**
+ * Calculate overall course progress including quizzes
+ */
+EnrollmentSchema.methods.calculateOverallProgress = async function() {
+    const Class = mongoose.model('Class');
+    const Stream = mongoose.model('Stream');
+    const Quiz = mongoose.model('Quiz');
+    const Assignment = mongoose.model('Assignment');
+    
+    const classData = await Class.findById(this.classId);
+    if (!classData) return 0;
+    
+    let totalItems = 0;
+    let completedItems = 0;
+    
+    // Videos
+    const streams = await Stream.find({ streamClass: this.classId });
+    totalItems += streams.length;
+    const completedVideos = this.progressItems.filter(
+        item => item.itemType === 'video' && item.completed
+    ).length;
+    completedItems += completedVideos;
+    
+    // Quizzes (published only)
+    const quizzes = await Quiz.find({ 
+        classId: this.classId, 
+        status: 'published' 
+    });
+    totalItems += quizzes.length;
+    const completedQuizzes = this.quizProgress.filter(q => q.completedAt).length;
+    completedItems += completedQuizzes;
+    
+    // Assignments
+    const assignments = await Assignment.find({ classId: this.classId });
+    totalItems += assignments.length;
+    const completedAssignments = this.progressItems.filter(
+        item => item.itemType === 'assignment' && item.completed
+    ).length;
+    completedItems += completedAssignments;
+    
+    const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+    
+    this.progress = Math.min(progress, 100);
+    if (progress >= 100) {
+        this.completed = true;
+        this.completedAt = new Date();
+    }
+    
+    await this.save();
+    return this.progress;
+};
+
 export default mongoose.model("Enrollment", EnrollmentSchema);

@@ -1351,7 +1351,6 @@ Regisrouter.post('/dashboard/learning-time', async (req, res) => {
   }
 });
 
-// Load dashboard stats (UPDATED with quiz stats)
 Regisrouter.post('/dashboard/load-stats', async (req, res) => {
   const { id } = req.body;
   
@@ -1375,9 +1374,19 @@ Regisrouter.post('/dashboard/load-stats', async (req, res) => {
         : 0
     };
     
-    // Get class progress
+    // Get enrollments with updated progress
     const enrollments = await Enrollment.find({ userId: id });
-    const totalProgress = enrollments.reduce((sum, e) => sum + e.progress, 0);
+    
+    // Calculate overall progress for each enrollment
+    let totalProgress = 0;
+    let completedClasses = 0;
+    
+    for (const enrollment of enrollments) {
+      const progress = await enrollment.calculateOverallProgress();
+      totalProgress += progress;
+      if (enrollment.completed) completedClasses++;
+    }
+    
     const avgProgress = enrollments.length > 0 ? Math.round(totalProgress / enrollments.length) : 0;
     
     const stats = {
@@ -1385,7 +1394,7 @@ Regisrouter.post('/dashboard/load-stats', async (req, res) => {
       quizStats,
       avgProgress,
       enrolledClasses: enrollments.length,
-      completedClasses: enrollments.filter(e => e.completed).length
+      completedClasses: completedClasses
     };
     
     res.json(stats);

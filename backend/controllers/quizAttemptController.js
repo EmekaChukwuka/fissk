@@ -148,7 +148,6 @@ export const submitAttempt = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    // Find active attempt
     const attempt = await QuizAttempt.findOne({
       quizId,
       userId,
@@ -162,23 +161,6 @@ export const submitAttempt = async (req, res) => {
       });
     }
 
-    // Check if all questions are answered (skip for essay questions)
-    const quiz = await Quiz.findById(quizId);
-    const unanswered = attempt.answers.filter((a, index) => {
-      const question = quiz.questions[index];
-      // Skip validation for essay questions (they can be blank)
-      if (question?.type === 'essay') return false;
-      return a.answer === null || a.answer === undefined || a.answer === '';
-    });
-
-    if (unanswered.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Please answer all questions before submitting. ${unanswered.length} question(s) remaining.`,
-        unansweredCount: unanswered.length
-      });
-    }
-
     // Calculate time spent
     const timeSpent = Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000);
     attempt.timeSpent = timeSpent;
@@ -186,8 +168,102 @@ export const submitAttempt = async (req, res) => {
 
     await attempt.save();
 
-    // Auto-grade the attempt (essay questions will be marked for manual grading)
+    // Auto-grade the attempt
     const gradedAttempt = await QuizService.autoGradeAttempt(attempt._id);
+
+    // ===== UPDATE CLASS STATS =====
+    const quiz = await Quiz.findById(quizId);
+    if (quiz) {
+      await Class.findByIdAndUpdate(quiz.classId, {
+        $inc: { quizCount: 1 }
+      });
+      
+      const allAttempts = await QuizAttempt.find({ 
+        classId: quiz.classId,
+        status: { $in: ['completed', 'graded'] }
+      });
+      
+      const scores = allAttempts.map(a => a.score || 0);
+      const avgScore = scores.length > 0 
+        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) 
+        : 0;
+      
+      await Class.findByIdAndUpdate(quiz.classId, {
+        averageQuizScore: avgScore
+      });
+    }
+
+    // ===== UPDATE ENROLLMENT QUIZ PROGRESS =====
+    const enrollment = await Enrollment.findOne({
+      userId: userId,
+      classId: attempt.classId
+    });
+
+    if (enrollment) {
+      // Check if quiz already exists in progress
+      const existingIndex = enrollment.quizProgress.findIndex(
+        q => q.quizId.toString() === quizId.toString()
+      );
+      
+      const quizData = {
+        quizId: quizId,
+        attemptId: gradedAttempt._id,
+        score: gradedAttempt.score,
+        passed: gradedAttempt.passed,
+        completedAt: new Date(),
+        attemptNumber: enrollment.quizProgress.filter(q => q.quizId.toString() === quizId.toString()).length + 1,
+        timeSpent: gradedAttempt.timeSpent || 0
+      };
+      
+      if (existingIndex !== -1) {
+        const existing = enrollment.quizProgress[existingIndex];
+        if (gradedAttempt.score > existing.score) {
+          enrollment.quizProgress[existingIndex] = quizData;
+        }
+      } else {
+        enrollment.quizProgress.push(quizData);
+      }
+      
+      // Update enrollment quiz stats
+      const completedQuizzes = enrollment.quizProgress.filter(q => q.completedAt);
+      enrollment.totalQuizzesTaken = completedQuizzes.length;
+      
+      if (completedQuizzes.length > 0) {
+        const scores = completedQuizzes.map(q => q.score);
+        enrollment.averageQuizScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+        enrollment.bestQuizScore = Math.max(...scores);
+        enrollment.quizzesPassed = completedQuizzes.filter(q => q.passed).length;
+      }
+      
+      // ===== NEW: UPDATE OVERALL COURSE PROGRESS =====
+      await updateCourseProgress(enrollment._id);
+      
+      await enrollment.save();
+    }
+
+    // ===== UPDATE USER QUIZ STATS =====
+    const user = await User.findById(userId);
+    if (user) {
+      const allAttempts = await QuizAttempt.find({ 
+        userId: userId,
+        status: { $in: ['completed', 'graded'] }
+      });
+      
+      if (allAttempts.length > 0) {
+        const scores = allAttempts.map(a => a.score || 0);
+        const passed = allAttempts.filter(a => a.passed).length;
+        
+        user.quizStats = {
+          totalQuizzesTaken: allAttempts.length,
+          averageScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+          bestScore: Math.max(...scores),
+          quizzesPassed: passed,
+          totalQuizzesCreated: user.quizStats?.totalQuizzesCreated || 0
+        };
+        
+        await user.save();
+      }
+    }
 
     res.json({
       success: true,
@@ -201,7 +277,67 @@ export const submitAttempt = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-// backend/controllers/quizAttemptController.js
+
+/**
+ * Update overall course progress based on videos, assignments, and quizzes
+ */
+async function updateCourseProgress(enrollmentId) {
+  const enrollment = await Enrollment.findById(enrollmentId);
+  if (!enrollment) return;
+
+  // Get class data to know total items
+  const classData = await Class.findById(enrollment.classId);
+  if (!classData) return;
+
+  // Count total items in the class
+  let totalItems = 0;
+  let completedItems = 0;
+
+  // 1. Videos/Streams
+  const streams = await Stream.find({ streamClass: enrollment.classId });
+  totalItems += streams.length;
+  
+  // Count completed videos from progressItems
+  const completedVideos = enrollment.progressItems.filter(
+    item => item.itemType === 'video' && item.completed
+  ).length;
+  completedItems += completedVideos;
+
+  // 2. Quizzes
+  const quizzes = await Quiz.find({ 
+    classId: enrollment.classId,
+    status: 'published'
+  });
+  totalItems += quizzes.length;
+  
+  // Count completed quizzes
+  const completedQuizzes = enrollment.quizProgress.filter(q => q.completedAt).length;
+  completedItems += completedQuizzes;
+
+  // 3. Assignments (if any)
+  const assignments = await Assignment.find({ classId: enrollment.classId });
+  totalItems += assignments.length;
+  
+  const completedAssignments = enrollment.progressItems.filter(
+    item => item.itemType === 'assignment' && item.completed
+  ).length;
+  completedItems += completedAssignments;
+
+  // Calculate progress percentage
+  const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+  // Update enrollment progress
+  enrollment.progress = Math.min(progress, 100);
+  
+  // Mark as completed if 100%
+  if (progress >= 100) {
+    enrollment.completed = true;
+    enrollment.completedAt = new Date();
+  }
+
+  await enrollment.save();
+  console.log(`📊 Course progress updated: ${progress}% (${completedItems}/${totalItems} items)`);
+}
 
 /**
  * Get attempt results
