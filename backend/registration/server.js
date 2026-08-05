@@ -1615,7 +1615,105 @@ Regisrouter.post('/instructor/stats', async (req, res) => {
     
     // Get total quizzes created
     const totalQuizzes = await Quiz.countDocuments({ instructorId });
+
+ // ===== RECENT ACTIVITY =====
+    const recentActivities = [];
     
+    // 1. Recent enrollments
+    const enrollments = await Enrollment.find()
+      .populate('userId', 'firstName lastName email')
+      .populate('classId', 'title')
+      .sort({ enrolledAt: -1 })
+      .limit(5);
+    
+    enrollments.forEach(enrollment => {
+      if (enrollment.classId && enrollment.classId.instructorId?.toString() === instructorId) {
+        const studentName = enrollment.userId ? 
+          `${enrollment.userId.firstName} ${enrollment.userId.lastName}`.trim() : 'A student';
+        recentActivities.push({
+          type: 'enrollment',
+          message: `${studentName} enrolled in "${enrollment.classId.title}"`,
+          timestamp: enrollment.enrolledAt,
+          icon: '👤',
+          color: '#3B82F6'
+        });
+      }
+    });
+    
+    // 2. Recent quiz attempts
+    const quizzes = await Quiz.find({ instructorId });
+    const quizIds = quizzes.map(q => q._id);
+    
+    const quizAttempts = await QuizAttempt.find({ 
+      quizId: { $in: quizIds },
+      status: 'completed'
+    })
+      .populate('userId', 'firstName lastName email')
+      .populate('quizId', 'title')
+      .sort({ submittedAt: -1 })
+      .limit(5);
+    
+    quizAttempts.forEach(attempt => {
+      const studentName = attempt.userId ? 
+        `${attempt.userId.firstName} ${attempt.userId.lastName}`.trim() : 'A student';
+      const quizTitle = attempt.quizId ? attempt.quizId.title : 'a quiz';
+      const passed = attempt.passed ? '✅ passed' : '❌ failed';
+      recentActivities.push({
+        type: 'quiz_attempt',
+        message: `${studentName} ${passed} "${quizTitle}" (${attempt.score}%)`,
+        timestamp: attempt.submittedAt,
+        icon: '📝',
+        color: attempt.passed ? '#10B981' : '#EF4444'
+      });
+    });
+    
+    // 3. Recent class creations/updates
+    const recentClasses = await Class.find({ instructorId })
+      .sort({ updatedAt: -1 })
+      .limit(3);
+    
+    recentClasses.forEach(cls => {
+      const isNew = new Date(cls.createdAt).getTime() === new Date(cls.updatedAt).getTime();
+      recentActivities.push({
+        type: isNew ? 'class_created' : 'class_updated',
+        message: isNew ? 
+          `You created "${cls.title}"` : 
+          `You updated "${cls.title}"`,
+        timestamp: cls.updatedAt,
+        icon: isNew ? '📚' : '✏️',
+        color: '#8B5FBF'
+      });
+    });
+    
+    // 4. Recent live streams
+    const streams = await LiveSession.find({ instructorId })
+      .sort({ createdAt: -1 })
+      .limit(3);
+    
+    streams.forEach(stream => {
+      const status = stream.streamStatus === 'live' ? 'started' : 'scheduled';
+      recentActivities.push({
+        type: 'stream',
+        message: `You ${status} "${stream.title}"`,
+        timestamp: stream.createdAt,
+        icon: '🎥',
+        color: stream.streamStatus === 'live' ? '#EF4444' : '#F59E0B'
+      });
+    });
+    
+    // 5. Recent payments (if any)
+    // ... add payment tracking if available
+    
+    // Sort all activities by timestamp (newest first)
+    recentActivities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Limit to 10 most recent
+    const recent = recentActivities.slice(0, 10).map(activity => ({
+      ...activity,
+      timeAgo: getTimeAgo(activity.timestamp)
+    }));
+    
+    // ===== STATS RESPONSE =====
     const stats = {
       totalClasses,
       totalStudents,
@@ -1624,15 +1722,29 @@ Regisrouter.post('/instructor/stats', async (req, res) => {
       earnings: instructor?.earnings || 0,
       totalRevenue: instructor?.totalRevenue || 0,
       totalSales: instructor?.totalSales || 0,
-      totalQuizzes
+      totalQuizzes,
+      recent 
     };
     
-    res.json([stats]);
+    res.json([stats]); 
+    
   } catch (error) {
     console.error('Get stats error:', error);
     res.status(500).json({ message: "Error fetching stats" });
   }
 });
+
+// Helper function to format time ago
+function getTimeAgo(date) {
+  const now = new Date();
+  const diff = Math.floor((now - new Date(date)) / 1000);
+  
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(date).toLocaleDateString();
+}
 
 // Get all enrollments for instructor (with payment info)
 Regisrouter.post('/instructor/enrollments', async (req, res) => {

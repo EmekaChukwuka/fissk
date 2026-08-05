@@ -205,33 +205,77 @@ async loadInstructorClasses() {
     }
   }
 
-  async loadInstructorStats() {
-    try {
-      const id = this.currentUser.id;
-      const res = await fetch('https://fissk-backend.onrender.com/register/instructor/stats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
-      });
-      const json = await res.json();
-      console.log(isNaN(json.totalStudents))
-      if (json) {
-        const s = json;
-        if (this.el.totalClasses) this.el.totalClasses.textContent = s.totalClasses || 0;
-        if (this.el.totalStudents) this.el.totalStudents.textContent = s.totalStudents || 0;
-        if (this.el.totalVideos) this.el.totalVideos.textContent = s.totalVideos || 0;
-        if (this.el.avgRating) this.el.avgRating.textContent = (s.avgRating || 0).toFixed(1);
-        if (this.el.totalEarnings && s.earnings !== undefined) {
-          this.el.totalEarnings.textContent = `₦${(s.earnings || 0).toLocaleString()}`;
-        }
-      }
-      if (json.recent && this.el.recentActivities) {
-        this.el.recentActivities.innerHTML = json.recent.map(r => `<div class="activity">${this.escapeHtml(r)}</div>`).join('');
-      }
-    } catch (err) {
-      console.error('loadInstructorStats error', err);
+renderRecentActivity(activities) {
+    const container = this.el.recentActivities;
+    if (!container) return;
+    
+    if (!activities || activities.length === 0) {
+        container.innerHTML = `
+            <div class="no-activity">
+                <p style="color: #6B7280; text-align: center; padding: 20px;">
+                    No recent activity yet. Start teaching and students will appear here!
+                </p>
+            </div>
+        `;
+        return;
     }
-  }
+    
+    container.innerHTML = activities.map(activity => `
+        <div class="activity-item" style="border-left: 3px solid ${activity.color || '#8B5FBF'};">
+            <div class="activity-icon">${activity.icon || '📌'}</div>
+            <div class="activity-content">
+                <p>${this.escapeHtml(activity.message)}</p>
+                <span class="activity-time">${activity.timeAgo || 'Just now'}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+ async loadInstructorStats() {
+    try {
+        const id = this.currentUser.id;
+        const res = await fetch('https://fissk-backend.onrender.com/register/instructor/stats', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+        const json = await res.json();
+        console.log('Stats response:', json);
+        
+        // Handle array response
+        let s = {};
+        if (Array.isArray(json) && json.length > 0) {
+            s = json[0];
+        } else if (json && typeof json === 'object' && !Array.isArray(json)) {
+            s = json;
+        }
+        
+        console.log('Processed stats:', s);
+        
+        if (s && Object.keys(s).length > 0) {
+            if (this.el.totalClasses) this.el.totalClasses.textContent = s.totalClasses || 0;
+            if (this.el.totalStudents) this.el.totalStudents.textContent = s.totalStudents || 0;
+            if (this.el.totalVideos) this.el.totalVideos.textContent = s.totalVideos || 0;
+            if (this.el.avgRating) this.el.avgRating.textContent = (s.avgRating || 0).toFixed(1);
+            if (this.el.totalEarnings) {
+                this.el.totalEarnings.textContent = `₦${(s.earnings || 0).toLocaleString()}`;
+            }
+        }
+        
+        // ===== RENDER RECENT ACTIVITY =====
+        if (s.recent && this.el.recentActivities) {
+            this.renderRecentActivity(s.recent);
+        } else if (this.el.recentActivities) {
+            this.renderRecentActivity([]);
+        }
+        
+    } catch (err) {
+        console.error('loadInstructorStats error', err);
+        if (this.el.recentActivities) {
+            this.renderRecentActivity([]);
+        }
+    }
+}
 
 // instructor-dashboard.js - FIXED
 
