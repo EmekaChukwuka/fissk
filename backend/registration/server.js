@@ -751,18 +751,36 @@ Regisrouter.post('/get-user-classes', async (req, res) => {
   }
 });
 
-// Update user progress
+//Progress update endpoint
 Regisrouter.post('/progress/update', async (req, res) => {
   const { classId, userId, progress } = req.body;
   
   try {
-    await Enrollment.findOneAndUpdate(
+    const enrollment = await Enrollment.findOneAndUpdate(
       { userId, classId },
       { 
         progress,
         lastAccessed: new Date()
-      }
+      },
+      { new: true }
     );
+    
+    // ===== CHECK IF COURSE IS COMPLETED =====
+    if (enrollment && progress >= 100 && !enrollment.completed) {
+      // Mark as completed
+      enrollment.completed = true;
+      enrollment.completedAt = new Date();
+      await enrollment.save();
+      
+      // ===== GENERATE CERTIFICATE =====
+      try {
+        const CertificateService = (await import('../services/certificateService.js')).default;
+        const certificate = await CertificateService.generateCertificate(userId, classId, enrollment);
+        console.log(`✅ Certificate generated for user ${userId} in class ${classId}: ${certificate.certificateNumber}`);
+      } catch (certError) {
+        console.error('Certificate generation error:', certError);
+      }
+    }
     
     res.json({ 
       success: true, 

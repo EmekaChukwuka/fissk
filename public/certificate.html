@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Certificates - FISSK Online Academy</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="fissklogo.jpg">
+    <style>
+        .certificates-page {
+            padding: 100px 0 60px;
+            background: var(--gray-light);
+            min-height: 100vh;
+        }
+
+        .certificates-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .certificates-header h1 {
+            font-size: 2rem;
+            color: var(--text-dark);
+        }
+
+        .certificates-header p {
+            color: var(--text-light);
+        }
+
+        .certificates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .certificate-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .certificate-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+
+        .certificate-card .cert-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+
+        .certificate-card h3 {
+            font-size: 1.1rem;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+
+        .certificate-card .course-title {
+            color: var(--text-light);
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .certificate-card .cert-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-bottom: 16px;
+        }
+
+        .certificate-card .cert-details span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .certificate-card .grade-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .grade-badge.distinction {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .grade-badge.merit {
+            background: #cce5ff;
+            color: #004085;
+        }
+
+        .grade-badge.pass {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .certificate-card .cert-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: auto;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .certificate-card .cert-actions .btn {
+            flex: 1;
+            justify-content: center;
+        }
+
+        .no-certificates {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+
+        .no-certificates .icon {
+            font-size: 64px;
+            display: block;
+            margin-bottom: 16px;
+        }
+
+        .no-certificates h3 {
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        /* Certificate View Modal */
+        .certificate-view {
+            max-width: 900px;
+            padding: 20px;
+            background: white;
+        }
+
+        .certificate-view .cert-actions-top {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .certificate-frame {
+            border: 8px solid #8B5FBF;
+            border-radius: 12px;
+            padding: 40px 60px;
+            background: white;
+            min-height: 500px;
+        }
+
+        @media (max-width: 768px) {
+            .certificates-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .certificate-card .cert-actions {
+                flex-direction: column;
+            }
+
+            .certificates-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Online Academy</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="nav-link">Home</a></li>
+                <li><a href="classes.html" class="nav-link">Classes</a></li>
+                <li><a href="dashboard.html" class="nav-link">Dashboard</a></li>
+                <li class="nav-user">
+                    <div class="user-dropdown" id="user-dropdown"></div>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <section class="certificates-page">
+        <div class="container">
+            <div class="certificates-header">
+                <div>
+                    <h1>🎓 My Certificates</h1>
+                    <p>All your earned certificates in one place</p>
+                </div>
+            </div>
+
+            <div id="certificatesContainer" class="certificates-grid">
+                <p style="grid-column: 1 / -1; text-align: center; color: var(--text-light); padding: 40px;">
+                    Loading your certificates...
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Certificate View Modal -->
+    <div id="certificateModal" class="modal">
+        <div class="modal-content certificate-view">
+            <div class="cert-actions-top">
+                <button class="btn btn-outline" onclick="closeCertificateModal()">Close</button>
+                <button class="btn btn-primary" id="downloadCertBtn">📥 Download</button>
+            </div>
+            <div id="certificateContent" class="certificate-frame">
+                <!-- Certificate will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="certificate.js"></script>
+</body>
+</html>

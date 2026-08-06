@@ -18,6 +18,7 @@ import payoutRouter from './routes/payoutRoutes.js';
 import adminRouter from './routes/adminRoutes.js';
 import createAdmin from './scripts/createAdmin.js';
 import quizRouter from './routes/quizRoutes.js';
+import certificateRouter from './routes/certificateRoutes.js';
 import axios from "axios";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,6 +46,7 @@ app.use('/api/payment', paymentRouter);
 app.use('/api/payout', payoutRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/quizzes', quizRouter);
+app.use('/api/certificates', certificateRouter);
 
 // ===== LIVEKIT CONFIGURATION =====
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
