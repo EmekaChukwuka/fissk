@@ -445,6 +445,86 @@ class ClassManager {
             window.showToast('Failed to load results.', 'error');
         }
     }
+    
+    // ===== LESSON METHODS =====
+
+/**
+ * Load lessons for this class
+ */
+async loadLessons() {
+    try {
+        const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${this.classId}`, {
+            headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+
+        if (!response.ok) throw new Error('Failed to load lessons');
+
+        const data = await response.json();
+        this.lessons = data.lessons || [];
+        console.log('Lessons loaded:', this.lessons.length);
+    } catch (error) {
+        console.error('Error loading lessons:', error);
+        this.lessons = [];
+    }
+}
+
+/**
+ * Render lessons in the lessons tab
+ */
+renderLessons() {
+    const container = document.getElementById('lessonsContainer');
+    if (!container) return;
+
+    if (!this.lessons || this.lessons.length === 0) {
+        container.innerHTML = `
+            <div class="no-lessons">
+                <p>📚 No lessons available yet.</p>
+                ${this.user?.user_type === 'instructor' ? 
+                    `<a href="instructor/lessons/create.html?classId=${this.classId}" class="btn btn-primary">Create First Lesson</a>` : 
+                    '<p class="no-lessons-sub">Check back later for new lessons.</p>'
+                }
+            </div>
+        `;
+        return;
+    }
+
+    // Calculate progress
+    const totalLessons = this.lessons.length;
+    const completedLessons = this.lessons.filter(l => l.completed).length;
+    const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+    container.innerHTML = `
+        <div class="lessons-progress" style="margin-bottom: 20px; padding: 16px; background: var(--bg-secondary); border-radius: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <strong>Course Progress</strong>
+                    <span style="color: var(--text-secondary); margin-left: 8px;">${completedLessons}/${totalLessons} lessons completed</span>
+                </div>
+                <span style="font-weight: 600; color: var(--accent-blue);">${progress}%</span>
+            </div>
+            <div class="progress-bar" style="margin-top: 8px; height: 6px; background: var(--bg-elevated); border-radius: 4px; overflow: hidden;">
+                <div class="progress-fill" style="width: ${progress}%; height: 100%; background: var(--accent-blue); border-radius: 4px; transition: width 0.3s ease;"></div>
+            </div>
+        </div>
+        <div class="lessons-grid">
+            ${this.lessons.map((lesson, index) => `
+                <div class="lesson-card ${lesson.completed ? 'completed' : ''}" 
+                     onclick="window.location.href='lesson.html?classId=${this.classId}&lessonId=${lesson._id}'">
+                    <div class="lesson-card-header">
+                        <span class="lesson-number">Lesson ${index + 1}</span>
+                        ${lesson.completed ? '<span class="completed-badge">✅ Completed</span>' : ''}
+                    </div>
+                    <h4>${this.escapeHtml(lesson.title)}</h4>
+                    <p>${this.escapeHtml(lesson.description || '')}</p>
+                    <div class="lesson-card-footer">
+                        <span>⏱️ ${lesson.estimatedTime || 0} min</span>
+                        <span>📝 ${lesson.contentItems?.length || 0} items</span>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
 
     async loadUserProgress() {
         try {
@@ -574,6 +654,13 @@ class ClassManager {
                 this.renderQuizzes();
             }
         }
+           if (tabName === 'lessons') {
+        if (!this.lessons || this.lessons.length === 0) {
+            this.loadLessons().then(() => this.renderLessons());
+        } else {
+            this.renderLessons();
+        }
+    }
     }
 
     async renderClassData() {
