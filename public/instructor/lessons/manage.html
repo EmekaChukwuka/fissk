@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Lessons - FISSK Online Academy</title>
+    <link rel="stylesheet" href="../../styles.css">
+    <link rel="stylesheet" href="../../css/lesson.css">
+    <link rel="icon" href="../../fissklogo.jpg">
+    <style>
+        .manage-page {
+            padding: 100px 0 60px;
+            background: var(--gray-light);
+            min-height: 100vh;
+        }
+
+        .manage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .manage-header h1 {
+            font-size: 1.8rem;
+            color: var(--text-dark);
+        }
+
+        .manage-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .manage-stat {
+            background: white;
+            padding: 16px 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            text-align: center;
+        }
+
+        .manage-stat .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .manage-stat .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .lesson-table-container {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .lesson-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .lesson-table th {
+            background: #f8f9fa;
+            padding: 14px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #2D3748;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .lesson-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f0f0f0;
+            color: #4a5568;
+            font-size: 0.9rem;
+            vertical-align: middle;
+        }
+
+        .lesson-table tr:hover td {
+            background: #faf8ff;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-badge.published {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.draft {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-sm.btn-primary {
+            background: #8B5FBF;
+            color: white;
+        }
+
+        .btn-sm.btn-primary:hover {
+            background: #7A4BA6;
+        }
+
+        .btn-sm.btn-outline {
+            background: transparent;
+            border: 1px solid #8B5FBF;
+            color: #8B5FBF;
+        }
+
+        .btn-sm.btn-outline:hover {
+            background: #8B5FBF;
+            color: white;
+        }
+
+        .btn-sm.btn-danger {
+            background: #EF4444;
+            color: white;
+        }
+
+        .btn-sm.btn-danger:hover {
+            background: #DC2626;
+        }
+
+        .no-lessons {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+
+        .no-lessons .icon {
+            font-size: 48px;
+            display: block;
+            margin-bottom: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .lesson-table-container {
+                overflow-x: auto;
+            }
+            .lesson-table {
+                min-width: 600px;
+            }
+            .manage-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Instructor Portal</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="../../instructor-dashboard.html" class="nav-link">Dashboard</a></li>
+                <li><a href="../../classes.html" class="nav-link">Classes</a></li>
+                <li class="nav-user">
+                    <div class="user-dropdown" id="user-dropdown"></div>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <section class="manage-page">
+        <div class="container">
+            <div class="manage-header">
+                <div>
+                    <h1>📚 Manage Lessons</h1>
+                    <p style="color: var(--text-light);">Organize your course content</p>
+                </div>
+                <a href="create.html?classId={classId}" class="btn btn-primary" id="createLessonBtn">+ Create New Lesson</a>
+            </div>
+
+            <div class="manage-stats" id="statsContainer">
+                <div class="manage-stat">
+                    <div class="stat-value" id="totalLessons">0</div>
+                    <div class="stat-label">Total Lessons</div>
+                </div>
+                <div class="manage-stat">
+                    <div class="stat-value" id="publishedLessons">0</div>
+                    <div class="stat-label">Published</div>
+                </div>
+                <div class="manage-stat">
+                    <div class="stat-value" id="draftLessons">0</div>
+                    <div class="stat-label">Drafts</div>
+                </div>
+            </div>
+
+            <div class="lesson-table-container">
+                <table class="lesson-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Title</th>
+                            <th>Items</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lessonsBody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-light);">
+                                Loading lessons...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <script src="../../js/quiz/quiz-core.js"></script>
+    <script src="../../js/lesson-manager.js"></script>
+</body>
+</html>

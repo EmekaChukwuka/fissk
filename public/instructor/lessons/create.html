@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Lesson - FISSK Online Academy</title>
+    <link rel="stylesheet" href="../../styles.css">
+    <link rel="stylesheet" href="../../css/lesson.css">
+    <link rel="icon" href="../../fissklogo.jpg">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <h2>FISSK</h2>
+                <span>Lesson Builder</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="../../instructor-dashboard.html" class="nav-link">Dashboard</a></li>
+                <li><a href="../../classes.html" class="nav-link">Classes</a></li>
+                <li class="nav-user">
+                    <div class="user-dropdown" id="user-dropdown"></div>
+                </li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <section class="lesson-builder">
+        <div class="container">
+            <div class="builder-header">
+                <h1>📚 Create New Lesson</h1>
+                <div class="builder-actions">
+                    <button class="btn btn-outline" id="previewBtn">👁️ Preview</button>
+                    <button class="btn btn-success" id="saveBtn">💾 Save Lesson</button>
+                </div>
+            </div>
+
+            <!-- Lesson Info -->
+            <div class="builder-section lesson-info">
+                <div class="form-group">
+                    <label for="lessonTitle">Lesson Title *</label>
+                    <input type="text" id="lessonTitle" placeholder="e.g., Introduction to French Verbs">
+                </div>
+                <div class="form-group">
+                    <label for="lessonDescription">Description</label>
+                    <textarea id="lessonDescription" rows="2" placeholder="What will students learn in this lesson?"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="lessonOrder">Order</label>
+                        <input type="number" id="lessonOrder" value="1" min="1">
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="isFreePreview"> Free Preview
+                        </label>
+                        <label>
+                            <input type="checkbox" id="isPublished" checked> Published
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Items -->
+            <div class="builder-section content-section">
+                <div class="content-header">
+                    <h3>📋 Lesson Content</h3>
+                    <button class="btn btn-primary" id="addContentBtn">+ Add Content</button>
+                </div>
+                <div id="contentItemsList" class="content-items-list">
+                    <div class="empty-content">
+                        <p>📝 No content added yet</p>
+                        <p class="empty-sub">Click "Add Content" to start building your lesson</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="builder-footer">
+                <button class="btn btn-outline" id="discardBtn">🗑️ Discard</button>
+                <div>
+                    <button class="btn btn-outline" id="previewBtn2">👁️ Preview</button>
+                    <button class="btn btn-success" id="saveBtn2">💾 Save Lesson</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Content Item Modal -->
+    <div id="contentModal" class="modal">
+        <div class="modal-content" style="max-width: 650px; max-height: 90vh; overflow-y: auto;">
+            <span class="close-modal" onclick="document.getElementById('contentModal').style.display='none'">&times;</span>
+            <h2 id="contentModalTitle">Add Content</h2>
+            <form id="contentForm">
+                <div class="form-group">
+                    <label>Content Type *</label>
+                    <select id="contentType" required>
+                        <option value="text">📝 Text</option>
+                        <option value="video">🎥 Video</option>
+                        <option value="quiz">📝 Quiz</option>
+                        <option value="material">📄 Material</option>
+                        <option value="assignment">✍️ Assignment</option>
+                        <option value="link">🔗 Link</option>
+                        <option value="embed">🎬 Embed</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Title *</label>
+                    <input type="text" id="contentTitle" placeholder="Content title">
+                </div>
+                <div class="form-group" id="contentTextField">
+                    <label>Content</label>
+                    <textarea id="contentText" rows="4" placeholder="Write your content here..."></textarea>
+                </div>
+                <div class="form-group" id="videoFields" style="display:none;">
+                    <label>Video URL</label>
+                    <input type="text" id="videoUrl" placeholder="https://example.com/video.mp4">
+                    <label style="margin-top: 8px;">Mux Playback ID</label>
+                    <input type="text" id="muxPlaybackId" placeholder="e.g., r2Z8QZTe4su38j004rYPHTFzxre2Xr9BYQGfSGaLTixo">
+                    <label style="margin-top: 8px;">Duration (minutes)</label>
+                    <input type="number" id="contentDuration" value="5" min="1">
+                </div>
+                <div class="form-group" id="quizFields" style="display:none;">
+                    <label>Quiz ID</label>
+                    <input type="text" id="quizId" placeholder="Quiz ID (from quiz management)">
+                </div>
+                <div class="form-group" id="materialFields" style="display:none;">
+                    <label>File URL</label>
+                    <input type="text" id="fileUrl" placeholder="https://example.com/file.pdf">
+                    <label style="margin-top: 8px;">File Name</label>
+                    <input type="text" id="fileName" placeholder="document.pdf">
+                    <label style="margin-top: 8px;">File Size (KB)</label>
+                    <input type="number" id="fileSize" value="0" min="0">
+                </div>
+                <div class="form-group" id="linkFields" style="display:none;">
+                    <label>Link URL *</label>
+                    <input type="url" id="linkUrl" placeholder="https://example.com">
+                    <label style="margin-top: 8px;">Open in</label>
+                    <select id="linkTarget">
+                        <option value="_blank">New Tab</option>
+                        <option value="_self">Same Tab</option>
+                    </select>
+                </div>
+                <div class="form-group" id="embedFields" style="display:none;">
+                    <label>Embed Code</label>
+                    <textarea id="embedCode" rows="3" placeholder="&lt;iframe src=&quot;https://www.youtube.com/embed/...&quot;&gt;&lt;/iframe&gt;"></textarea>
+                </div>
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="isRequired" checked> Required to complete lesson
+                    </label>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('contentModal').style.display='none'">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveContentBtn">Add Content</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <span class="close-modal" onclick="document.getElementById('previewModal').style.display='none'">&times;</span>
+            <h2>👁️ Lesson Preview</h2>
+            <div id="previewContent">
+                <p style="text-align: center; padding: 20px; color: var(--text-light);">Loading preview...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="../../js/quiz/quiz-core.js"></script>
+    <script src="../../js/lesson-manager.js"></script>
+</body>
+</html>

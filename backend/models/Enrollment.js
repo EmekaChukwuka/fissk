@@ -11,21 +11,33 @@ const SubmissionSchema = new mongoose.Schema({
   graderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { _id: false });
 
-// Sub‑schema for progress items (videos and assignments)
+// Sub‑schema for progress items (videos, lessons, and assignments)
 const ProgressItemSchema = new mongoose.Schema({
-  itemType: { type: String, enum: ['video', 'assignment'], required: true },
-  itemId: { type: mongoose.Schema.Types.ObjectId, required: true, refPath: 'progressItems.itemTypeModel' },
+  itemType: { 
+    type: String, 
+    enum: ['video', 'assignment', 'lesson'], 
+    required: true 
+  },
+  itemId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    required: true, 
+    refPath: 'progressItems.itemTypeModel' 
+  },
   itemTypeModel: {
     type: String,
     required: true,
-    enum: ['Video', 'Assignment']
+    enum: ['Video', 'Assignment', 'Lesson']
   },
   completed: { type: Boolean, default: false },
   progressPercentage: { type: Number, default: 0 },
   timeSpentSeconds: { type: Number, default: 0 },
   lastAccessed: { type: Date, default: Date.now },
   completedAt: Date,
-  submission: SubmissionSchema
+  submission: SubmissionSchema,
+  // Lesson specific fields
+  lessonIndex: { type: Number, default: 0 },
+  contentItemsCompleted: { type: Number, default: 0 },
+  totalContentItems: { type: Number, default: 0 }
 }, { _id: false });
 
 // ===== QUIZ PROGRESS SCHEMA =====
@@ -39,6 +51,17 @@ const QuizProgressSchema = new mongoose.Schema({
   timeSpent: { type: Number, default: 0 } // In seconds
 }, { _id: false });
 
+// ===== LESSON PROGRESS SCHEMA =====
+const LessonProgressSchema = new mongoose.Schema({
+  lessonId: { type: mongoose.Schema.Types.ObjectId, ref: 'Lesson' },
+  completed: { type: Boolean, default: false },
+  completedAt: Date,
+  contentItemsCompleted: { type: Number, default: 0 },
+  totalContentItems: { type: Number, default: 0 },
+  progressPercentage: { type: Number, default: 0 },
+  lastAccessed: { type: Date, default: Date.now }
+}, { _id: false });
+
 const EnrollmentSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   classId: { type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true },
@@ -49,7 +72,15 @@ const EnrollmentSchema = new mongoose.Schema({
   completedAt: Date,
   certificateIssued: { type: Boolean, default: false },
   certificateUrl: String,
+  
+  // ===== PROGRESS ITEMS (Videos, Assignments, Lessons) =====
   progressItems: [ProgressItemSchema],
+  
+  // ===== LESSON PROGRESS =====
+  lessonProgress: [LessonProgressSchema],
+  totalLessons: { type: Number, default: 0 },
+  completedLessons: { type: Number, default: 0 },
+  lessonProgressPercentage: { type: Number, default: 0 },
   
   // ===== QUIZ PROGRESS =====
   quizProgress: [QuizProgressSchema],
@@ -77,7 +108,9 @@ EnrollmentSchema.index({ completed: 1 });
 EnrollmentSchema.index({ paymentReference: 1 });
 EnrollmentSchema.index({ paymentStatus: 1 });
 EnrollmentSchema.index({ userId: 1, 'quizProgress.quizId': 1 });
+EnrollmentSchema.index({ userId: 1, 'lessonProgress.lessonId': 1 });
 EnrollmentSchema.index({ totalQuizzesTaken: -1 });
+EnrollmentSchema.index({ completedLessons: -1 });
 
 // ===== METHODS =====
 
@@ -106,7 +139,6 @@ EnrollmentSchema.methods.updateQuizStats = async function() {
  * Add a quiz attempt to the enrollment progress
  */
 EnrollmentSchema.methods.addQuizAttempt = async function(quizId, attemptId, score, passed, timeSpent) {
-  // Check if this quiz already exists in progress
   const existingIndex = this.quizProgress.findIndex(
     q => q.quizId.toString() === quizId.toString()
   );
@@ -122,7 +154,6 @@ EnrollmentSchema.methods.addQuizAttempt = async function(quizId, attemptId, scor
   };
   
   if (existingIndex !== -1) {
-    // Update existing entry (only if better score or newer attempt)
     const existing = this.quizProgress[existingIndex];
     if (score > existing.score) {
       this.quizProgress[existingIndex] = quizData;
@@ -132,6 +163,7 @@ EnrollmentSchema.methods.addQuizAttempt = async function(quizId, attemptId, scor
   }
   
   await this.updateQuizStats();
+  await this.calculateOverallProgress();
   return this;
 };
 
@@ -154,14 +186,102 @@ EnrollmentSchema.methods.getQuizScore = function(quizId) {
   return quiz ? quiz.score : null;
 };
 
+// ===== LESSON PROGRESS METHODS =====
+
 /**
- * Calculate overall course progress including quizzes
+ * Update lesson progress for this enrollment
+ */
+EnrollmentSchema.methods.updateLessonProgress = async function(lessonId, progressPercentage, contentItemsCompleted, totalContentItems) {
+  const existingIndex = this.lessonProgress.findIndex(
+    l => l.lessonId.toString() === lessonId.toString()
+  );
+  
+  const isComplete = progressPercentage >= 100;
+  
+  const lessonData = {
+    lessonId,
+    completed: isComplete,
+    completedAt: isComplete ? new Date() : null,
+    contentItemsCompleted: contentItemsCompleted || 0,
+    totalContentItems: totalContentItems || 0,
+    progressPercentage: Math.min(progressPercentage || 0, 100),
+    lastAccessed: new Date()
+  };
+  
+  if (existingIndex !== -1) {
+    this.lessonProgress[existingIndex] = lessonData;
+  } else {
+    this.lessonProgress.push(lessonData);
+  }
+  
+  // Update lesson stats
+  this.completedLessons = this.lessonProgress.filter(l => l.completed).length;
+  this.totalLessons = this.lessonProgress.length;
+  
+  const totalProgress = this.lessonProgress.reduce((sum, l) => sum + l.progressPercentage, 0);
+  this.lessonProgressPercentage = this.lessonProgress.length > 0 
+    ? Math.round(totalProgress / this.lessonProgress.length) 
+    : 0;
+  
+  await this.save();
+  await this.calculateOverallProgress();
+  return this;
+};
+
+/**
+ * Get lesson progress for a specific lesson
+ */
+EnrollmentSchema.methods.getLessonProgress = function(lessonId) {
+  const lesson = this.lessonProgress.find(
+    l => l.lessonId.toString() === lessonId.toString()
+  );
+  return lesson || null;
+};
+
+/**
+ * Check if a lesson is completed
+ */
+EnrollmentSchema.methods.isLessonCompleted = function(lessonId) {
+  const lesson = this.lessonProgress.find(
+    l => l.lessonId.toString() === lessonId.toString()
+  );
+  return lesson ? lesson.completed : false;
+};
+
+/**
+ * Add a lesson to progress items (for overall progress tracking)
+ */
+EnrollmentSchema.methods.addLessonToProgress = async function(lessonId, completed = false) {
+  // Check if already exists
+  const existing = this.progressItems.find(
+    item => item.itemType === 'lesson' && item.itemId.toString() === lessonId.toString()
+  );
+  
+  if (!existing) {
+    this.progressItems.push({
+      itemType: 'lesson',
+      itemId: lessonId,
+      itemTypeModel: 'Lesson',
+      completed: completed,
+      progressPercentage: completed ? 100 : 0,
+      completedAt: completed ? new Date() : null,
+      lastAccessed: new Date()
+    });
+    await this.save();
+  }
+  
+  return this;
+};
+
+/**
+ * Calculate overall course progress including videos, quizzes, assignments, and lessons
  */
 EnrollmentSchema.methods.calculateOverallProgress = async function() {
     const Class = mongoose.model('Class');
     const Stream = mongoose.model('Stream');
     const Quiz = mongoose.model('Quiz');
     const Assignment = mongoose.model('Assignment');
+    const Lesson = mongoose.model('Lesson');
     
     const classData = await Class.findById(this.classId);
     if (!classData) return 0;
@@ -169,7 +289,7 @@ EnrollmentSchema.methods.calculateOverallProgress = async function() {
     let totalItems = 0;
     let completedItems = 0;
     
-    // Videos
+    // 1. Videos/Streams
     const streams = await Stream.find({ streamClass: this.classId });
     totalItems += streams.length;
     const completedVideos = this.progressItems.filter(
@@ -177,7 +297,7 @@ EnrollmentSchema.methods.calculateOverallProgress = async function() {
     ).length;
     completedItems += completedVideos;
     
-    // Quizzes (published only)
+    // 2. Quizzes (published only)
     const quizzes = await Quiz.find({ 
         classId: this.classId, 
         status: 'published' 
@@ -186,7 +306,7 @@ EnrollmentSchema.methods.calculateOverallProgress = async function() {
     const completedQuizzes = this.quizProgress.filter(q => q.completedAt).length;
     completedItems += completedQuizzes;
     
-    // Assignments
+    // 3. Assignments
     const assignments = await Assignment.find({ classId: this.classId });
     totalItems += assignments.length;
     const completedAssignments = this.progressItems.filter(
@@ -194,6 +314,16 @@ EnrollmentSchema.methods.calculateOverallProgress = async function() {
     ).length;
     completedItems += completedAssignments;
     
+    // 4. Lessons (new)
+    const lessons = await Lesson.find({ 
+        classId: this.classId,
+        isPublished: true 
+    });
+    totalItems += lessons.length;
+    const completedLessons = this.lessonProgress.filter(l => l.completed).length;
+    completedItems += completedLessons;
+    
+    // Calculate progress
     const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
     
     this.progress = Math.min(progress, 100);
@@ -204,6 +334,35 @@ EnrollmentSchema.methods.calculateOverallProgress = async function() {
     
     await this.save();
     return this.progress;
+};
+
+/**
+ * Get all progress data for dashboard
+ */
+EnrollmentSchema.methods.getProgressSummary = function() {
+  return {
+    overall: this.progress,
+    completed: this.completed,
+    videos: {
+      total: this.progressItems.filter(i => i.itemType === 'video').length,
+      completed: this.progressItems.filter(i => i.itemType === 'video' && i.completed).length
+    },
+    quizzes: {
+      total: this.quizProgress.length,
+      completed: this.quizProgress.filter(q => q.completedAt).length,
+      averageScore: this.averageQuizScore,
+      passed: this.quizzesPassed
+    },
+    lessons: {
+      total: this.lessonProgress.length,
+      completed: this.completedLessons,
+      progress: this.lessonProgressPercentage
+    },
+    assignments: {
+      total: this.progressItems.filter(i => i.itemType === 'assignment').length,
+      completed: this.progressItems.filter(i => i.itemType === 'assignment' && i.completed).length
+    }
+  };
 };
 
 export default mongoose.model("Enrollment", EnrollmentSchema);
