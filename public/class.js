@@ -10,6 +10,7 @@ class ClassManager {
         this.videos = [];
         this.recordings = [];
         this.quizzes = [];
+        this.lessons = [];
         this.isEnrolled = false;
         this.isLoading = true;
         this.hlsInstance = null;
@@ -33,24 +34,24 @@ class ClassManager {
         this.showLoadingState();
         
         try {
-            // Load class data first
             await this.loadClassData();
             
-            // Then load everything else
             await Promise.all([
                 this.checkEnrollment(),
                 this.loadClassVideos(),
                 this.loadClassRecordings(),
                 this.checkPaymentStatus(),
-                this.loadQuizzes()
+                this.loadQuizzes(),
+                this.loadLessons()
             ]);
             
             this.renderClassData();
             this.renderVideos();
-            this.renderClassReviews();
             this.renderRecordings();
             this.renderPriceAndPayment();
             this.renderQuizzes();
+            this.renderLessons();
+            this.renderClassReviews();
             this.setupEventListeners();
         } catch (error) {
             console.error('Initialization error:', error);
@@ -67,17 +68,6 @@ class ClassManager {
         const videosContainer = document.getElementById('videosContainer');
         if (videosContainer) {
             videosContainer.innerHTML = `
-                <div class="loading-skeleton">
-                    <div class="skeleton-card"></div>
-                    <div class="skeleton-card"></div>
-                    <div class="skeleton-card"></div>
-                </div>
-            `;
-        }
-        
-        const recordingsContainer = document.getElementById('recordingsContainer');
-        if (recordingsContainer) {
-            recordingsContainer.innerHTML = `
                 <div class="loading-skeleton">
                     <div class="skeleton-card"></div>
                     <div class="skeleton-card"></div>
@@ -107,7 +97,6 @@ class ClassManager {
             const data = await response.json();
             console.log('Class data received:', data);
             
-            // Handle different response formats
             if (data.classA && data.classA.length > 0) {
                 this.classData = data.classA[0];
             } else if (data.class && data.class._id) {
@@ -172,6 +161,8 @@ class ClassManager {
                     (c.class_id?.toString() === this.classId) || (c._id?.toString() === this.classId)
                 );
             }
+            
+            console.log('Enrollment status:', this.isEnrolled);
         } catch (error) {
             console.error('Error checking enrollment:', error);
             this.isEnrolled = false;
@@ -313,6 +304,24 @@ class ClassManager {
         const container = document.getElementById('quizzesContainer');
         if (!container) return;
         
+        if (!this.isEnrolled) {
+            container.innerHTML = `
+                <div class="access-locked">
+                    <div class="lock-icon">🔒</div>
+                    <h3>Enroll to Access Quizzes</h3>
+                    <p>You need to be enrolled in this class to take quizzes.</p>
+                    <button class="btn btn-primary" id="enrollForQuizzesBtn">Enroll Now</button>
+                </div>
+            `;
+            const enrollBtn = container.querySelector('#enrollForQuizzesBtn');
+            if (enrollBtn) {
+                enrollBtn.addEventListener('click', () => {
+                    this.handleEnrollment();
+                });
+            }
+            return;
+        }
+        
         if (!this.quizzes || this.quizzes.length === 0) {
             container.innerHTML = `
                 <div class="no-quizzes">
@@ -427,7 +436,9 @@ class ClassManager {
         }
     }
     
-    // ===== LESSON METHODS =====
+    // ============================================================
+    // LESSON METHODS
+    // ============================================================
 
     async loadLessons() {
         try {
@@ -449,6 +460,24 @@ class ClassManager {
     renderLessons() {
         const container = document.getElementById('lessonsContainer');
         if (!container) return;
+
+        if (!this.isEnrolled) {
+            container.innerHTML = `
+                <div class="access-locked">
+                    <div class="lock-icon">🔒</div>
+                    <h3>Enroll to Access Lessons</h3>
+                    <p>You need to be enrolled in this class to view lessons.</p>
+                    <button class="btn btn-primary" id="enrollForLessonsBtn">Enroll Now</button>
+                </div>
+            `;
+            const enrollBtn = container.querySelector('#enrollForLessonsBtn');
+            if (enrollBtn) {
+                enrollBtn.addEventListener('click', () => {
+                    this.handleEnrollment();
+                });
+            }
+            return;
+        }
 
         if (!this.lessons || this.lessons.length === 0) {
             container.innerHTML = `
@@ -662,11 +691,11 @@ class ClassManager {
             const enrollBtn = document.getElementById('enrollBtn');
             if (enrollBtn) {
                 if (this.isEnrolled) {
-                    enrollBtn.textContent = 'Already Enrolled ✓';
+                    enrollBtn.textContent = '✅ Already Enrolled';
                     enrollBtn.disabled = true;
                     enrollBtn.classList.add('enrolled');
                 } else {
-                    enrollBtn.textContent = 'Enroll Now';
+                    enrollBtn.textContent = '📝 Enroll Now';
                     enrollBtn.disabled = false;
                     enrollBtn.classList.remove('enrolled');
                 }
@@ -725,15 +754,15 @@ class ClassManager {
     }
 
     /**
-     * RENDER PRICE AND PAYMENT - HIDES PAYMENT SECTION FOR ENROLLED STUDENTS
+     * RENDER PRICE AND PAYMENT
+     * - Hides payment section completely for enrolled students
+     * - Shows free badge for free classes
+     * - Shows buy button for paid classes (non-enrolled only)
      */
     renderPriceAndPayment() {
         const price = this.classData?.price || 0;
         const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
         const currency = this.classData?.currency || 'NGN';
-        
-        const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
-        const isEnrolled = this.isEnrolled;
         
         let paymentSection = document.getElementById('paymentSection');
         if (!paymentSection) {
@@ -747,24 +776,41 @@ class ClassManager {
         }
         
         // ===== HIDE PAYMENT SECTION FOR ENROLLED STUDENTS =====
-        if (isEnrolled) {
+        if (this.isEnrolled) {
             paymentSection.className = 'payment-section payment-section-hidden';
-            paymentSection.innerHTML = '';
-            return;
-        }
-        
-        paymentSection.className = 'payment-section';
-        
-        if (isFree || price === 0) {
             paymentSection.innerHTML = `
-                <div class="payment-info free-badge">
-                    <span class="badge free">🎓 FREE CLASS</span>
-                    <p>All content is available for free. No payment required.</p>
+                <div class="payment-info already-enrolled-badge">
+                    <span class="badge">✅ You are enrolled in this class</span>
+                    <p>You have full access to all content. Enjoy learning! 🎓</p>
                 </div>
             `;
             return;
         }
         
+        // Show payment section for non-enrolled users
+        paymentSection.className = 'payment-section';
+        
+        // Free class
+        if (isFree || price === 0) {
+            paymentSection.innerHTML = `
+                <div class="payment-info free-badge">
+                    <span class="badge">🎓 FREE CLASS</span>
+                    <p>All content is available for free. No payment required.</p>
+                    <button class="btn btn-primary" id="enrollFreeBtn" style="margin-top: 12px;">
+                        📝 Enroll for Free
+                    </button>
+                </div>
+            `;
+            const freeEnrollBtn = document.getElementById('enrollFreeBtn');
+            if (freeEnrollBtn) {
+                freeEnrollBtn.addEventListener('click', () => {
+                    this.handleEnrollment();
+                });
+            }
+            return;
+        }
+        
+        // Paid class - show buy button
         paymentSection.innerHTML = `
             <div class="payment-info">
                 <div class="price-display">
@@ -796,6 +842,9 @@ class ClassManager {
 
     /**
      * INITIATE PAYMENT - FIXED JSON PARSING ERROR
+     * - Checks enrollment status before allowing payment
+     * - Handles API errors gracefully
+     * - Properly parses JSON responses
      */
     async initiatePayment() {
         // Check if user is logged in
@@ -814,7 +863,7 @@ class ClassManager {
         
         const price = this.classData?.price || 0;
         if (price <= 0) {
-            window.showToast('This course is free', 'info');
+            window.showToast('This course is free. Click Enroll for Free.', 'info');
             return;
         }
         
@@ -854,7 +903,12 @@ class ClassManager {
             const responseText = await response.text();
             console.log('Payment response text:', responseText);
             
-            // Parse JSON only if there's content
+            // Check if response is empty
+            if (!responseText || responseText.trim() === '') {
+                throw new Error('Empty response from payment server');
+            }
+            
+            // Parse JSON
             let data;
             try {
                 data = JSON.parse(responseText);
@@ -883,6 +937,10 @@ class ClassManager {
             }
         }
     }
+
+    // ============================================================
+    // FORUM METHODS
+    // ============================================================
 
     async renderClassForum() {
         const container = document.getElementById('classForumContainer');
@@ -1153,6 +1211,10 @@ class ClassManager {
     async filterForumTopics() {
         await this.renderClassForum();
     }
+
+    // ============================================================
+    // REVIEWS METHODS
+    // ============================================================
 
     async renderClassReviews() {
         const container = document.getElementById('classReviewsContainer');
@@ -1590,6 +1652,10 @@ class ClassManager {
         }
     }
 
+    // ============================================================
+    // VIDEO METHODS
+    // ============================================================
+
     renderVideos() {
         const videosContainer = document.getElementById('videosContainer');
         const noVideos = document.getElementById('noVideos');
@@ -1681,7 +1747,6 @@ class ClassManager {
                 const title = video.videoDetails?.title || video.title || 'Untitled';
                 const description = video.videoDetails?.description || video.description || 'No description';
                 const duration = video.videoDetails?.duration || video.duration || 'Unknown';
-                const price = video.price || this.classData?.price || 0;
                 
                 return `
                     <div class="video-card ${isLocked ? 'locked' : ''}" 
@@ -1692,7 +1757,6 @@ class ClassManager {
                             <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
                             ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
                             ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
-                            ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
                         </div>
                         <div class="video-info">
                             <h4>${isLocked ? '🔒 ' : ''}${this.escapeHtml(title)}</h4>
@@ -1712,16 +1776,7 @@ class ClassManager {
                     const isLocked = card.dataset.locked === 'true';
                     
                     if (isLocked) {
-                        const price = this.videos[videoIndex]?.price || this.classData?.price || 0;
-                        if (price > 0) {
-                            window.showToast(`💳 This video requires payment. Price: ₦${price.toLocaleString()}`, true);
-                            const paymentSection = document.getElementById('paymentSection');
-                            if (paymentSection) {
-                                paymentSection.scrollIntoView({ behavior: 'smooth' });
-                            }
-                        } else {
-                            window.showToast('🔒 Please enroll in this class to access this video', true);
-                        }
+                        window.showToast('🔒 Please enroll in this class to access this video', true);
                         return;
                     }
                     
@@ -1829,7 +1884,6 @@ class ClassManager {
                 const muxStatus = recording.muxStatus || 'preparing';
                 const isReady = muxStatus === 'ready';
                 const isPreparing = muxStatus === 'preparing' || muxStatus === 'uploading';
-                const price = recording.price || this.classData?.price || 0;
                 
                 const statusBadge = isPreparing 
                     ? '<span class="processing-badge">⏳ Processing...</span>' 
@@ -1850,7 +1904,6 @@ class ClassManager {
                             ${statusBadge}
                             ${!isReady ? '<div class="processing-overlay">⏳ Processing...</div>' : ''}
                             ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
-                            ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
                         </div>
                         <div class="video-info">
                             <h4>${isLocked ? '🔒 ' : '📹 '}${this.escapeHtml(title)}</h4>
@@ -1873,16 +1926,7 @@ class ClassManager {
                     const muxStatus = card.dataset.muxStatus;
                     
                     if (isLocked) {
-                        const price = this.classData?.price || 0;
-                        if (price > 0) {
-                            window.showToast(`💳 This recording requires payment. Price: ₦${price.toLocaleString()}`, true);
-                            const paymentSection = document.getElementById('paymentSection');
-                            if (paymentSection) {
-                                paymentSection.scrollIntoView({ behavior: 'smooth' });
-                            }
-                        } else {
-                            window.showToast('🔒 Please enroll in this class to access this recording', true);
-                        }
+                        window.showToast('🔒 Please enroll in this class to access this recording', true);
                         return;
                     }
                     
@@ -2139,22 +2183,26 @@ class ClassManager {
         }
     }
 
+    // ============================================================
+    // ENROLLMENT METHOD
+    // ============================================================
+
     async handleEnrollment() {
         if (this.isEnrolled) {
-            alert('You are already enrolled in this class!');
+            window.showToast('You are already enrolled in this class!', false);
             return;
         }
 
         if (!this.user || !this.user.email) {
-            alert('Please login to enroll in this class');
-            window.location.href = 'index.html';
+            window.showToast('Please login to enroll in this class', true);
+            window.location.href = 'login.html';
             return;
         }
 
         const enrollBtn = document.getElementById('enrollBtn');
         if (enrollBtn) {
             enrollBtn.disabled = true;
-            enrollBtn.textContent = 'Processing...';
+            enrollBtn.textContent = '⏳ Processing...';
         }
 
         try {
@@ -2167,19 +2215,19 @@ class ClassManager {
             if (response.ok) {
                 this.isEnrolled = true;
                 this.renderClassData();
-                this.renderPriceAndPayment(); // Refresh payment section
-                alert('Successfully enrolled in the class!');
-                location.reload();
+                this.renderPriceAndPayment();
+                window.showToast('Successfully enrolled in the class! 🎉', false);
+                setTimeout(() => location.reload(), 1500);
             } else {
                 const error = await response.json();
                 throw new Error(error.message || 'Enrollment failed');
             }
         } catch (error) {
             console.error('Error enrolling in class:', error);
-            alert(error.message || 'Failed to enroll in class. Please try again.');
+            window.showToast(error.message || 'Failed to enroll in class. Please try again.', true);
             if (enrollBtn) {
                 enrollBtn.disabled = false;
-                enrollBtn.textContent = 'Enroll Now';
+                enrollBtn.textContent = '📝 Enroll Now';
             }
         }
     }
@@ -2282,9 +2330,10 @@ if (typeof showToast === 'undefined') {
             z-index: 10000;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             animation: slideIn 0.3s ease;
+            max-width: 90%;
         `;
         document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        setTimeout(() => toast.remove(), 4000);
     };
 }
 

@@ -17,9 +17,8 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.08);
         }
-        .payment-section.paid-access {
-            background: rgba(16, 185, 129, 0.15);
-            border-color: rgba(16, 185, 129, 0.3);
+        .payment-section.payment-section-hidden {
+            display: none !important;
         }
 
         .payment-info {
@@ -94,9 +93,19 @@
             color: rgba(255,255,255,0.8);
             margin-top: 10px;
         }
-        
-        .payment-section-hidden {
-            display: none !important;
+
+        .already-enrolled-badge {
+            display: inline-block;
+            background: #10B981;
+            color: white;
+            padding: 8px 28px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        .already-enrolled-badge p {
+            color: rgba(255,255,255,0.8);
+            margin-top: 10px;
         }
     </style>
 </head>
@@ -169,7 +178,7 @@
                         <button class="tab-btn" data-tab="details">📋 Details</button>
                     </div>
 
-                    <!-- New Forum Tab Content -->
+                    <!-- Forum Tab Content -->
                     <div id="forumTab" class="tab-content">
                         <div id="classForumContainer">
                             <!-- Forum content will be loaded here -->
@@ -185,19 +194,20 @@
                             <p>No recorded classes available yet.</p>
                         </div>
                     </div>
-                                        <!-- Quizzes Tab -->
+                    <!-- Quizzes Tab -->
                     <div id="quizzesTab" class="tab-content">
                         <h3>📝 Class Quizzes</h3>
                         <div id="quizzesContainer">
                             <!-- Quizzes will be loaded dynamically -->
                         </div>
-                        </div>
-                                    <div id="lessonsTab" class="tab-content">
-                    <h3>📚 Course Lessons</h3>
-                    <div id="lessonsContainer">
-                        <!-- Lessons will be loaded here -->
                     </div>
-                </div>
+                    <!-- Lessons Tab -->
+                    <div id="lessonsTab" class="tab-content">
+                        <h3>📚 Course Lessons</h3>
+                        <div id="lessonsContainer">
+                            <!-- Lessons will be loaded here -->
+                        </div>
+                    </div>
                     <!-- Reviews Tab -->
                     <div id="reviewsTab" class="tab-content">
                         <h3>Class Reviews</h3>
@@ -212,7 +222,6 @@
                             <!-- Materials will be loaded dynamically -->
                         </div>
                     </div>
-
                     <!-- Details Tab -->
                     <div id="detailsTab" class="tab-content">
                         <h3>About This Class</h3>
