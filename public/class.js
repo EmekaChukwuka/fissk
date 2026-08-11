@@ -53,11 +53,59 @@ class ClassManager {
             this.renderLessons();
             this.renderClassReviews();
             this.setupEventListeners();
+            
+            // Check for payment verification callback
+            this.checkPaymentVerification();
         } catch (error) {
             console.error('Initialization error:', error);
         } finally {
             this.isLoading = false;
             this.hideLoadingState();
+        }
+    }
+
+    /**
+     * Check if returning from payment gateway
+     */
+    checkPaymentVerification() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const reference = urlParams.get('reference');
+        const status = urlParams.get('status');
+        
+        if (reference && status) {
+            console.log('Payment verification callback detected:', { reference, status });
+            if (status === 'success') {
+                // Refresh enrollment and payment status after successful payment
+                this.refreshEnrollmentAndPayment();
+            }
+        }
+    }
+
+    /**
+     * Refresh enrollment and payment status after payment
+     */
+    async refreshEnrollmentAndPayment() {
+        try {
+            console.log('Refreshing enrollment and payment status...');
+            
+            // Re-check enrollment
+            await this.checkEnrollment();
+            
+            // Re-check payment status
+            await this.checkPaymentStatus();
+            
+            // Re-render everything
+            this.renderClassData();
+            this.renderVideos();
+            this.renderRecordings();
+            this.renderPriceAndPayment();
+            this.renderQuizzes();
+            this.renderLessons();
+            
+            window.showToast('Payment verified! You now have full access to this class. 🎉', false);
+        } catch (error) {
+            console.error('Error refreshing status:', error);
+            window.showToast('Payment successful! Please refresh the page to access content.', false);
         }
     }
 
@@ -221,6 +269,11 @@ class ClassManager {
             let allVideos = [];
             if (data.success && data.videos) {
                 allVideos = data.videos;
+                // Update payment status from response
+                if (data.hasAccess !== undefined) {
+                    this.hasPaidAccess = data.hasAccess;
+                    this.enrollmentPaymentStatus = data.accessType || 'none';
+                }
             } else if (Array.isArray(data)) {
                 allVideos = data;
             }
@@ -230,6 +283,7 @@ class ClassManager {
             );
             
             console.log('Recordings loaded:', this.recordings.length);
+            console.log('Payment status from recordings:', this.enrollmentPaymentStatus, 'Has paid access:', this.hasPaidAccess);
         } catch (error) {
             console.error('Error loading class recordings:', error);
             this.recordings = [];
@@ -237,15 +291,22 @@ class ClassManager {
     }
 
     async checkPaymentStatus() {
-        if (!this.user || !this.user.id) return;
+        if (!this.user || !this.user.id) {
+            this.hasPaidAccess = false;
+            this.enrollmentPaymentStatus = 'none';
+            return;
+        }
         
         try {
+            // Check if class is free
             if (this.classData && (this.classData.isFree || this.classData.price === 0)) {
                 this.enrollmentPaymentStatus = 'free';
                 this.hasPaidAccess = true;
+                console.log('Class is free - access granted');
                 return;
             }
             
+            // Check enrollment status with payment details
             if (this.isEnrolled) {
                 const response = await fetch('https://fissk-backend.onrender.com/register/get-user-classes', {
                     method: 'POST',
@@ -255,21 +316,45 @@ class ClassManager {
                 
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('User classes data:', data);
+                    
                     if (data.classes && data.classes.length) {
                         const classEnrollment = data.classes.find(c => 
                             (c.class_id?.toString() === this.classId) || (c._id?.toString() === this.classId)
                         );
+                        
                         if (classEnrollment) {
-                            this.enrollmentPaymentStatus = classEnrollment.paymentStatus || 'free';
-                            this.hasPaidAccess = classEnrollment.paymentStatus === 'paid' || classEnrollment.accessType === 'paid';
+                            // Check multiple possible payment status fields
+                            this.enrollmentPaymentStatus = classEnrollment.paymentStatus || 
+                                                         classEnrollment.status || 
+                                                         'free';
+                            
+                            // Check if payment is completed
+                            const isPaid = this.enrollmentPaymentStatus === 'paid' || 
+                                          this.enrollmentPaymentStatus === 'completed' ||
+                                          classEnrollment.accessType === 'paid' ||
+                                          classEnrollment.isPaid === true;
+                            
+                            this.hasPaidAccess = isPaid;
+                            
+                            console.log('Enrollment payment status:', this.enrollmentPaymentStatus);
+                            console.log('Has paid access:', this.hasPaidAccess);
                         }
                     }
                 }
             }
             
-            console.log('Payment status:', this.enrollmentPaymentStatus, 'Paid:', this.hasPaidAccess);
+            // If not enrolled or no payment info, default to false
+            if (!this.isEnrolled) {
+                this.hasPaidAccess = false;
+                this.enrollmentPaymentStatus = 'none';
+            }
+            
+            console.log('Final payment status:', this.enrollmentPaymentStatus, 'Paid:', this.hasPaidAccess);
         } catch (error) {
             console.error('Check payment status error:', error);
+            this.hasPaidAccess = false;
+            this.enrollmentPaymentStatus = 'none';
         }
     }
 
@@ -886,29 +971,26 @@ class ClassManager {
                     classId: this.classId,
                     userId: this.user.id,
                     email: this.user.email,
-                    amount: price
+                    amount: price,
+                    callbackUrl: window.location.href.split('?')[0] + '?payment=processing'
                 })
             });
             
             console.log('Payment response status:', response.status);
             
-            // Check if response is ok before parsing JSON
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('Payment error response:', errorText);
                 throw new Error(`Payment request failed: ${response.status} ${response.statusText}`);
             }
             
-            // Get response text first to handle empty responses
             const responseText = await response.text();
             console.log('Payment response text:', responseText);
             
-            // Check if response is empty
             if (!responseText || responseText.trim() === '') {
                 throw new Error('Empty response from payment server');
             }
             
-            // Parse JSON
             let data;
             try {
                 data = JSON.parse(responseText);
@@ -918,6 +1000,8 @@ class ClassManager {
             }
             
             if (data.success && data.data && data.data.authorizationUrl) {
+                // Store the class ID for callback handling
+                localStorage.setItem('payment_pending_class', this.classId);
                 // Redirect to payment gateway
                 window.location.href = data.data.authorizationUrl;
             } else {
@@ -928,7 +1012,6 @@ class ClassManager {
             console.error('Payment error:', error);
             window.showToast(error.message || 'Failed to initialize payment. Please try again.', true);
             
-            // Re-enable button
             if (buyBtn) {
                 buyBtn.disabled = false;
                 const currency = this.classData?.currency || 'NGN';
@@ -1656,6 +1739,26 @@ class ClassManager {
     // VIDEO METHODS
     // ============================================================
 
+    /**
+     * Check if user has paid access to this class
+     */
+    hasPaidAccessToClass() {
+        // If class is free, grant access
+        if (this.classData && (this.classData.isFree || this.classData.price === 0)) {
+            return true;
+        }
+        
+        // If enrolled and payment status is paid or completed
+        if (this.isEnrolled) {
+            const paidStatuses = ['paid', 'completed', 'success', 'verified'];
+            if (paidStatuses.includes(this.enrollmentPaymentStatus)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
     renderVideos() {
         const videosContainer = document.getElementById('videosContainer');
         const noVideos = document.getElementById('noVideos');
@@ -1698,34 +1801,37 @@ class ClassManager {
             return;
         }
 
-        const price = this.classData?.price || 0;
-        const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
-        const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
+        // Check if user has paid access
+        const hasAccess = this.hasPaidAccessToClass();
+        console.log('Has paid access in renderVideos:', hasAccess, 'Payment status:', this.enrollmentPaymentStatus);
 
-        if (!isFree && price > 0 && !hasPaid) {
-            if (videosContainer) {
-                videosContainer.style.display = 'block';
-                videosContainer.innerHTML = `
-                    <div class="access-locked">
-                        <div class="lock-icon">💰</div>
-                        <h3>Payment Required</h3>
-                        <p>This class requires payment to access videos and materials.</p>
-                        <div class="price-display-small">
-                            <span class="price">₦${price.toLocaleString()}</span>
-                            <span class="label">One-time payment • Lifetime access</span>
+        if (!hasAccess) {
+            const price = this.classData?.price || 0;
+            if (price > 0) {
+                if (videosContainer) {
+                    videosContainer.style.display = 'block';
+                    videosContainer.innerHTML = `
+                        <div class="access-locked">
+                            <div class="lock-icon">💰</div>
+                            <h3>Payment Required</h3>
+                            <p>This class requires payment to access videos and materials.</p>
+                            <div class="price-display-small">
+                                <span class="price">₦${price.toLocaleString()}</span>
+                                <span class="label">One-time payment • Lifetime access</span>
+                            </div>
+                            <button class="btn btn-primary" id="buyForVideosBtn">💳 Buy Course - ₦${price.toLocaleString()}</button>
                         </div>
-                        <button class="btn btn-primary" id="buyForVideosBtn">💳 Buy Course - ₦${price.toLocaleString()}</button>
-                    </div>
-                `;
-                const buyBtn = videosContainer.querySelector('#buyForVideosBtn');
-                if (buyBtn) {
-                    buyBtn.addEventListener('click', () => {
-                        this.initiatePayment();
-                    });
+                    `;
+                    const buyBtn = videosContainer.querySelector('#buyForVideosBtn');
+                    if (buyBtn) {
+                        buyBtn.addEventListener('click', () => {
+                            this.initiatePayment();
+                        });
+                    }
                 }
+                if (noVideos) noVideos.style.display = 'none';
+                return;
             }
-            if (noVideos) noVideos.style.display = 'none';
-            return;
         }
 
         if (!this.videos || this.videos.length === 0) {
@@ -1743,7 +1849,7 @@ class ClassManager {
             videosContainer.innerHTML = this.videos.map((video, index) => {
                 const thumbnailUrl = video.thumbnailUrl || 
                     (video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` : '');
-                const isLocked = video.locked === true;
+                const isLocked = video.locked === true && !hasAccess;
                 const title = video.videoDetails?.title || video.title || 'Untitled';
                 const description = video.videoDetails?.description || video.description || 'No description';
                 const duration = video.videoDetails?.duration || video.duration || 'Unknown';
@@ -1776,7 +1882,7 @@ class ClassManager {
                     const isLocked = card.dataset.locked === 'true';
                     
                     if (isLocked) {
-                        window.showToast('🔒 Please enroll in this class to access this video', true);
+                        window.showToast('🔒 Please purchase this class to access this video', true);
                         return;
                     }
                     
@@ -1829,34 +1935,37 @@ class ClassManager {
             return;
         }
 
-        const price = this.classData?.price || 0;
-        const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
-        const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
+        // Check if user has paid access
+        const hasAccess = this.hasPaidAccessToClass();
+        console.log('Has paid access in renderRecordings:', hasAccess, 'Payment status:', this.enrollmentPaymentStatus);
 
-        if (!isFree && price > 0 && !hasPaid) {
-            if (recordingsContainer) {
-                recordingsContainer.style.display = 'block';
-                recordingsContainer.innerHTML = `
-                    <div class="access-locked">
-                        <div class="lock-icon">💰</div>
-                        <h3>Payment Required</h3>
-                        <p>This class requires payment to access recordings and materials.</p>
-                        <div class="price-display-small">
-                            <span class="price">₦${price.toLocaleString()}</span>
-                            <span class="label">One-time payment • Lifetime access</span>
+        if (!hasAccess) {
+            const price = this.classData?.price || 0;
+            if (price > 0) {
+                if (recordingsContainer) {
+                    recordingsContainer.style.display = 'block';
+                    recordingsContainer.innerHTML = `
+                        <div class="access-locked">
+                            <div class="lock-icon">💰</div>
+                            <h3>Payment Required</h3>
+                            <p>This class requires payment to access recordings and materials.</p>
+                            <div class="price-display-small">
+                                <span class="price">₦${price.toLocaleString()}</span>
+                                <span class="label">One-time payment • Lifetime access</span>
+                            </div>
+                            <button class="btn btn-primary" id="buyForRecordingsBtn">💳 Buy Course - ₦${price.toLocaleString()}</button>
                         </div>
-                        <button class="btn btn-primary" id="buyForRecordingsBtn">💳 Buy Course - ₦${price.toLocaleString()}</button>
-                    </div>
-                `;
-                const buyBtn = recordingsContainer.querySelector('#buyForRecordingsBtn');
-                if (buyBtn) {
-                    buyBtn.addEventListener('click', () => {
-                        this.initiatePayment();
-                    });
+                    `;
+                    const buyBtn = recordingsContainer.querySelector('#buyForRecordingsBtn');
+                    if (buyBtn) {
+                        buyBtn.addEventListener('click', () => {
+                            this.initiatePayment();
+                        });
+                    }
                 }
+                if (noRecordings) noRecordings.style.display = 'none';
+                return;
             }
-            if (noRecordings) noRecordings.style.display = 'none';
-            return;
         }
 
         if (!this.recordings || this.recordings.length === 0) {
@@ -1872,7 +1981,7 @@ class ClassManager {
         if (recordingsContainer) {
             recordingsContainer.style.display = 'grid';
             recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
-                const isLocked = recording.locked === true;
+                const isLocked = recording.locked === true && !hasAccess;
                 const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url || 
                     (recording.muxPlaybackId ? `https://stream.mux.com/${recording.muxPlaybackId}.m3u8` : null);
                 const thumbnailUrl = recording.thumbnailUrl || 
@@ -1926,7 +2035,7 @@ class ClassManager {
                     const muxStatus = card.dataset.muxStatus;
                     
                     if (isLocked) {
-                        window.showToast('🔒 Please enroll in this class to access this recording', true);
+                        window.showToast('🔒 Please purchase this class to access this recording', true);
                         return;
                     }
                     
