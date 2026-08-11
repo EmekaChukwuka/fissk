@@ -138,6 +138,8 @@ export const verifyPayment = async (req, res) => {
   try {
     const { reference } = req.body;
 
+    console.log(`🔍 Verifying payment reference: ${reference}`);
+
     if (!reference) {
       return res.status(400).json({
         success: false,
@@ -145,13 +147,13 @@ export const verifyPayment = async (req, res) => {
       });
     }
 
-    console.log(`🔍 Verifying payment: ${reference}`);
-
     // Find payment record
     const payment = await Payment.findOne({ reference })
-      .populate('user')
-      .populate('class')
-      .populate('instructor');
+      .populate('user', 'firstName lastName email')
+      .populate('class', 'title')
+      .populate('instructor', 'firstName lastName');
+
+    console.log('Payment found:', payment ? 'Yes' : 'No');
 
     if (!payment) {
       return res.status(404).json({
@@ -192,7 +194,6 @@ export const verifyPayment = async (req, res) => {
       payment.status = 'failed';
       await payment.save();
 
-      // Update enrollment
       await Enrollment.findOneAndUpdate(
         { paymentReference: reference },
         { paymentStatus: 'failed' }
@@ -237,23 +238,6 @@ export const verifyPayment = async (req, res) => {
         totalSales: 1
       }
     });
-
-    // Send email receipt
-    try {
-      await emailService.sendPaymentReceipt(
-        payment.user.email,
-        `${payment.user.firstName} ${payment.user.lastName}`,
-        {
-          courseName: payment.class.title,
-          amount: payment.amount,
-          reference: payment.reference,
-          paidAt: payment.paidAt,
-          instructorName: `${payment.instructor.firstName} ${payment.instructor.lastName}`
-        }
-      );
-    } catch (emailError) {
-      console.error('Failed to send receipt email:', emailError);
-    }
 
     console.log(`✅ Payment verified successfully: ${reference}`);
 
@@ -320,27 +304,38 @@ export const checkPaymentStatus = async (req, res) => {
 // ===== WEBHOOK HANDLER =====
 export const handleWebhook = async (req, res) => {
   try {
+    // Log the incoming webhook
+    console.log('📨 Webhook received');
+    console.log('Headers:', req.headers);
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+
     const signature = req.headers['x-paystack-signature'];
     const payload = req.body;
 
-    // Verify webhook signature
+    if (!signature) {
+      console.error('❌ No webhook signature provided');
+      return res.status(401).json({ error: 'No signature provided' });
+    }
+
+    // Verify webhook signature using the webhook secret
     const isValid = paymentService.verifyWebhookSignature(signature, payload);
 
     if (!isValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid webhook signature'
-      });
+      console.error('❌ Invalid webhook signature');
+      return res.status(401).json({ error: 'Invalid signature' });
     }
+
+    console.log('✅ Webhook signature verified');
 
     const event = payload.event;
     const data = payload.data;
 
-    console.log(`📨 Webhook received: ${event} for reference: ${data.reference}`);
+    console.log(`📨 Webhook event: ${event} for reference: ${data?.reference}`);
 
     // Handle charge.success event
     if (event === 'charge.success') {
       const reference = data.reference;
+      console.log(`💰 Processing successful payment: ${reference}`);
 
       // Find payment record
       const payment = await Payment.findOne({ reference })
@@ -350,6 +345,7 @@ export const handleWebhook = async (req, res) => {
 
       if (!payment) {
         console.log(`⚠️ Payment not found for reference: ${reference}`);
+        // Still return 200 to acknowledge the webhook
         return res.status(200).json({ success: true });
       }
 
@@ -359,11 +355,15 @@ export const handleWebhook = async (req, res) => {
         return res.status(200).json({ success: true });
       }
 
+      console.log(`✅ Payment found: ${payment._id}, updating...`);
+
       // Update payment
       payment.status = 'success';
       payment.paystackData = data;
       payment.paidAt = new Date();
       await payment.save();
+
+      console.log(`✅ Payment updated to success: ${reference}`);
 
       // Update enrollment
       const enrollment = await Enrollment.findOneAndUpdate(
@@ -375,6 +375,8 @@ export const handleWebhook = async (req, res) => {
         },
         { new: true, upsert: true }
       );
+
+      console.log(`✅ Enrollment updated: ${enrollment?._id || 'created'}`);
 
       // Update class stats
       await Class.findByIdAndUpdate(payment.class._id, {
@@ -393,6 +395,8 @@ export const handleWebhook = async (req, res) => {
         }
       });
 
+      console.log(`✅ Stats updated for class ${payment.class._id}`);
+
       // Send email receipt
       try {
         await emailService.sendPaymentReceipt(
@@ -406,16 +410,18 @@ export const handleWebhook = async (req, res) => {
             instructorName: `${payment.instructor.firstName} ${payment.instructor.lastName}`
           }
         );
+        console.log(`✅ Receipt email sent to ${payment.user.email}`);
       } catch (emailError) {
         console.error('Failed to send receipt email:', emailError);
       }
 
-      console.log(`✅ Webhook processed: ${reference}`);
+      console.log(`✅ Webhook processed successfully: ${reference}`);
     }
 
     // Handle charge.failed event
     if (event === 'charge.failed') {
       const reference = data.reference;
+      console.log(`❌ Payment failed: ${reference}`);
 
       await Payment.findOneAndUpdate(
         { reference },
@@ -430,16 +436,18 @@ export const handleWebhook = async (req, res) => {
         { paymentStatus: 'failed' }
       );
 
-      console.log(`❌ Payment failed: ${reference}`);
+      console.log(`❌ Payment marked as failed: ${reference}`);
     }
 
     res.status(200).json({ success: true });
 
   } catch (error) {
     console.error('Webhook handler error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Webhook processing failed'
+    // Always return 200 to Paystack to acknowledge receipt
+    res.status(200).json({ 
+      success: false, 
+      message: 'Webhook processing failed but acknowledged',
+      error: error.message 
     });
   }
 };
