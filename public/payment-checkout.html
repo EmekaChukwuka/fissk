@@ -103,6 +103,17 @@
             color: #1A1A2E;
             font-weight: 500;
         }
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .error-message .btn {
+            margin-top: 12px;
+        }
     </style>
 </head>
 <body>
@@ -135,22 +146,36 @@
                 <p>Complete your purchase to get full access</p>
             </div>
 
-            <div id="courseInfo" class="course-info">
-                <h3>Loading course details...</h3>
-                <p>Please wait</p>
+            <div id="loadingMessage" style="text-align: center; padding: 20px; color: #6B7280;">
+                <div class="spinner" style="margin: 0 auto 16px; border: 4px solid #f3f3f3; border-top: 4px solid #8B5FBF; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+                <p>Loading course details...</p>
             </div>
 
-            <div class="price-display" id="priceDisplay">
-                <span class="amount" id="priceAmount">₦0</span>
-                <span class="label">One-time payment • Lifetime access</span>
+            <div id="errorContainer" style="display: none;">
+                <div class="error-message" id="errorMessage">
+                    <p id="errorText">Something went wrong</p>
+                    <a href="classes.html" class="btn btn-primary">Browse Courses</a>
+                </div>
             </div>
 
-            <button class="btn btn-primary buy-btn" id="payNowBtn" onclick="initiatePayment()">
-                💳 Pay Now
-            </button>
+            <div id="paymentContent" style="display: none;">
+                <div id="courseInfo" class="course-info">
+                    <h3 id="courseTitle">Loading...</h3>
+                    <p id="courseDescription">Please wait</p>
+                </div>
 
-            <div class="secure-badge">
-                🔒 Secure payment via Paystack • Your payment is safe
+                <div class="price-display" id="priceDisplay">
+                    <span class="amount" id="priceAmount">₦0</span>
+                    <span class="label">One-time payment • Lifetime access</span>
+                </div>
+
+                <button class="btn btn-primary buy-btn" id="payNowBtn" onclick="initiatePayment()">
+                    💳 Pay Now
+                </button>
+
+                <div class="secure-badge">
+                    🔒 Secure payment via Paystack • Your payment is safe
+                </div>
             </div>
         </div>
     </div>
@@ -228,32 +253,112 @@
         const urlParams = new URLSearchParams(window.location.search);
         const classId = urlParams.get('classId');
         const user = JSON.parse(localStorage.getItem('user'));
+        const token = localStorage.getItem('token');
         let classData = null;
+
+        // DOM Elements
+        const loadingMessage = document.getElementById('loadingMessage');
+        const errorContainer = document.getElementById('errorContainer');
+        const errorText = document.getElementById('errorText');
+        const paymentContent = document.getElementById('paymentContent');
+        const courseTitle = document.getElementById('courseTitle');
+        const courseDescription = document.getElementById('courseDescription');
+        const priceAmount = document.getElementById('priceAmount');
+        const payNowBtn = document.getElementById('payNowBtn');
 
         async function loadClass() {
             try {
-                const response = await fetch(`/register/class/${classId}`);
-                const data = await response.json();
+                // Try multiple endpoints
+                let data = null;
+                let response = null;
                 
-                if (data.classA && data.classA.length > 0) {
-                    classData = data.classA[0];
+                // Try the main endpoint first
+                response = await fetch(`https://fissk-backend.onrender.com/register/class/${classId}`, {
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : '',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    data = await response.json();
                     
-                    document.getElementById('courseInfo').innerHTML = `
-                        <h3>${escapeHtml(classData.title)}</h3>
-                        <p>${escapeHtml(classData.description || 'No description available')}</p>
-                    `;
+                    if (data.classA && data.classA.length > 0) {
+                        classData = data.classA[0];
+                    } else if (data.class && data.class._id) {
+                        classData = data.class;
+                    } else if (data._id) {
+                        classData = data;
+                    }
+                }
+
+                // If not found, try the classes endpoint to get all classes and filter
+                if (!classData) {
+                    const allClassesRes = await fetch('https://fissk-backend.onrender.com/register/classes', {
+                        headers: {
+                            'Authorization': token ? `Bearer ${token}` : '',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    if (allClassesRes.ok) {
+                        const allClasses = await allClassesRes.json();
+                        if (allClasses.classes) {
+                            classData = allClasses.classes.find(c => c._id === classId);
+                        }
+                    }
+                }
+
+                // If still not found, try the class endpoint with POST method
+                if (!classData) {
+                    const postRes = await fetch(`https://fissk-backend.onrender.com/register/class/${classId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': token ? `Bearer ${token}` : '',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ id: classId })
+                    });
+                    
+                    if (postRes.ok) {
+                        const postData = await postRes.json();
+                        if (postData.classA && postData.classA.length > 0) {
+                            classData = postData.classA[0];
+                        }
+                    }
+                }
+
+                // Hide loading, show content or error
+                loadingMessage.style.display = 'none';
+
+                if (classData) {
+                    paymentContent.style.display = 'block';
+                    
+                    courseTitle.textContent = classData.title || 'Untitled Course';
+                    courseDescription.textContent = classData.description || 'No description available';
                     
                     const price = classData.price || 0;
                     const currency = classData.currency || 'NGN';
-                    document.getElementById('priceAmount').textContent = `${currency} ${price.toLocaleString()}`;
+                    priceAmount.textContent = `${currency} ${price.toLocaleString()}`;
+                    
+                    if (price <= 0 || classData.isFree) {
+                        payNowBtn.textContent = '🎓 Enroll for Free';
+                        payNowBtn.onclick = enrollForFree;
+                    }
+                } else {
+                    showError('Course not found. Please go back and try again.');
                 }
+
             } catch (error) {
                 console.error('Load class error:', error);
-                document.getElementById('courseInfo').innerHTML = `
-                    <h3>Error loading course</h3>
-                    <p>Please try again or go back to browse courses.</p>
-                `;
+                loadingMessage.style.display = 'none';
+                showError('Failed to load course details. Please try again.');
             }
+        }
+
+        function showError(message) {
+            errorContainer.style.display = 'block';
+            errorText.textContent = message;
         }
 
         function escapeHtml(str) {
@@ -261,6 +366,40 @@
             return String(str).replace(/[&<>]/g, function(s) {
                 return ({'&': '&amp;', '<': '&lt;', '>': '&gt;'})[s];
             });
+        }
+
+        async function enrollForFree() {
+            if (!user) {
+                alert('Please login to enroll');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            try {
+                const response = await fetch('https://fissk-backend.onrender.com/register/join-class', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    },
+                    body: JSON.stringify({
+                        email: user.email,
+                        classId: classId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert('✅ Successfully enrolled in the class!');
+                    window.location.href = `class.html?id=${classId}`;
+                } else {
+                    alert(data.message || 'Failed to enroll. Please try again.');
+                }
+            } catch (error) {
+                console.error('Free enrollment error:', error);
+                alert('Failed to enroll. Please try again.');
+            }
         }
 
         async function initiatePayment() {
@@ -276,28 +415,26 @@
             }
 
             const price = classData.price || 0;
-            if (price <= 0) {
-                alert('This course is free! You can enroll for free.');
-                window.location.href = `class.html?id=${classId}`;
+            if (price <= 0 || classData.isFree) {
+                await enrollForFree();
                 return;
             }
 
             const loader = document.getElementById('loaderOverlay');
-            const payBtn = document.getElementById('payNowBtn');
             
             loader.classList.add('active');
-            payBtn.disabled = true;
-            payBtn.textContent = '⏳ Processing...';
+            payNowBtn.disabled = true;
+            payNowBtn.textContent = '⏳ Processing...';
 
             try {
-                const response = await fetch('/api/payment/initialize', {
+                const response = await fetch('https://fissk-backend.onrender.com/api/payment/initialize', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Authorization': token ? `Bearer ${token}` : ''
                     },
                     body: JSON.stringify({
-                        classId: classId,
-                        userId: user.id
+                        classId: classId
                     })
                 });
 
@@ -313,36 +450,38 @@
                 alert('Failed to initialize payment. Please try again.');
             } finally {
                 loader.classList.remove('active');
-                payBtn.disabled = false;
-                payBtn.textContent = '💳 Pay Now';
+                payNowBtn.disabled = false;
+                payNowBtn.textContent = '💳 Pay Now';
             }
         }
 
-        // Check if user is logged in
+        // ===== INITIALIZE =====
         if (!user) {
-            document.getElementById('checkoutContainer').innerHTML = `
-                <div class="checkout-header">
-                    <h1>🔒 Login Required</h1>
-                    <p>Please login to purchase this course</p>
-                </div>
-                <div style="text-align: center; margin-top: 20px;">
-                    <a href="login.html" class="btn btn-primary">Login</a>
-                    <a href="classes.html" class="btn btn-outline" style="margin-left: 12px;">Browse Courses</a>
-                </div>
+            loadingMessage.style.display = 'none';
+            errorContainer.style.display = 'block';
+            errorText.innerHTML = `
+                🔒 Please login to purchase this course
+                <br><br>
+                <a href="login.html" class="btn btn-primary">Login</a>
+                <a href="classes.html" class="btn btn-outline" style="margin-left: 12px;">Browse Courses</a>
             `;
+            document.querySelector('#errorMessage .btn')?.remove();
         } else if (!classId) {
-            document.getElementById('checkoutContainer').innerHTML = `
-                <div class="checkout-header">
-                    <h1>❌ Invalid Request</h1>
-                    <p>No course selected. Please browse courses and try again.</p>
-                </div>
-                <div style="text-align: center; margin-top: 20px;">
-                    <a href="classes.html" class="btn btn-primary">Browse Courses</a>
-                </div>
+            loadingMessage.style.display = 'none';
+            errorContainer.style.display = 'block';
+            errorText.innerHTML = `
+                ❌ No course selected. Please browse courses and try again.
+                <br><br>
+                <a href="classes.html" class="btn btn-primary">Browse Courses</a>
             `;
+            document.querySelector('#errorMessage .btn')?.remove();
         } else {
             loadClass();
         }
+
+        // Make functions globally accessible
+        window.initiatePayment = initiatePayment;
+        window.enrollForFree = enrollForFree;
     </script>
 </body>
 </html>
