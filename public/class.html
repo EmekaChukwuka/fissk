@@ -17,6 +17,10 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.08);
         }
+        .payment-section.paid-access {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
 
         .payment-info {
             text-align: center;
@@ -55,6 +59,10 @@
             padding: 14px 48px;
             margin-top: 8px;
         }
+        .buy-course-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
 
         .secure-note {
             font-size: 0.85rem;
@@ -85,6 +93,10 @@
         .free-badge p, .paid-badge p {
             color: rgba(255,255,255,0.8);
             margin-top: 10px;
+        }
+        
+        .payment-section-hidden {
+            display: none !important;
         }
     </style>
 </head>

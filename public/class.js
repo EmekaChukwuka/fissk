@@ -42,7 +42,7 @@ class ClassManager {
                 this.loadClassVideos(),
                 this.loadClassRecordings(),
                 this.checkPaymentStatus(),
-                this.loadQuizzes() // Load quizzes
+                this.loadQuizzes()
             ]);
             
             this.renderClassData();
@@ -50,11 +50,10 @@ class ClassManager {
             this.renderClassReviews();
             this.renderRecordings();
             this.renderPriceAndPayment();
-            this.renderQuizzes(); // Render quizzes
+            this.renderQuizzes();
             this.setupEventListeners();
         } catch (error) {
             console.error('Initialization error:', error);
-            // Error is already shown in loadClassData
         } finally {
             this.isLoading = false;
             this.hideLoadingState();
@@ -127,7 +126,6 @@ class ClassManager {
         } catch (error) {
             console.error('Error loading class data:', error);
             
-            // Show error in the UI
             const classNameEl = document.getElementById('className');
             if (classNameEl) {
                 classNameEl.innerHTML = '⚠️ Class not found';
@@ -288,15 +286,12 @@ class ClassManager {
     // QUIZ METHODS
     // ============================================================
 
-    /**
-     * Load quizzes for this class
-     */
     async loadQuizzes() {
         try {
             const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/class/${this.classId}`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json'
+                    'Content-Type': 'application/json'
                 }
             });
             
@@ -314,9 +309,6 @@ class ClassManager {
         }
     }
 
-    /**
-     * Render quizzes in the quizzes tab
-     */
     renderQuizzes() {
         const container = document.getElementById('quizzesContainer');
         if (!container) return;
@@ -340,7 +332,6 @@ class ClassManager {
             </div>
         `;
         
-        // Add event listeners for quiz cards
         container.querySelectorAll('.quiz-card .quiz-action-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -356,9 +347,6 @@ class ClassManager {
         });
     }
 
-    /**
-     * Render a single quiz card
-     */
     renderQuizCard(quiz) {
         const isCompleted = quiz.userAttempts > 0;
         const isInProgress = quiz.inProgress;
@@ -409,9 +397,6 @@ class ClassManager {
         `;
     }
 
-    /**
-     * Start or resume a quiz
-     */
     async startQuiz(quizId) {
         try {
             window.location.href = `quiz/take.html?quizId=${quizId}`;
@@ -421,16 +406,12 @@ class ClassManager {
         }
     }
 
-    /**
-     * View quiz results
-     */
     async viewQuizResults(quizId) {
         try {
-            // Get the latest attempt
             const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${quizId}`, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
-                'Content-Type': 'application/json'
+                    'Content-Type': 'application/json'
                 }
             });
             
@@ -448,83 +429,76 @@ class ClassManager {
     
     // ===== LESSON METHODS =====
 
-/**
- * Load lessons for this class
- */
-async loadLessons() {
-    try {
-        const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${this.classId}`, {
-            headers: { 'Authorization': `Bearer ${this.token}` }
-        });
+    async loadLessons() {
+        try {
+            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${this.classId}`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
 
-        if (!response.ok) throw new Error('Failed to load lessons');
+            if (!response.ok) throw new Error('Failed to load lessons');
 
-        const data = await response.json();
-        this.lessons = data.lessons || [];
-        console.log('Lessons loaded:', this.lessons.length);
-    } catch (error) {
-        console.error('Error loading lessons:', error);
-        this.lessons = [];
+            const data = await response.json();
+            this.lessons = data.lessons || [];
+            console.log('Lessons loaded:', this.lessons.length);
+        } catch (error) {
+            console.error('Error loading lessons:', error);
+            this.lessons = [];
+        }
     }
-}
 
-/**
- * Render lessons in the lessons tab
- */
-renderLessons() {
-    const container = document.getElementById('lessonsContainer');
-    if (!container) return;
+    renderLessons() {
+        const container = document.getElementById('lessonsContainer');
+        if (!container) return;
 
-    if (!this.lessons || this.lessons.length === 0) {
+        if (!this.lessons || this.lessons.length === 0) {
+            container.innerHTML = `
+                <div class="no-lessons">
+                    <p>📚 No lessons available yet.</p>
+                    ${this.user?.user_type === 'instructor' ? 
+                        `<a href="instructor/lessons/create.html?classId=${this.classId}" class="btn btn-primary">Create First Lesson</a>` : 
+                        '<p class="no-lessons-sub">Check back later for new lessons.</p>'
+                    }
+                </div>
+            `;
+            return;
+        }
+
+        const totalLessons = this.lessons.length;
+        const completedLessons = this.lessons.filter(l => l.completed).length;
+        const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
         container.innerHTML = `
-            <div class="no-lessons">
-                <p>📚 No lessons available yet.</p>
-                ${this.user?.user_type === 'instructor' ? 
-                    `<a href="instructor/lessons/create.html?classId=${this.classId}" class="btn btn-primary">Create First Lesson</a>` : 
-                    '<p class="no-lessons-sub">Check back later for new lessons.</p>'
-                }
+            <div class="lessons-progress" style="margin-bottom: 20px; padding: 16px; background: var(--bg-secondary); border-radius: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                    <div>
+                        <strong>Course Progress</strong>
+                        <span style="color: var(--text-secondary); margin-left: 8px;">${completedLessons}/${totalLessons} lessons completed</span>
+                    </div>
+                    <span style="font-weight: 600; color: var(--accent-blue);">${progress}%</span>
+                </div>
+                <div class="progress-bar" style="margin-top: 8px; height: 6px; background: var(--bg-elevated); border-radius: 4px; overflow: hidden;">
+                    <div class="progress-fill" style="width: ${progress}%; height: 100%; background: var(--accent-blue); border-radius: 4px; transition: width 0.3s ease;"></div>
+                </div>
+            </div>
+            <div class="lessons-grid">
+                ${this.lessons.map((lesson, index) => `
+                    <div class="lesson-card ${lesson.completed ? 'completed' : ''}" 
+                         onclick="window.location.href='lesson.html?classId=${this.classId}&lessonId=${lesson._id}'">
+                        <div class="lesson-card-header">
+                            <span class="lesson-number">Lesson ${index + 1}</span>
+                            ${lesson.completed ? '<span class="completed-badge">✅ Completed</span>' : ''}
+                        </div>
+                        <h4>${this.escapeHtml(lesson.title)}</h4>
+                        <p>${this.escapeHtml(lesson.description || '')}</p>
+                        <div class="lesson-card-footer">
+                            <span>⏱️ ${lesson.estimatedTime || 0} min</span>
+                            <span>📝 ${lesson.contentItems?.length || 0} items</span>
+                        </div>
+                    </div>
+                `).join('')}
             </div>
         `;
-        return;
     }
-
-    // Calculate progress
-    const totalLessons = this.lessons.length;
-    const completedLessons = this.lessons.filter(l => l.completed).length;
-    const progress = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-
-    container.innerHTML = `
-        <div class="lessons-progress" style="margin-bottom: 20px; padding: 16px; background: var(--bg-secondary); border-radius: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                <div>
-                    <strong>Course Progress</strong>
-                    <span style="color: var(--text-secondary); margin-left: 8px;">${completedLessons}/${totalLessons} lessons completed</span>
-                </div>
-                <span style="font-weight: 600; color: var(--accent-blue);">${progress}%</span>
-            </div>
-            <div class="progress-bar" style="margin-top: 8px; height: 6px; background: var(--bg-elevated); border-radius: 4px; overflow: hidden;">
-                <div class="progress-fill" style="width: ${progress}%; height: 100%; background: var(--accent-blue); border-radius: 4px; transition: width 0.3s ease;"></div>
-            </div>
-        </div>
-        <div class="lessons-grid">
-            ${this.lessons.map((lesson, index) => `
-                <div class="lesson-card ${lesson.completed ? 'completed' : ''}" 
-                     onclick="window.location.href='lesson.html?classId=${this.classId}&lessonId=${lesson._id}'">
-                    <div class="lesson-card-header">
-                        <span class="lesson-number">Lesson ${index + 1}</span>
-                        ${lesson.completed ? '<span class="completed-badge">✅ Completed</span>' : ''}
-                    </div>
-                    <h4>${this.escapeHtml(lesson.title)}</h4>
-                    <p>${this.escapeHtml(lesson.description || '')}</p>
-                    <div class="lesson-card-footer">
-                        <span>⏱️ ${lesson.estimatedTime || 0} min</span>
-                        <span>📝 ${lesson.contentItems?.length || 0} items</span>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
 
     async loadUserProgress() {
         try {
@@ -644,7 +618,6 @@ renderLessons() {
             this.renderClassReviews();
         }
         
-        // ===== QUIZ TAB =====
         if (tabName === 'quizzes') {
             if (!this.quizzes || this.quizzes.length === 0) {
                 this.loadQuizzes().then(() => {
@@ -654,13 +627,13 @@ renderLessons() {
                 this.renderQuizzes();
             }
         }
-           if (tabName === 'lessons') {
-        if (!this.lessons || this.lessons.length === 0) {
-            this.loadLessons().then(() => this.renderLessons());
-        } else {
-            this.renderLessons();
+        if (tabName === 'lessons') {
+            if (!this.lessons || this.lessons.length === 0) {
+                this.loadLessons().then(() => this.renderLessons());
+            } else {
+                this.renderLessons();
+            }
         }
-    }
     }
 
     async renderClassData() {
@@ -704,13 +677,11 @@ renderLessons() {
                     const instructorNameEl = document.getElementById('instructorName');
                     const instructorBioEl = document.getElementById('instructorBio');
                     
-                    // Try to get instructor name from class data
                     if (this.classData.instructorId) {
                         if (typeof this.classData.instructorId === 'object' && this.classData.instructorId.firstName) {
                             const name = `${this.classData.instructorId.firstName || ''} ${this.classData.instructorId.lastName || ''}`.trim();
                             if (instructorNameEl) instructorNameEl.textContent = name || 'Staff';
                         } else {
-                            // Fetch instructor details
                             const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -753,12 +724,16 @@ renderLessons() {
         `;
     }
 
+    /**
+     * RENDER PRICE AND PAYMENT - HIDES PAYMENT SECTION FOR ENROLLED STUDENTS
+     */
     renderPriceAndPayment() {
         const price = this.classData?.price || 0;
         const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
         const currency = this.classData?.currency || 'NGN';
         
         const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
+        const isEnrolled = this.isEnrolled;
         
         let paymentSection = document.getElementById('paymentSection');
         if (!paymentSection) {
@@ -771,21 +746,20 @@ renderLessons() {
             }
         }
         
+        // ===== HIDE PAYMENT SECTION FOR ENROLLED STUDENTS =====
+        if (isEnrolled) {
+            paymentSection.className = 'payment-section payment-section-hidden';
+            paymentSection.innerHTML = '';
+            return;
+        }
+        
+        paymentSection.className = 'payment-section';
+        
         if (isFree || price === 0) {
             paymentSection.innerHTML = `
                 <div class="payment-info free-badge">
                     <span class="badge free">🎓 FREE CLASS</span>
                     <p>All content is available for free. No payment required.</p>
-                </div>
-            `;
-            return;
-        }
-        
-        if (hasPaid) {
-            paymentSection.innerHTML = `
-                <div class="payment-info paid-badge">
-                    <span class="badge paid">✅ ACCESS GRANTED</span>
-                    <p>You have full access to all recordings and materials.</p>
                 </div>
             `;
             return;
@@ -820,10 +794,21 @@ renderLessons() {
         }
     }
 
+    /**
+     * INITIATE PAYMENT - FIXED JSON PARSING ERROR
+     */
     async initiatePayment() {
+        // Check if user is logged in
         if (!this.user) {
-            window.showToast('Please login to purchase this course', 'error');
+            window.showToast('Please login to purchase this course', true);
             window.location.href = 'login.html';
+            return;
+        }
+        
+        // Check if already enrolled
+        if (this.isEnrolled) {
+            window.showToast('You are already enrolled in this class!', false);
+            this.renderPriceAndPayment();
             return;
         }
         
@@ -840,31 +825,61 @@ renderLessons() {
         }
         
         try {
-            const response = await fetch('/api/payment/initialize', {
+            console.log('Initiating payment for class:', this.classId, 'User:', this.user.id);
+            
+            const response = await fetch('https://fissk-backend.onrender.com/api/payment/initialize', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
                 },
                 body: JSON.stringify({
                     classId: this.classId,
-                    userId: this.user.id
+                    userId: this.user.id,
+                    email: this.user.email,
+                    amount: price
                 })
             });
             
-            const data = await response.json();
+            console.log('Payment response status:', response.status);
             
-            if (data.success) {
+            // Check if response is ok before parsing JSON
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Payment error response:', errorText);
+                throw new Error(`Payment request failed: ${response.status} ${response.statusText}`);
+            }
+            
+            // Get response text first to handle empty responses
+            const responseText = await response.text();
+            console.log('Payment response text:', responseText);
+            
+            // Parse JSON only if there's content
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('Failed to parse payment response:', parseError);
+                throw new Error('Invalid response from payment server');
+            }
+            
+            if (data.success && data.data && data.data.authorizationUrl) {
+                // Redirect to payment gateway
                 window.location.href = data.data.authorizationUrl;
             } else {
-                window.showToast(data.message || 'Payment initialization failed', 'error');
+                throw new Error(data.message || 'Payment initialization failed');
             }
+            
         } catch (error) {
             console.error('Payment error:', error);
-            window.showToast('Failed to initialize payment. Please try again.', 'error');
-        } finally {
+            window.showToast(error.message || 'Failed to initialize payment. Please try again.', true);
+            
+            // Re-enable button
             if (buyBtn) {
                 buyBtn.disabled = false;
-                buyBtn.textContent = `💳 Buy Course - ₦${price.toLocaleString()}`;
+                const currency = this.classData?.currency || 'NGN';
+                const price = this.classData?.price || 0;
+                buyBtn.textContent = `💳 Buy Course - ${currency} ${price.toLocaleString()}`;
             }
         }
     }
@@ -1575,336 +1590,318 @@ renderLessons() {
         }
     }
 
-   /**
- * Render videos - ONLY for enrolled users
- */
-renderVideos() {
-    const videosContainer = document.getElementById('videosContainer');
-    const noVideos = document.getElementById('noVideos');
+    renderVideos() {
+        const videosContainer = document.getElementById('videosContainer');
+        const noVideos = document.getElementById('noVideos');
 
-    // ===== ACCESS CONTROL =====
-    // Check if user is logged in
-    if (!this.user) {
-        if (videosContainer) {
-            videosContainer.style.display = 'block';
-            videosContainer.innerHTML = `
-                <div class="access-locked">
-                    <div class="lock-icon">🔒</div>
-                    <h3>Access Restricted</h3>
-                    <p>Please <a href="login.html" class="btn-link">login</a> to view class videos.</p>
-                    <a href="login.html" class="btn btn-primary">Login to Access</a>
-                </div>
-            `;
-        }
-        if (noVideos) noVideos.style.display = 'none';
-        return;
-    }
-
-    // Check if user is enrolled
-    if (!this.isEnrolled) {
-        if (videosContainer) {
-            videosContainer.style.display = 'block';
-            videosContainer.innerHTML = `
-                <div class="access-locked">
-                    <div class="lock-icon">🔒</div>
-                    <h3>Enroll to Access Videos</h3>
-                    <p>You need to be enrolled in this class to view videos and materials.</p>
-                    <button class="btn btn-primary" id="enrollForVideosBtn">Enroll Now</button>
-                </div>
-            `;
-            const enrollBtn = videosContainer.querySelector('#enrollForVideosBtn');
-            if (enrollBtn) {
-                enrollBtn.addEventListener('click', () => {
-                    this.handleEnrollment();
-                });
-            }
-        }
-        if (noVideos) noVideos.style.display = 'none';
-        return;
-    }
-
-    // Check if class requires payment and user has paid
-    const price = this.classData?.price || 0;
-    const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
-    const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
-
-    if (!isFree && price > 0 && !hasPaid) {
-        if (videosContainer) {
-            videosContainer.style.display = 'block';
-            videosContainer.innerHTML = `
-                <div class="access-locked">
-                    <div class="lock-icon">💰</div>
-                    <h3>Payment Required</h3>
-                    <p>This class requires payment to access videos and materials.</p>
-                    <div class="price-display-small">
-                        <span class="price">₦${price.toLocaleString()}</span>
-                        <span class="label">One-time payment • Lifetime access</span>
+        if (!this.user) {
+            if (videosContainer) {
+                videosContainer.style.display = 'block';
+                videosContainer.innerHTML = `
+                    <div class="access-locked">
+                        <div class="lock-icon">🔒</div>
+                        <h3>Access Restricted</h3>
+                        <p>Please <a href="login.html" class="btn-link">login</a> to view class videos.</p>
+                        <a href="login.html" class="btn btn-primary">Login to Access</a>
                     </div>
-                    <button class="btn btn-primary" id="buyForVideosBtn">💳 Buy Course - ₦${price.toLocaleString()}</button>
-                </div>
-            `;
-            const buyBtn = videosContainer.querySelector('#buyForVideosBtn');
-            if (buyBtn) {
-                buyBtn.addEventListener('click', () => {
-                    this.initiatePayment();
-                });
+                `;
             }
+            if (noVideos) noVideos.style.display = 'none';
+            return;
         }
-        if (noVideos) noVideos.style.display = 'none';
-        return;
-    }
 
-    // If no videos, show message
-    if (!this.videos || this.videos.length === 0) {
-        if (videosContainer) videosContainer.style.display = 'none';
-        if (noVideos) {
-            noVideos.style.display = 'block';
-            noVideos.innerHTML = '<p>No videos available for this class yet.</p>';
-        }
-        return;
-    }
-    
-    // User has access - show videos
-    if (noVideos) noVideos.style.display = 'none';
-    if (videosContainer) {
-        videosContainer.style.display = 'grid';
-        videosContainer.innerHTML = this.videos.map((video, index) => {
-            const thumbnailUrl = video.thumbnailUrl || 
-                (video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` : '');
-            const isLocked = video.locked === true;
-            const title = video.videoDetails?.title || video.title || 'Untitled';
-            const description = video.videoDetails?.description || video.description || 'No description';
-            const duration = video.videoDetails?.duration || video.duration || 'Unknown';
-            const price = video.price || this.classData?.price || 0;
-            
-            return `
-                <div class="video-card ${isLocked ? 'locked' : ''}" 
-                     data-video-index="${index}" 
-                     data-video-id="${video._id || video.id}"
-                     data-locked="${isLocked}">
-                    <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
-                        <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
-                        ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
-                        ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
-                        ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
+        if (!this.isEnrolled) {
+            if (videosContainer) {
+                videosContainer.style.display = 'block';
+                videosContainer.innerHTML = `
+                    <div class="access-locked">
+                        <div class="lock-icon">🔒</div>
+                        <h3>Enroll to Access Videos</h3>
+                        <p>You need to be enrolled in this class to view videos and materials.</p>
+                        <button class="btn btn-primary" id="enrollForVideosBtn">Enroll Now</button>
                     </div>
-                    <div class="video-info">
-                        <h4>${isLocked ? '🔒 ' : ''}${this.escapeHtml(title)}</h4>
-                        <p>${this.escapeHtml(description)}</p>
-                        <div class="video-meta">
-                            <span>⏱️ ${duration}</span>
-                            ${isLocked ? '<span class="locked-badge">🔒 Purchase Required</span>' : ''}
+                `;
+                const enrollBtn = videosContainer.querySelector('#enrollForVideosBtn');
+                if (enrollBtn) {
+                    enrollBtn.addEventListener('click', () => {
+                        this.handleEnrollment();
+                    });
+                }
+            }
+            if (noVideos) noVideos.style.display = 'none';
+            return;
+        }
+
+        const price = this.classData?.price || 0;
+        const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
+        const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
+
+        if (!isFree && price > 0 && !hasPaid) {
+            if (videosContainer) {
+                videosContainer.style.display = 'block';
+                videosContainer.innerHTML = `
+                    <div class="access-locked">
+                        <div class="lock-icon">💰</div>
+                        <h3>Payment Required</h3>
+                        <p>This class requires payment to access videos and materials.</p>
+                        <div class="price-display-small">
+                            <span class="price">₦${price.toLocaleString()}</span>
+                            <span class="label">One-time payment • Lifetime access</span>
+                        </div>
+                        <button class="btn btn-primary" id="buyForVideosBtn">💳 Buy Course - ₦${price.toLocaleString()}</button>
+                    </div>
+                `;
+                const buyBtn = videosContainer.querySelector('#buyForVideosBtn');
+                if (buyBtn) {
+                    buyBtn.addEventListener('click', () => {
+                        this.initiatePayment();
+                    });
+                }
+            }
+            if (noVideos) noVideos.style.display = 'none';
+            return;
+        }
+
+        if (!this.videos || this.videos.length === 0) {
+            if (videosContainer) videosContainer.style.display = 'none';
+            if (noVideos) {
+                noVideos.style.display = 'block';
+                noVideos.innerHTML = '<p>No videos available for this class yet.</p>';
+            }
+            return;
+        }
+        
+        if (noVideos) noVideos.style.display = 'none';
+        if (videosContainer) {
+            videosContainer.style.display = 'grid';
+            videosContainer.innerHTML = this.videos.map((video, index) => {
+                const thumbnailUrl = video.thumbnailUrl || 
+                    (video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` : '');
+                const isLocked = video.locked === true;
+                const title = video.videoDetails?.title || video.title || 'Untitled';
+                const description = video.videoDetails?.description || video.description || 'No description';
+                const duration = video.videoDetails?.duration || video.duration || 'Unknown';
+                const price = video.price || this.classData?.price || 0;
+                
+                return `
+                    <div class="video-card ${isLocked ? 'locked' : ''}" 
+                         data-video-index="${index}" 
+                         data-video-id="${video._id || video.id}"
+                         data-locked="${isLocked}">
+                        <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
+                            <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
+                            ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
+                            ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
+                            ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
+                        </div>
+                        <div class="video-info">
+                            <h4>${isLocked ? '🔒 ' : ''}${this.escapeHtml(title)}</h4>
+                            <p>${this.escapeHtml(description)}</p>
+                            <div class="video-meta">
+                                <span>⏱️ ${duration}</span>
+                                ${isLocked ? '<span class="locked-badge">🔒 Purchase Required</span>' : ''}
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-        }).join('');
+                `;
+            }).join('');
 
-        videosContainer.querySelectorAll('.video-card').forEach((card) => {
-            card.addEventListener('click', () => {
-                const videoIndex = parseInt(card.dataset.videoIndex);
-                const isLocked = card.dataset.locked === 'true';
-                
-                if (isLocked) {
-                    const price = this.videos[videoIndex]?.price || this.classData?.price || 0;
-                    if (price > 0) {
-                        window.showToast(`💳 This video requires payment. Price: ₦${price.toLocaleString()}`, true);
-                        const paymentSection = document.getElementById('paymentSection');
-                        if (paymentSection) {
-                            paymentSection.scrollIntoView({ behavior: 'smooth' });
+            videosContainer.querySelectorAll('.video-card').forEach((card) => {
+                card.addEventListener('click', () => {
+                    const videoIndex = parseInt(card.dataset.videoIndex);
+                    const isLocked = card.dataset.locked === 'true';
+                    
+                    if (isLocked) {
+                        const price = this.videos[videoIndex]?.price || this.classData?.price || 0;
+                        if (price > 0) {
+                            window.showToast(`💳 This video requires payment. Price: ₦${price.toLocaleString()}`, true);
+                            const paymentSection = document.getElementById('paymentSection');
+                            if (paymentSection) {
+                                paymentSection.scrollIntoView({ behavior: 'smooth' });
+                            }
+                        } else {
+                            window.showToast('🔒 Please enroll in this class to access this video', true);
                         }
-                    } else {
-                        window.showToast('🔒 Please enroll in this class to access this video', true);
+                        return;
                     }
-                    return;
-                }
-                
-                console.log('Video card clicked, index:', videoIndex);
-                this.playVideo(videoIndex);
+                    
+                    console.log('Video card clicked, index:', videoIndex);
+                    this.playVideo(videoIndex);
+                });
             });
-        });
-    }
-}
-
-   /**
- * Render recordings - ONLY for enrolled users with paid access
- */
-renderRecordings() {
-    const recordingsContainer = document.getElementById('recordingsContainer');
-    const noRecordings = document.getElementById('noRecordings');
-
-    // ===== ACCESS CONTROL =====
-    // Check if user is logged in
-    if (!this.user) {
-        if (recordingsContainer) {
-            recordingsContainer.style.display = 'block';
-            recordingsContainer.innerHTML = `
-                <div class="access-locked">
-                    <div class="lock-icon">🔒</div>
-                    <h3>Access Restricted</h3>
-                    <p>Please <a href="login.html" class="btn-link">login</a> to view class recordings.</p>
-                    <a href="login.html" class="btn btn-primary">Login to Access</a>
-                </div>
-            `;
         }
-        if (noRecordings) noRecordings.style.display = 'none';
-        return;
     }
 
-    // Check if user is enrolled
-    if (!this.isEnrolled) {
-        if (recordingsContainer) {
-            recordingsContainer.style.display = 'block';
-            recordingsContainer.innerHTML = `
-                <div class="access-locked">
-                    <div class="lock-icon">🔒</div>
-                    <h3>Enroll to Access Recordings</h3>
-                    <p>You need to be enrolled in this class to view recordings and materials.</p>
-                    <button class="btn btn-primary" id="enrollForRecordingsBtn">Enroll Now</button>
-                </div>
-            `;
-            const enrollBtn = recordingsContainer.querySelector('#enrollForRecordingsBtn');
-            if (enrollBtn) {
-                enrollBtn.addEventListener('click', () => {
-                    this.handleEnrollment();
-                });
-            }
-        }
-        if (noRecordings) noRecordings.style.display = 'none';
-        return;
-    }
+    renderRecordings() {
+        const recordingsContainer = document.getElementById('recordingsContainer');
+        const noRecordings = document.getElementById('noRecordings');
 
-    // Check if class requires payment and user has paid
-    const price = this.classData?.price || 0;
-    const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
-    const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
-
-    if (!isFree && price > 0 && !hasPaid) {
-        if (recordingsContainer) {
-            recordingsContainer.style.display = 'block';
-            recordingsContainer.innerHTML = `
-                <div class="access-locked">
-                    <div class="lock-icon">💰</div>
-                    <h3>Payment Required</h3>
-                    <p>This class requires payment to access recordings and materials.</p>
-                    <div class="price-display-small">
-                        <span class="price">₦${price.toLocaleString()}</span>
-                        <span class="label">One-time payment • Lifetime access</span>
+        if (!this.user) {
+            if (recordingsContainer) {
+                recordingsContainer.style.display = 'block';
+                recordingsContainer.innerHTML = `
+                    <div class="access-locked">
+                        <div class="lock-icon">🔒</div>
+                        <h3>Access Restricted</h3>
+                        <p>Please <a href="login.html" class="btn-link">login</a> to view class recordings.</p>
+                        <a href="login.html" class="btn btn-primary">Login to Access</a>
                     </div>
-                    <button class="btn btn-primary" id="buyForRecordingsBtn">💳 Buy Course - ₦${price.toLocaleString()}</button>
-                </div>
-            `;
-            const buyBtn = recordingsContainer.querySelector('#buyForRecordingsBtn');
-            if (buyBtn) {
-                buyBtn.addEventListener('click', () => {
-                    this.initiatePayment();
-                });
+                `;
             }
+            if (noRecordings) noRecordings.style.display = 'none';
+            return;
         }
-        if (noRecordings) noRecordings.style.display = 'none';
-        return;
-    }
 
-    // If no recordings, show message
-    if (!this.recordings || this.recordings.length === 0) {
-        if (recordingsContainer) recordingsContainer.style.display = 'none';
-        if (noRecordings) {
-            noRecordings.style.display = 'block';
-            noRecordings.innerHTML = '<p>No past livestream recordings available for this class yet.</p>';
-        }
-        return;
-    }
-    
-    // User has access - show recordings
-    if (noRecordings) noRecordings.style.display = 'none';
-    if (recordingsContainer) {
-        recordingsContainer.style.display = 'grid';
-        recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
-            const isLocked = recording.locked === true;
-            const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url || 
-                (recording.muxPlaybackId ? `https://stream.mux.com/${recording.muxPlaybackId}.m3u8` : null);
-            const thumbnailUrl = recording.thumbnailUrl || 
-                (recording.muxPlaybackId ? `https://image.mux.com/${recording.muxPlaybackId}/thumbnail.jpg?time=5` : '');
-            const title = recording.classTitle || recording.name || recording.filename || `Recording ${index + 1}`;
-            const description = recording.classDescription || recording.description || 'Past livestream recording';
-            const date = recording.uploadDate || recording.createdAt;
-            const duration = recording.duration || 'Unknown';
-            const muxStatus = recording.muxStatus || 'preparing';
-            const isReady = muxStatus === 'ready';
-            const isPreparing = muxStatus === 'preparing' || muxStatus === 'uploading';
-            const price = recording.price || this.classData?.price || 0;
-            
-            const statusBadge = isPreparing 
-                ? '<span class="processing-badge">⏳ Processing...</span>' 
-                : isReady 
-                    ? '<span class="ready-badge">✅ Ready</span>' 
-                    : '<span class="error-badge">⚠️ Error</span>';
-            
-            return `
-                <div class="recording-card ${isReady ? 'ready' : 'processing'} ${isLocked ? 'locked' : ''}" 
-                     data-recording-index="${index}" 
-                     data-recording-url="${videoUrl || ''}"
-                     data-mux-playback-id="${recording.muxPlaybackId || ''}"
-                     data-mux-status="${muxStatus}"
-                     data-locked="${isLocked}">
-                    <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
-                        <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
-                        ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
-                        ${statusBadge}
-                        ${!isReady ? '<div class="processing-overlay">⏳ Processing...</div>' : ''}
-                        ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
-                        ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
+        if (!this.isEnrolled) {
+            if (recordingsContainer) {
+                recordingsContainer.style.display = 'block';
+                recordingsContainer.innerHTML = `
+                    <div class="access-locked">
+                        <div class="lock-icon">🔒</div>
+                        <h3>Enroll to Access Recordings</h3>
+                        <p>You need to be enrolled in this class to view recordings and materials.</p>
+                        <button class="btn btn-primary" id="enrollForRecordingsBtn">Enroll Now</button>
                     </div>
-                    <div class="video-info">
-                        <h4>${isLocked ? '🔒 ' : '📹 '}${this.escapeHtml(title)}</h4>
-                        <p>${this.escapeHtml(description)}</p>
-                        <div class="video-meta">
-                            <span>⏱️ ${duration}</span>
-                            ${date ? `<span>📅 ${new Date(date).toLocaleDateString()}</span>` : ''}
-                            ${isPreparing ? `<span class="status-text">⏳ Processing...</span>` : ''}
-                            ${isLocked ? '<span class="locked-badge">🔒 Purchase Required</span>' : ''}
+                `;
+                const enrollBtn = recordingsContainer.querySelector('#enrollForRecordingsBtn');
+                if (enrollBtn) {
+                    enrollBtn.addEventListener('click', () => {
+                        this.handleEnrollment();
+                    });
+                }
+            }
+            if (noRecordings) noRecordings.style.display = 'none';
+            return;
+        }
+
+        const price = this.classData?.price || 0;
+        const isFree = this.classData?.isFree !== undefined ? this.classData.isFree : true;
+        const hasPaid = this.isEnrolled && this.enrollmentPaymentStatus === 'paid';
+
+        if (!isFree && price > 0 && !hasPaid) {
+            if (recordingsContainer) {
+                recordingsContainer.style.display = 'block';
+                recordingsContainer.innerHTML = `
+                    <div class="access-locked">
+                        <div class="lock-icon">💰</div>
+                        <h3>Payment Required</h3>
+                        <p>This class requires payment to access recordings and materials.</p>
+                        <div class="price-display-small">
+                            <span class="price">₦${price.toLocaleString()}</span>
+                            <span class="label">One-time payment • Lifetime access</span>
+                        </div>
+                        <button class="btn btn-primary" id="buyForRecordingsBtn">💳 Buy Course - ₦${price.toLocaleString()}</button>
+                    </div>
+                `;
+                const buyBtn = recordingsContainer.querySelector('#buyForRecordingsBtn');
+                if (buyBtn) {
+                    buyBtn.addEventListener('click', () => {
+                        this.initiatePayment();
+                    });
+                }
+            }
+            if (noRecordings) noRecordings.style.display = 'none';
+            return;
+        }
+
+        if (!this.recordings || this.recordings.length === 0) {
+            if (recordingsContainer) recordingsContainer.style.display = 'none';
+            if (noRecordings) {
+                noRecordings.style.display = 'block';
+                noRecordings.innerHTML = '<p>No past livestream recordings available for this class yet.</p>';
+            }
+            return;
+        }
+        
+        if (noRecordings) noRecordings.style.display = 'none';
+        if (recordingsContainer) {
+            recordingsContainer.style.display = 'grid';
+            recordingsContainer.innerHTML = this.recordings.map((recording, index) => {
+                const isLocked = recording.locked === true;
+                const videoUrl = recording.hlsUrl || recording.cloudinaryUrl || recording.url || 
+                    (recording.muxPlaybackId ? `https://stream.mux.com/${recording.muxPlaybackId}.m3u8` : null);
+                const thumbnailUrl = recording.thumbnailUrl || 
+                    (recording.muxPlaybackId ? `https://image.mux.com/${recording.muxPlaybackId}/thumbnail.jpg?time=5` : '');
+                const title = recording.classTitle || recording.name || recording.filename || `Recording ${index + 1}`;
+                const description = recording.classDescription || recording.description || 'Past livestream recording';
+                const date = recording.uploadDate || recording.createdAt;
+                const duration = recording.duration || 'Unknown';
+                const muxStatus = recording.muxStatus || 'preparing';
+                const isReady = muxStatus === 'ready';
+                const isPreparing = muxStatus === 'preparing' || muxStatus === 'uploading';
+                const price = recording.price || this.classData?.price || 0;
+                
+                const statusBadge = isPreparing 
+                    ? '<span class="processing-badge">⏳ Processing...</span>' 
+                    : isReady 
+                        ? '<span class="ready-badge">✅ Ready</span>' 
+                        : '<span class="error-badge">⚠️ Error</span>';
+                
+                return `
+                    <div class="recording-card ${isReady ? 'ready' : 'processing'} ${isLocked ? 'locked' : ''}" 
+                         data-recording-index="${index}" 
+                         data-recording-url="${videoUrl || ''}"
+                         data-mux-playback-id="${recording.muxPlaybackId || ''}"
+                         data-mux-status="${muxStatus}"
+                         data-locked="${isLocked}">
+                        <div class="video-thumbnail" style="background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); position: relative;">
+                            <span class="play-icon">${isLocked ? '🔒' : '▶'}</span>
+                            ${thumbnailUrl ? `<img src="${thumbnailUrl}" style="width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; opacity: 0.5;" onerror="this.style.display='none'">` : ''}
+                            ${statusBadge}
+                            ${!isReady ? '<div class="processing-overlay">⏳ Processing...</div>' : ''}
+                            ${isLocked ? '<div class="lock-overlay">🔒</div>' : ''}
+                            ${isLocked && price > 0 ? '<span class="price-badge">💰 ₦' + price.toLocaleString() + '</span>' : ''}
+                        </div>
+                        <div class="video-info">
+                            <h4>${isLocked ? '🔒 ' : '📹 '}${this.escapeHtml(title)}</h4>
+                            <p>${this.escapeHtml(description)}</p>
+                            <div class="video-meta">
+                                <span>⏱️ ${duration}</span>
+                                ${date ? `<span>📅 ${new Date(date).toLocaleDateString()}</span>` : ''}
+                                ${isPreparing ? `<span class="status-text">⏳ Processing...</span>` : ''}
+                                ${isLocked ? '<span class="locked-badge">🔒 Purchase Required</span>' : ''}
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-        }).join('');
+                `;
+            }).join('');
 
-        recordingsContainer.querySelectorAll('.recording-card').forEach((card) => {
-            card.addEventListener('click', () => {
-                const isLocked = card.dataset.locked === 'true';
-                const recordingUrl = card.dataset.recordingUrl;
-                const muxStatus = card.dataset.muxStatus;
-                
-                if (isLocked) {
-                    const price = this.classData?.price || 0;
-                    if (price > 0) {
-                        window.showToast(`💳 This recording requires payment. Price: ₦${price.toLocaleString()}`, true);
-                        const paymentSection = document.getElementById('paymentSection');
-                        if (paymentSection) {
-                            paymentSection.scrollIntoView({ behavior: 'smooth' });
+            recordingsContainer.querySelectorAll('.recording-card').forEach((card) => {
+                card.addEventListener('click', () => {
+                    const isLocked = card.dataset.locked === 'true';
+                    const recordingUrl = card.dataset.recordingUrl;
+                    const muxStatus = card.dataset.muxStatus;
+                    
+                    if (isLocked) {
+                        const price = this.classData?.price || 0;
+                        if (price > 0) {
+                            window.showToast(`💳 This recording requires payment. Price: ₦${price.toLocaleString()}`, true);
+                            const paymentSection = document.getElementById('paymentSection');
+                            if (paymentSection) {
+                                paymentSection.scrollIntoView({ behavior: 'smooth' });
+                            }
+                        } else {
+                            window.showToast('🔒 Please enroll in this class to access this recording', true);
                         }
-                    } else {
-                        window.showToast('🔒 Please enroll in this class to access this recording', true);
+                        return;
                     }
-                    return;
-                }
-                
-                console.log('Recording card clicked, URL:', recordingUrl);
-                
-                if (!recordingUrl) {
-                    window.showToast('Video URL not available', true);
-                    return;
-                }
-                
-                if (muxStatus === 'preparing' || muxStatus === 'uploading') {
-                    window.showToast('⏳ This video is still processing. Please wait a few minutes.', true);
-                }
-                
-                this.playRecording(recordingUrl, card);
+                    
+                    console.log('Recording card clicked, URL:', recordingUrl);
+                    
+                    if (!recordingUrl) {
+                        window.showToast('Video URL not available', true);
+                        return;
+                    }
+                    
+                    if (muxStatus === 'preparing' || muxStatus === 'uploading') {
+                        window.showToast('⏳ This video is still processing. Please wait a few minutes.', true);
+                    }
+                    
+                    this.playRecording(recordingUrl, card);
+                });
             });
-        });
+        }
     }
-}
 
     playVideo(videoIndex) {
         const video = this.videos[videoIndex];
@@ -2170,6 +2167,7 @@ renderRecordings() {
             if (response.ok) {
                 this.isEnrolled = true;
                 this.renderClassData();
+                this.renderPriceAndPayment(); // Refresh payment section
                 alert('Successfully enrolled in the class!');
                 location.reload();
             } else {
