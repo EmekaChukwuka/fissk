@@ -133,7 +133,7 @@ export const initializePayment = async (req, res) => {
   }
 };
 
-// ===== VERIFY PAYMENT =====
+// ===== VERIFY PAYMENT  =====
 export const verifyPayment = async (req, res) => {
   try {
     const { reference } = req.body;
@@ -144,6 +144,8 @@ export const verifyPayment = async (req, res) => {
         message: 'Reference is required'
       });
     }
+
+    console.log(`🔍 Verifying payment: ${reference}`);
 
     // Find payment record
     const payment = await Payment.findOne({ reference })
@@ -216,7 +218,7 @@ export const verifyPayment = async (req, res) => {
         paidAt: new Date(),
         accessType: 'paid'
       },
-      { new: true }
+      { new: true, upsert: true }
     );
 
     // Update class stats
@@ -251,8 +253,9 @@ export const verifyPayment = async (req, res) => {
       );
     } catch (emailError) {
       console.error('Failed to send receipt email:', emailError);
-      // Don't fail the request if email fails
     }
+
+    console.log(`✅ Payment verified successfully: ${reference}`);
 
     res.json({
       success: true,

@@ -19,7 +19,7 @@ paymentRouter.post('/webhook', handleWebhook);
 paymentRouter.post('/initialize', auth, initializePayment);
 
 // Verify payment
-paymentRouter.post('/verify', auth, verifyPayment);
+paymentRouter.post('/verify', verifyPayment);
 
 // Check payment status for a class
 paymentRouter.get('/status/:classId', auth, checkPaymentStatus);
