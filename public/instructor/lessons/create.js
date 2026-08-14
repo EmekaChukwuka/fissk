@@ -119,6 +119,9 @@ class LessonBuilder {
         try {
             console.log(`Loading available content for class ${this.classId}...`);
 
+            // Show loading state in selects
+            this.updateSelectsLoading(true);
+
             // Load available videos
             const videoRes = await fetch(`https://fissk-backend.onrender.com/api/lessons/available-videos/${this.classId}`, {
                 headers: { 
@@ -153,7 +156,7 @@ class LessonBuilder {
                 const quizData = await quizRes.json();
                 this.availableQuizzes = quizData.quizzes || [];
                 console.log(`Loaded ${this.availableQuizzes.length} quizzes`);
-                console.log(` this.availableQuizzes:`, this.availableQuizzes);
+                console.log('this.availableQuizzes:', this.availableQuizzes);
             } else {
                 if (quizRes.status === 401) {
                     localStorage.removeItem('token');
@@ -164,8 +167,102 @@ class LessonBuilder {
                 this.availableQuizzes = [];
             }
 
+            // Update selects with loaded data
+            this.updateSelectsLoading(false);
+            this.populateSelects();
+
         } catch (error) {
             console.error('Load available content error:', error);
+            this.updateSelectsLoading(false);
+            this.populateSelects();
+            
+            // Show a non-blocking warning
+            const warningMsg = document.createElement('div');
+            warningMsg.style.cssText = `
+                background: #fff3cd;
+                color: #856404;
+                padding: 12px 16px;
+                border-radius: 8px;
+                margin: 12px 0;
+                border: 1px solid #ffc107;
+            `;
+            warningMsg.innerHTML = `
+                ⚠️ Could not load some content. You can still create text content. 
+                Videos and quizzes may not be available if you don't have permission.
+            `;
+            const container = document.querySelector('.builder-card');
+            if (container) {
+                container.insertBefore(warningMsg, container.firstChild);
+            }
+        }
+    }
+
+    updateSelectsLoading(isLoading) {
+        const videoSelect = document.getElementById('videoSelect');
+        const quizSelect = document.getElementById('quizSelect');
+        
+        if (videoSelect) {
+            videoSelect.innerHTML = isLoading 
+                ? '<option value="">Loading videos...</option>'
+                : '<option value="">Select a recorded video...</option>';
+            videoSelect.disabled = isLoading;
+        }
+        
+        if (quizSelect) {
+            quizSelect.innerHTML = isLoading 
+                ? '<option value="">Loading quizzes...</option>'
+                : '<option value="">Select a quiz...</option>';
+            quizSelect.disabled = isLoading;
+        }
+    }
+
+    populateSelects() {
+        console.log('🔄 Populating selects...');
+        console.log('Available videos:', this.availableVideos);
+        console.log('Available quizzes:', this.availableQuizzes);
+
+        // Populate video select
+        const videoSelect = document.getElementById('videoSelect');
+        if (videoSelect) {
+            if (!this.availableVideos || this.availableVideos.length === 0) {
+                videoSelect.innerHTML = `
+                    <option value="">No videos available</option>
+                `;
+            } else {
+                videoSelect.innerHTML = `
+                    <option value="">Select a recorded video...</option>
+                    ${this.availableVideos.map(v => `
+                        <option value="${v._id}">${this.escapeHtml(v.classTitle || v.name || v.filename || 'Untitled')}</option>
+                    `).join('')}
+                `;
+            }
+            console.log('✅ Video select populated with', this.availableVideos.length, 'options');
+        } else {
+            console.warn('⚠️ Video select element not found');
+        }
+
+        // Populate quiz select
+        const quizSelect = document.getElementById('quizSelect');
+        if (quizSelect) {
+            if (!this.availableQuizzes || this.availableQuizzes.length === 0) {
+                quizSelect.innerHTML = `
+                    <option value="">No quizzes available</option>
+                `;
+                console.log('ℹ️ No quizzes available to populate');
+            } else {
+                quizSelect.innerHTML = `
+                    <option value="">Select a quiz...</option>
+                    ${this.availableQuizzes.map(q => {
+                        const title = q.title || 'Untitled Quiz';
+                        const questions = q.questionCount || 0;
+                        return `<option value="${q._id}">${this.escapeHtml(title)} (${questions} questions)</option>`;
+                    }).join('')}
+                `;
+                console.log('✅ Quiz select populated with', this.availableQuizzes.length, 'options');
+                console.log('Quiz select HTML:', quizSelect.innerHTML);
+            }
+        } else {
+            console.warn('⚠️ Quiz select element not found');
         }
     }
 
@@ -292,9 +389,13 @@ class LessonBuilder {
                 break;
             case 'video':
                 if (videoField) videoField.style.display = 'block';
+                // Refresh video select when showing
+                this.populateSelects();
                 break;
             case 'quiz':
                 if (quizField) quizField.style.display = 'block';
+                // Refresh quiz select when showing
+                this.populateSelects();
                 break;
             case 'material':
                 if (materialField) materialField.style.display = 'block';
@@ -381,6 +482,9 @@ class LessonBuilder {
 
         this.toggleContentFields();
         modal.style.display = 'flex';
+        
+        // Make sure selects are populated when modal opens
+        this.populateSelects();
     }
 
     saveContentItem() {

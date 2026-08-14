@@ -363,27 +363,50 @@ class ClassManager {
     // ============================================================
 
     async loadQuizzes() {
-        try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/class/${this.classId}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to load quizzes');
-            }
-            
-            const data = await response.json();
-            this.quizzes = data.quizzes || [];
-            console.log('Quizzes loaded:', this.quizzes.length);
-            
-        } catch (error) {
-            console.error('Error loading quizzes:', error);
+    try {
+        // Get fresh token
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+            console.log('No token found, skipping quiz load');
             this.quizzes = [];
+            return;
         }
+
+        console.log('Loading quizzes with token:', token.substring(0, 20) + '...');
+
+        const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/class/${this.classId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('Quiz load response status:', response.status);
+
+        if (response.status === 401) {
+            console.log('Token expired or invalid, clearing storage');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            // Don't redirect immediately, just show toast
+            window.showToast('Session expired. Please login again.', true);
+            this.quizzes = [];
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(`Failed to load quizzes: ${response.status}`);
+        }
+
+        const data = await response.json();
+        this.quizzes = data.quizzes || [];
+        console.log('Quizzes loaded:', this.quizzes.length);
+        
+    } catch (error) {
+        console.error('Error loading quizzes:', error);
+        this.quizzes = [];
     }
+}
 
     renderQuizzes() {
         const container = document.getElementById('quizzesContainer');
@@ -521,21 +544,250 @@ class ClassManager {
         }
     }
     
+
+
+    /**
+ * Show lesson detail in a modal
+ */
+showLessonDetail(lesson) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('lessonDetailModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'lessonDetailModal';
+        modal.className = 'modal';
+        modal.style.display = 'none';
+        document.body.appendChild(modal);
+    }
+
+    // Build content items HTML
+    let itemsHTML = '';
+    let completedCount = 0;
+    const totalItems = lesson.contentItems?.length || 0;
+
+    if (lesson.contentItems && lesson.contentItems.length > 0) {
+        itemsHTML = lesson.contentItems.map((item, index) => {
+            const isCompleted = false;
+            
+            let itemContent = '';
+            switch (item.type) {
+                case 'text':
+                    itemContent = `
+                        <div class="item-text-content" style="color: rgba(255,255,255,0.9);">${this.escapeHtml(item.content || '')}</div>
+                    `;
+                    break;
+                case 'video':
+                    // Get the correct video ID - use contentId or videoId
+                    const videoId = item.contentId || item.videoId;
+                    const videoUrl = item.videoDetails?.playbackUrl || 
+                                    (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : '');
+                    itemContent = `
+                        <div class="item-video-wrapper">
+                            ${videoUrl ? `
+                                <video controls style="max-width: 100%; border-radius: 8px;">
+                                    <source src="${videoUrl}" type="application/x-mpegURL">
+                                </video>
+                            ` : '<p style="color: rgba(255,255,255,0.5);">Video not available</p>'}
+                        </div>
+                        ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                    `;
+                    break;
+                case 'quiz':
+                    // FIX: Get the correct quiz ID - use contentId or quizId
+                    const quizId = item.contentId || item.quizId?._id || item.quizId;
+                    const quizDetails = item.quizDetails || {};
+                    itemContent = `
+                        <div class="item-quiz-wrapper">
+                            ${quizId ? `
+                                <a href="quiz/take.html?quizId=${quizId}" class="btn btn-primary" style="margin-right: 8px; background: #8B5FBF; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                                    📝 Take Quiz
+                                </a>
+                            ` : `
+                                <span style="color: rgba(255,255,255,0.5);">Quiz not available</span>
+                            `}
+                            ${quizDetails.questionCount ? `<span style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-left: 8px;">${quizDetails.questionCount} questions</span>` : ''}
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                        </div>
+                    `;
+                    break;
+                case 'material':
+                    itemContent = `
+                        <div class="item-material-wrapper">
+                            ${item.fileUrl ? `
+                                <a href="${item.fileUrl}" class="btn btn-outline" download style="margin-right: 8px; color: #8B5FBF; border: 1px solid #8B5FBF; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                                    📥 Download ${item.fileName || 'File'}
+                                </a>
+                            ` : '<p style="color: rgba(255,255,255,0.5);">Material not available</p>'}
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                        </div>
+                    `;
+                    break;
+                case 'link':
+                    itemContent = `
+                        <div class="item-link-wrapper">
+                            <a href="${item.linkUrl}" target="${item.linkTarget || '_blank'}" class="btn btn-outline" style="color: #8B5FBF; border: 1px solid #8B5FBF; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                                🔗 ${this.escapeHtml(item.title || 'Open Link')}
+                            </a>
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                        </div>
+                    `;
+                    break;
+                case 'embed':
+                    itemContent = `
+                        <div class="item-embed-wrapper">
+                            ${item.embedCode ? item.embedCode : ''}
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                        </div>
+                    `;
+                    break;
+                default:
+                    itemContent = `<p style="color: rgba(255,255,255,0.5);">Content type not supported</p>`;
+            }
+
+            const typeLabels = {
+                'text': 'Text',
+                'video': 'Video',
+                'quiz': 'Quiz',
+                'material': 'Material',
+                'link': 'Link',
+                'embed': 'Embed'
+            };
+
+            const typeColors = {
+                'text': '#3B82F6',
+                'video': '#EF4444',
+                'quiz': '#F59E0B',
+                'material': '#10B981',
+                'link': '#8B5FBF',
+                'embed': '#6B7280'
+            };
+
+            return `
+                <div class="lesson-content-item" data-item-index="${index}" style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; border-left: 4px solid ${typeColors[item.type] || '#8B5FBF'}; margin-bottom: 16px;">
+                    <div class="item-header" style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                        <span class="item-type-badge ${item.type}" style="display: inline-block; padding: 2px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; background: ${typeColors[item.type] || '#6B7280'}; color: white;">
+                            ${typeLabels[item.type] || item.type}
+                        </span>
+                        ${item.isRequired ? '<span style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">Required</span>' : '<span style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">Optional</span>'}
+                    </div>
+                    ${item.title ? `<div class="item-title" style="font-size: 1rem; font-weight: 600; color: white;">${this.escapeHtml(item.title)}</div>` : ''}
+                    ${itemContent}
+                    <div class="item-footer" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        ${item.duration ? `<span class="item-duration" style="font-size: 0.8rem; color: rgba(255,255,255,0.5);">⏱️ ${item.duration} min</span>` : ''}
+                        <button class="item-complete-btn incomplete" data-item-index="${index}" style="padding: 4px 16px; border-radius: 20px; font-size: 0.8rem; border: none; cursor: pointer; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.2);">
+                            Mark as Read
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } else {
+        itemsHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center; padding: 20px;">No content items in this lesson.</p>';
+    }
+
+    // Calculate progress
+    const progress = lesson.progressPercentage || 0;
+
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto; background: #1A1A2E; border-radius: 16px; padding: 32px; border: 1px solid rgba(255,255,255,0.1);">
+            <span class="close-modal" onclick="document.getElementById('lessonDetailModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; cursor: pointer; color: rgba(255,255,255,0.6); transition: color 0.3s ease; z-index: 10;">&times;</span>
+            
+            <div style="margin-bottom: 16px;">
+                <h2 style="color: white; margin: 0;">${this.escapeHtml(lesson.title)}</h2>
+                ${lesson.description ? `<p style="color: rgba(255,255,255,0.6); margin-top: 4px;">${this.escapeHtml(lesson.description)}</p>` : ''}
+            </div>
+
+            <div class="lesson-progress-container" style="background: rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;">
+                <div class="progress-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <h4 style="color: white; font-size: 1rem; margin: 0;">📊 Lesson Progress</h4>
+                    <span style="color: rgba(255,255,255,0.7); font-size: 0.9rem;">${progress}% complete</span>
+                </div>
+                <div class="progress-bar" style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 8px;">
+                    <div class="progress-fill" style="width: ${progress}%; height: 100%; background: linear-gradient(90deg, #8B5FBF, #6C3CE1); border-radius: 4px; transition: width 0.5s ease;"></div>
+                </div>
+            </div>
+
+            <div class="lesson-content-items" style="display: flex; flex-direction: column; gap: 16px;">
+                ${itemsHTML}
+            </div>
+
+            <button class="mark-lesson-complete-btn ${lesson.completed ? 'completed' : 'available'}" 
+                    id="markLessonCompleteBtn"
+                    ${lesson.completed ? 'disabled' : ''}
+                    style="padding: 12px 32px; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s ease; width: 100%; margin-top: 20px; ${lesson.completed ? 'background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); cursor: default;' : 'background: #10B981; color: white;'}">
+                ${lesson.completed ? '✅ Lesson Completed' : '✅ Mark Lesson as Complete'}
+            </button>
+        </div>
+    `;
+
+    // Show modal
+    modal.style.display = 'flex';
+
+    // Add event listener for mark complete button
+    const completeBtn = document.getElementById('markLessonCompleteBtn');
+    if (completeBtn && !lesson.completed) {
+        completeBtn.addEventListener('click', () => {
+            this.markLessonComplete(lesson._id);
+        });
+    }
+
+    // Add event listeners for item complete buttons
+    modal.querySelectorAll('.item-complete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const itemIndex = parseInt(btn.dataset.itemIndex);
+            this.toggleItemComplete(lesson._id, itemIndex, btn);
+        });
+    });
+}
+
+
     // ============================================================
     // LESSON METHODS
     // ============================================================
 
-    async loadLessons() {
+        async loadLessons() {
         try {
+            // Get fresh token
+            const token = localStorage.getItem('token');
+            
+            if (!token) {
+                console.log('No token found, skipping lessons load');
+                this.lessons = [];
+                return;
+            }
+
+            console.log('Loading lessons with token:', token.substring(0, 20) + '...');
+
             const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${this.classId}`, {
-                headers: { 'Authorization': `Bearer ${this.token}` }
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
             });
 
-            if (!response.ok) throw new Error('Failed to load lessons');
+            console.log('Lessons load response status:', response.status);
+
+            if (response.status === 401) {
+                console.log('Token expired or invalid, clearing storage');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.showToast('Session expired. Please login again.', true);
+                this.lessons = [];
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error(`Failed to load lessons: ${response.status}`);
+            }
 
             const data = await response.json();
             this.lessons = data.lessons || [];
             console.log('Lessons loaded:', this.lessons.length);
+
+            // Update lesson progress in sidebar
+            this.updateLessonProgressSidebar();
+
         } catch (error) {
             console.error('Error loading lessons:', error);
             this.lessons = [];
@@ -2366,205 +2618,262 @@ class ClassManager {
     /**
      * View a specific lesson in detail
      */
-    async viewLesson(lessonId) {
-        try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to load lesson');
-            }
-
-            const data = await response.json();
-            const lesson = data.lesson;
-
-            // Open in a modal or navigate to lesson page
-            this.showLessonDetail(lesson);
-        } catch (error) {
-            console.error('View lesson error:', error);
-            window.showToast('Failed to load lesson content', true);
+   /**
+ * View a specific lesson in detail
+ */
+async viewLesson(lessonId) {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.showToast('Please login to view lesson', true);
+            window.location.href = 'login.html';
+            return;
         }
-    }
 
+        const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.showToast('Session expired. Please login again.', true);
+                window.location.href = 'login.html';
+                return;
+            }
+            throw new Error('Failed to load lesson');
+        }
+
+        const data = await response.json();
+        const lesson = data.lesson;
+
+        // FIX: Ensure quiz items have proper IDs
+        if (lesson.contentItems) {
+            lesson.contentItems = lesson.contentItems.map(item => {
+                if (item.type === 'quiz') {
+                    // The quiz ID could be in contentId or quizId
+                    const quizId = item.contentId || 
+                                  (item.quizId?._id) || 
+                                  (typeof item.quizId === 'string' ? item.quizId : null);
+                    return {
+                        ...item,
+                        quizId: quizId,
+                        contentId: quizId
+                    };
+                }
+                return item;
+            });
+        }
+
+        // Open in a modal or navigate to lesson page
+        this.showLessonDetail(lesson);
+    } catch (error) {
+        console.error('View lesson error:', error);
+        window.showToast('Failed to load lesson content', true);
+    }
+}
     /**
      * Show lesson detail in a modal
      */
-    showLessonDetail(lesson) {
-        // Create modal if it doesn't exist
-        let modal = document.getElementById('lessonDetailModal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'lessonDetailModal';
-            modal.className = 'modal';
-            modal.style.display = 'none';
-            document.body.appendChild(modal);
-        }
+/**
+ * Show lesson detail in a modal
+ */
+showLessonDetail(lesson) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('lessonDetailModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'lessonDetailModal';
+        modal.className = 'modal';
+        modal.style.display = 'none';
+        document.body.appendChild(modal);
+    }
 
-        // Build content items HTML
-        let itemsHTML = '';
-        let completedCount = 0;
-        const totalItems = lesson.contentItems?.length || 0;
+    // Build content items HTML
+    let itemsHTML = '';
+    const totalItems = lesson.contentItems?.length || 0;
 
-        if (lesson.contentItems && lesson.contentItems.length > 0) {
-            itemsHTML = lesson.contentItems.map((item, index) => {
-                const isCompleted = false; // We'll track this per item
-                
-                let itemContent = '';
-                switch (item.type) {
-                    case 'text':
-                        itemContent = `
-                            <div class="item-text-content">${this.escapeHtml(item.content || '')}</div>
-                        `;
-                        break;
-                    case 'video':
-                        const videoUrl = item.videoDetails?.playbackUrl || 
-                                        (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : '');
-                        itemContent = `
-                            <div class="item-video-wrapper">
-                                ${videoUrl ? `
-                                    <video controls>
-                                        <source src="${videoUrl}" type="application/x-mpegURL">
-                                    </video>
-                                ` : '<p style="color: rgba(255,255,255,0.5);">Video not available</p>'}
-                            </div>
-                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                        `;
-                        break;
-                    case 'quiz':
-                        const quizDetails = item.quizDetails || {};
-                        itemContent = `
-                            <div class="item-quiz-wrapper">
-                                <a href="quiz/take.html?quizId=${item.quizId?._id || item.quizId}" class="btn btn-primary" style="margin-right: 8px;">
+    // Get the correct quiz ID helper
+    const getQuizId = (item) => {
+        return item.contentId || item.quizId?._id || item.quizId || null;
+    };
+
+    if (lesson.contentItems && lesson.contentItems.length > 0) {
+        itemsHTML = lesson.contentItems.map((item, index) => {
+            let itemContent = '';
+            switch (item.type) {
+                case 'text':
+                    itemContent = `
+                        <div class="item-text-content" style="color: rgba(255,255,255,0.9); white-space: pre-wrap;">${this.escapeHtml(item.content || '')}</div>
+                    `;
+                    break;
+                case 'video':
+                    const videoUrl = item.videoDetails?.playbackUrl || 
+                                    (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : '');
+                    itemContent = `
+                        <div class="item-video-wrapper">
+                            ${videoUrl ? `
+                                <video controls style="max-width: 100%; border-radius: 8px; width: 100%;">
+                                    <source src="${videoUrl}" type="application/x-mpegURL">
+                                    Your browser does not support the video tag.
+                                </video>
+                            ` : '<p style="color: rgba(255,255,255,0.5);">Video not available</p>'}
+                        </div>
+                        ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                    `;
+                    break;
+                case 'quiz':
+                    // FIX: Get the correct quiz ID
+                    const quizId = getQuizId(item);
+                    const quizDetails = item.quizDetails || {};
+                    itemContent = `
+                        <div class="item-quiz-wrapper">
+                            ${quizId ? `
+                                <a href="quiz/take.html?quizId=${quizId}" class="btn btn-primary" style="margin-right: 8px; background: #8B5FBF; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
                                     📝 Take Quiz
                                 </a>
-                                ${quizDetails.questionCount ? `<span style="color: rgba(255,255,255,0.5); font-size: 0.85rem;">${quizDetails.questionCount} questions</span>` : ''}
-                                ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                            </div>
-                        `;
-                        break;
-                    case 'material':
-                        itemContent = `
-                            <div class="item-material-wrapper">
-                                ${item.fileUrl ? `
-                                    <a href="${item.fileUrl}" class="btn btn-outline" download style="margin-right: 8px;">
-                                        📥 Download ${item.fileName || 'File'}
-                                    </a>
-                                ` : '<p style="color: rgba(255,255,255,0.5);">Material not available</p>'}
-                                ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                            </div>
-                        `;
-                        break;
-                    case 'link':
-                        itemContent = `
-                            <div class="item-link-wrapper">
-                                <a href="${item.linkUrl}" target="${item.linkTarget || '_blank'}" class="btn btn-outline">
-                                    🔗 ${this.escapeHtml(item.title || 'Open Link')}
+                            ` : `
+                                <span style="color: rgba(255,255,255,0.5);">Quiz ID not found</span>
+                            `}
+                            ${quizDetails.questionCount ? `<span style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-left: 8px;">${quizDetails.questionCount} questions</span>` : ''}
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                        </div>
+                    `;
+                    break;
+                case 'material':
+                    itemContent = `
+                        <div class="item-material-wrapper">
+                            ${item.fileUrl ? `
+                                <a href="${item.fileUrl}" class="btn btn-outline" download style="margin-right: 8px; color: #8B5FBF; border: 1px solid #8B5FBF; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                                    📥 Download ${item.fileName || 'File'}
                                 </a>
-                                ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                            </div>
-                        `;
-                        break;
-                    case 'embed':
-                        itemContent = `
-                            <div class="item-embed-wrapper">
-                                ${item.embedCode ? item.embedCode : ''}
-                                ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                            </div>
-                        `;
-                        break;
-                    default:
-                        itemContent = `<p style="color: rgba(255,255,255,0.5);">Content type not supported</p>`;
-                }
-
-                const typeLabels = {
-                    'text': 'Text',
-                    'video': 'Video',
-                    'quiz': 'Quiz',
-                    'material': 'Material',
-                    'link': 'Link',
-                    'embed': 'Embed'
-                };
-
-                return `
-                    <div class="lesson-content-item" data-item-index="${index}">
-                        <div class="item-header">
-                            <span class="item-type-badge ${item.type}">${typeLabels[item.type] || item.type}</span>
-                            ${item.isRequired ? '<span style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">Required</span>' : '<span style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">Optional</span>'}
+                            ` : '<p style="color: rgba(255,255,255,0.5);">Material not available</p>'}
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
                         </div>
-                        ${item.title ? `<div class="item-title">${this.escapeHtml(item.title)}</div>` : ''}
-                        ${itemContent}
-                        <div class="item-footer">
-                            ${item.duration ? `<span class="item-duration">⏱️ ${item.duration} min</span>` : ''}
-                            <button class="item-complete-btn incomplete" data-item-index="${index}">
-                                ${isCompleted ? '✅ Completed' : 'Mark as Read'}
-                            </button>
+                    `;
+                    break;
+                case 'link':
+                    itemContent = `
+                        <div class="item-link-wrapper">
+                            <a href="${item.linkUrl}" target="${item.linkTarget || '_blank'}" class="btn btn-outline" style="color: #8B5FBF; border: 1px solid #8B5FBF; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                                🔗 ${this.escapeHtml(item.title || 'Open Link')}
+                            </a>
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
                         </div>
+                    `;
+                    break;
+                case 'embed':
+                    itemContent = `
+                        <div class="item-embed-wrapper">
+                            ${item.embedCode ? item.embedCode : ''}
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                        </div>
+                    `;
+                    break;
+                default:
+                    itemContent = `<p style="color: rgba(255,255,255,0.5);">Content type not supported</p>`;
+            }
+
+            const typeLabels = {
+                'text': 'Text',
+                'video': 'Video',
+                'quiz': 'Quiz',
+                'material': 'Material',
+                'link': 'Link',
+                'embed': 'Embed'
+            };
+
+            const typeColors = {
+                'text': '#3B82F6',
+                'video': '#EF4444',
+                'quiz': '#F59E0B',
+                'material': '#10B981',
+                'link': '#8B5FBF',
+                'embed': '#6B7280'
+            };
+
+            return `
+                <div class="lesson-content-item" data-item-index="${index}" style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; border-left: 4px solid ${typeColors[item.type] || '#8B5FBF'}; margin-bottom: 16px;">
+                    <div class="item-header" style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                        <span class="item-type-badge ${item.type}" style="display: inline-block; padding: 2px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; background: ${typeColors[item.type] || '#6B7280'}; color: white;">
+                            ${typeLabels[item.type] || item.type}
+                        </span>
+                        ${item.isRequired ? '<span style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">Required</span>' : '<span style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">Optional</span>'}
                     </div>
-                `;
-            }).join('');
-        } else {
-            itemsHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center; padding: 20px;">No content items in this lesson.</p>';
-        }
-
-        // Calculate progress
-        const progress = lesson.progressPercentage || 0;
-
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto; background: #1A1A2E; border-radius: 16px; padding: 32px;">
-                <span class="close-modal" onclick="document.getElementById('lessonDetailModal').style.display='none'">&times;</span>
-                
-                <div style="margin-bottom: 16px;">
-                    <h2 style="color: white; margin: 0;">${this.escapeHtml(lesson.title)}</h2>
-                    ${lesson.description ? `<p style="color: rgba(255,255,255,0.6); margin-top: 4px;">${this.escapeHtml(lesson.description)}</p>` : ''}
-                </div>
-
-                <div class="lesson-progress-container">
-                    <div class="progress-header">
-                        <h4>📊 Lesson Progress</h4>
-                        <span>${progress}% complete</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${progress}%;"></div>
+                    ${item.title ? `<div class="item-title" style="font-size: 1rem; font-weight: 600; color: white;">${this.escapeHtml(item.title)}</div>` : ''}
+                    ${itemContent}
+                    <div class="item-footer" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        ${item.duration ? `<span class="item-duration" style="font-size: 0.8rem; color: rgba(255,255,255,0.5);">⏱️ ${item.duration} min</span>` : ''}
+                        <button class="item-complete-btn incomplete" data-item-index="${index}" style="padding: 4px 16px; border-radius: 20px; font-size: 0.8rem; border: none; cursor: pointer; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.2);">
+                            Mark as Read
+                        </button>
                     </div>
                 </div>
+            `;
+        }).join('');
+    } else {
+        itemsHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center; padding: 20px;">No content items in this lesson.</p>';
+    }
 
-                <div class="lesson-content-items">
-                    ${itemsHTML}
-                </div>
+    // Calculate progress
+    const progress = lesson.progressPercentage || 0;
 
-                <button class="mark-lesson-complete-btn ${lesson.completed ? 'completed' : 'available'}" 
-                        id="markLessonCompleteBtn"
-                        ${lesson.completed ? 'disabled' : ''}>
-                    ${lesson.completed ? '✅ Lesson Completed' : '✅ Mark Lesson as Complete'}
-                </button>
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto; background: #1A1A2E; border-radius: 16px; padding: 32px; border: 1px solid rgba(255,255,255,0.1); position: relative;">
+            <span class="close-modal" onclick="document.getElementById('lessonDetailModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; cursor: pointer; color: rgba(255,255,255,0.6); transition: color 0.3s ease; z-index: 10;">&times;</span>
+            
+            <div style="margin-bottom: 16px;">
+                <h2 style="color: white; margin: 0;">${this.escapeHtml(lesson.title)}</h2>
+                ${lesson.description ? `<p style="color: rgba(255,255,255,0.6); margin-top: 4px;">${this.escapeHtml(lesson.description)}</p>` : ''}
             </div>
-        `;
 
-        // Show modal
-        modal.style.display = 'flex';
+            <div class="lesson-progress-container" style="background: rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;">
+                <div class="progress-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <h4 style="color: white; font-size: 1rem; margin: 0;">📊 Lesson Progress</h4>
+                    <span style="color: rgba(255,255,255,0.7); font-size: 0.9rem;">${progress}% complete</span>
+                </div>
+                <div class="progress-bar" style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 8px;">
+                    <div class="progress-fill" style="width: ${progress}%; height: 100%; background: linear-gradient(90deg, #8B5FBF, #6C3CE1); border-radius: 4px; transition: width 0.5s ease;"></div>
+                </div>
+            </div>
 
-        // Add event listener for mark complete button
-        const completeBtn = document.getElementById('markLessonCompleteBtn');
-        if (completeBtn && !lesson.completed) {
-            completeBtn.addEventListener('click', () => {
-                this.markLessonComplete(lesson._id);
-            });
-        }
+            <div class="lesson-content-items" style="display: flex; flex-direction: column; gap: 16px;">
+                ${itemsHTML}
+            </div>
 
-        // Add event listeners for item complete buttons
-        modal.querySelectorAll('.item-complete-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const itemIndex = parseInt(btn.dataset.itemIndex);
-                this.toggleItemComplete(lesson._id, itemIndex, btn);
-            });
+            <button class="mark-lesson-complete-btn ${lesson.completed ? 'completed' : 'available'}" 
+                    id="markLessonCompleteBtn"
+                    ${lesson.completed ? 'disabled' : ''}
+                    style="padding: 12px 32px; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s ease; width: 100%; margin-top: 20px; ${lesson.completed ? 'background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); cursor: default;' : 'background: #10B981; color: white;'}">
+                ${lesson.completed ? '✅ Lesson Completed' : '✅ Mark Lesson as Complete'}
+            </button>
+        </div>
+    `;
+
+    // Show modal
+    modal.style.display = 'flex';
+
+    // Add event listener for mark complete button
+    const completeBtn = document.getElementById('markLessonCompleteBtn');
+    if (completeBtn && !lesson.completed) {
+        completeBtn.addEventListener('click', () => {
+            this.markLessonComplete(lesson._id);
         });
     }
 
+    // Add event listeners for item complete buttons
+    modal.querySelectorAll('.item-complete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const itemIndex = parseInt(btn.dataset.itemIndex);
+            this.toggleItemComplete(lesson._id, itemIndex, btn);
+        });
+    });
+}
     /**
      * Mark a lesson as complete
      */

@@ -128,6 +128,10 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
  * Get a single lesson with full content
  * GET /api/lessons/:lessonId
  */
+/**
+ * Get a single lesson with full content
+ * GET /api/lessons/:lessonId
+ */
 lessonRouter.get('/:lessonId', auth, async (req, res) => {
   try {
     const { lessonId } = req.params;
@@ -148,7 +152,6 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
     // Check access
     const classData = await Class.findById(lesson.classId);
     
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
@@ -186,15 +189,16 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
 
     console.log('✅ Access granted');
 
-    // Populate video and quiz details
+    // Populate video and quiz details - FIX: Include the actual IDs
     const populatedContentItems = await Promise.all(
       lesson.contentItems.map(async (item) => {
         if (item.type === 'video' && item.contentId) {
-          // Use Stream.getClassVideos or direct model access
-          // We'll use the wrapper class's getById method
           const video = await Stream.getById(item.contentId);
           return {
             ...item,
+            // Keep the original contentId
+            contentId: item.contentId,
+            videoId: item.contentId,
             videoDetails: video ? {
               _id: video._id,
               muxPlaybackId: video.muxPlaybackId,
@@ -208,11 +212,21 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
         }
         if (item.type === 'quiz' && item.contentId) {
           const quiz = await Quiz.findById(item.contentId)
-            .select('title description questionCount totalPoints settings status')
+            .select('_id title description questionCount totalPoints settings status')
             .lean();
           return {
             ...item,
-            quizDetails: quiz
+            // KEEP the contentId - this is the quiz ID!
+            contentId: item.contentId,
+            quizId: item.contentId, // Also set quizId for frontend compatibility
+            quizDetails: quiz ? {
+              _id: quiz._id,
+              title: quiz.title,
+              description: quiz.description,
+              questionCount: quiz.questionCount,
+              totalPoints: quiz.totalPoints,
+              status: quiz.status
+            } : null
           };
         }
         return item;
@@ -223,6 +237,8 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
     const progress = enrollment?.lessonProgress?.find(
       lp => lp.lessonId.toString() === lessonId.toString()
     );
+
+    console.log('Populated content items:', JSON.stringify(populatedContentItems, null, 2));
 
     res.json({
       success: true,
