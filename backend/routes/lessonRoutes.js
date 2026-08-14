@@ -21,32 +21,72 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
     const { classId } = req.params;
     const userId = req.user.id;
 
-    // Check if user is enrolled or is instructor
+    console.log('========================================');
+    console.log('📊 GET CLASS LESSONS DEBUG');
+    console.log('========================================');
+    console.log('classId:', classId);
+    console.log('userId:', userId);
+    console.log('user_type:', req.user.user_type);
+
+    // Check if class exists
     const classData = await Class.findById(classId);
     if (!classData) {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    const isInstructor = classData.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
-    const enrollment = await Enrollment.findOne({ userId, classId });
+    console.log('✅ Class found:', classData.title);
+    console.log('Class instructorId:', classData.instructorId);
 
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
+      const userIdStr = userId ? userId.toString() : '';
+      isInstructor = instructorIdStr === userIdStr;
+      console.log('Is instructor?', isInstructor);
+    } catch (err) {
+      console.error('Error comparing IDs:', err);
+      isInstructor = false;
+    }
+
+    // Check if admin (using user_type from token)
+    const isAdmin = req.user.user_type === 'admin';
+    console.log('Is admin?', isAdmin);
+
+    // Check enrollment
+    let enrollment = null;
+    try {
+      enrollment = await Enrollment.findOne({ userId, classId });
+      console.log('Enrollment found:', !!enrollment);
+    } catch (err) {
+      console.error('Error checking enrollment:', err);
+    }
+
+    // If not instructor, not admin, and not enrolled, deny access
     if (!isInstructor && !isAdmin && !enrollment) {
+      console.log('❌ Access denied - not instructor, not admin, not enrolled');
       return res.status(403).json({ 
         success: false, 
         message: 'You must be enrolled in this class to view lessons' 
       });
     }
 
-    // Get published lessons (instructors and admins see all)
+    console.log('✅ User has access to lessons');
+
+    // Build query - instructors and admins see all, students see only published
     const query = { classId };
     if (!isInstructor && !isAdmin) {
       query.isPublished = true;
+      console.log('Student view - only showing published lessons');
+    } else {
+      console.log('Instructor/Admin view - showing all lessons');
     }
 
     const lessons = await Lesson.find(query)
       .sort({ order: 1 })
       .lean();
+
+    console.log(`Found ${lessons.length} lessons for class ${classId}`);
 
     // Get user progress
     const lessonProgress = enrollment?.lessonProgress || [];
@@ -61,10 +101,12 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
         completed: progress?.completed || false,
         progressPercentage: progress?.progressPercentage || 0,
         completedAt: progress?.completedAt || null,
-        // For students, hide draft lessons
         isPublished: (isInstructor || isAdmin) ? lesson.isPublished : lesson.isPublished
       };
     });
+
+    console.log('✅ Successfully returned lessons');
+    console.log('========================================');
 
     res.json({
       success: true,
@@ -87,20 +129,42 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
     const { lessonId } = req.params;
     const userId = req.user.id;
 
+    console.log('=== GET LESSON ===');
+    console.log('Lesson ID:', lessonId);
+    console.log('User ID:', userId);
+
     const lesson = await Lesson.findById(lessonId).lean();
 
     if (!lesson) {
       return res.status(404).json({ success: false, message: 'Lesson not found' });
     }
 
+    console.log('Lesson found:', lesson.title);
+
     // Check access
     const classData = await Class.findById(lesson.classId);
-    const isInstructor = classData.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
+    
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
+      const userIdStr = userId ? userId.toString() : '';
+      isInstructor = instructorIdStr === userIdStr;
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    const isAdmin = req.user.user_type === 'admin';
     const enrollment = await Enrollment.findOne({ userId, classId: lesson.classId });
+
+    console.log('Is instructor?', isInstructor);
+    console.log('Is admin?', isAdmin);
+    console.log('Is enrolled?', !!enrollment);
+    console.log('Is free preview?', lesson.isFreePreview);
 
     // Allow if instructor, admin, enrolled student, or free preview
     if (!isInstructor && !isAdmin && !enrollment && !lesson.isFreePreview) {
+      console.log('❌ Access denied');
       return res.status(403).json({ 
         success: false, 
         message: 'You do not have access to this lesson' 
@@ -109,11 +173,14 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
 
     // If student and lesson is not published, deny access
     if (!isInstructor && !isAdmin && !lesson.isPublished) {
+      console.log('❌ Lesson not published');
       return res.status(403).json({ 
         success: false, 
         message: 'This lesson is not published yet' 
       });
     }
+
+    console.log('✅ Access granted');
 
     // Populate video and quiz details
     const populatedContentItems = await Promise.all(
@@ -289,8 +356,17 @@ lessonRouter.get('/instructor/class/:classId', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    const isInstructor = classData.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
+      const userIdStr = userId ? userId.toString() : '';
+      isInstructor = instructorIdStr === userIdStr;
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    const isAdmin = req.user.user_type === 'admin';
 
     if (!isInstructor && !isAdmin) {
       return res.status(403).json({ 
@@ -324,25 +400,51 @@ lessonRouter.get('/available-videos/:classId', auth, async (req, res) => {
     const { classId } = req.params;
     const userId = req.user.id;
 
+    console.log('========================================');
+    console.log('🎬 GET AVAILABLE VIDEOS DEBUG');
+    console.log('========================================');
+    console.log('classId:', classId);
+    console.log('userId:', userId);
+    console.log('user_type:', req.user.user_type);
+
     // Check if class exists
     const classData = await Class.findById(classId);
     if (!classData) {
+      console.log('❌ Class not found');
       return res.status(404).json({ 
         success: false, 
         message: 'Class not found' 
       });
     }
 
-    // Check if user is instructor or admin
-    const isInstructor = classData.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
+    console.log('✅ Class found:', classData.title);
+    console.log('Class instructorId:', classData.instructorId);
 
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
+      const userIdStr = userId ? userId.toString() : '';
+      isInstructor = instructorIdStr === userIdStr;
+      console.log('Is instructor?', isInstructor);
+    } catch (err) {
+      console.error('Error comparing IDs:', err);
+      isInstructor = false;
+    }
+
+    const isAdmin = req.user.user_type === 'admin';
+    console.log('Is admin?', isAdmin);
+
+    // Check if user is instructor or admin
     if (!isInstructor && !isAdmin) {
+      console.log('❌ Access denied - not instructor or admin');
       return res.status(403).json({ 
         success: false, 
         message: 'Only the class instructor can access this' 
       });
     }
+
+    console.log('✅ Access granted');
 
     // Get all videos (streams) for this class that are ready
     const videos = await Stream.find({ 
@@ -353,6 +455,9 @@ lessonRouter.get('/available-videos/:classId', auth, async (req, res) => {
       .select('_id name filename classTitle muxPlaybackId muxStatus duration createdAt')
       .sort({ createdAt: -1 })
       .lean();
+
+    console.log(`Found ${videos.length} videos for class ${classId}`);
+    console.log('========================================');
 
     res.json({
       success: true,
@@ -375,31 +480,60 @@ lessonRouter.get('/available-quizzes/:classId', auth, async (req, res) => {
     const { classId } = req.params;
     const userId = req.user.id;
 
+    console.log('========================================');
+    console.log('📝 GET AVAILABLE QUIZZES DEBUG');
+    console.log('========================================');
+    console.log('classId:', classId);
+    console.log('userId:', userId);
+    console.log('user_type:', req.user.user_type);
+
     // Check if class exists
     const classData = await Class.findById(classId);
     if (!classData) {
+      console.log('❌ Class not found');
       return res.status(404).json({ 
         success: false, 
         message: 'Class not found' 
       });
     }
 
-    // Check if user is instructor or admin
-    const isInstructor = classData.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
+    console.log('✅ Class found:', classData.title);
+    console.log('Class instructorId:', classData.instructorId);
 
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
+      const userIdStr = userId ? userId.toString() : '';
+      isInstructor = instructorIdStr === userIdStr;
+      console.log('Is instructor?', isInstructor);
+    } catch (err) {
+      console.error('Error comparing IDs:', err);
+      isInstructor = false;
+    }
+
+    const isAdmin = req.user.user_type === 'admin';
+    console.log('Is admin?', isAdmin);
+
+    // Check if user is instructor or admin
     if (!isInstructor && !isAdmin) {
+      console.log('❌ Access denied - not instructor or admin');
       return res.status(403).json({ 
         success: false, 
         message: 'Only the class instructor can access this' 
       });
     }
 
+    console.log('✅ Access granted');
+
     // Get all quizzes for this class (including drafts for instructor)
     const quizzes = await Quiz.find({ classId })
       .select('_id title description questionCount totalPoints status createdAt')
       .sort({ createdAt: -1 })
       .lean();
+
+    console.log(`Found ${quizzes.length} quizzes for class ${classId}`);
+    console.log('========================================');
 
     res.json({
       success: true,
@@ -422,21 +556,41 @@ lessonRouter.post('/', auth, async (req, res) => {
     const { classId, title, description, contentItems, order, isFreePreview, isPublished } = req.body;
     const userId = req.user.id;
 
+    console.log('========================================');
+    console.log('📝 CREATE LESSON DEBUG');
+    console.log('========================================');
+    console.log('classId:', classId);
+    console.log('userId:', userId);
+    console.log('user_type:', req.user.user_type);
+    console.log('title:', title);
+
     // Check if user is instructor of this class
     const classData = await Class.findById(classId);
     if (!classData) {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    const isInstructor = classData.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
+      const userIdStr = userId ? userId.toString() : '';
+      isInstructor = instructorIdStr === userIdStr;
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    const isAdmin = req.user.user_type === 'admin';
 
     if (!isInstructor && !isAdmin) {
+      console.log('❌ User is not instructor of this class');
       return res.status(403).json({ 
         success: false, 
         message: 'Only the class instructor can create lessons' 
       });
     }
+
+    console.log('✅ User is instructor/admin');
 
     // Validate content items
     if (contentItems && contentItems.length > 0) {
@@ -499,6 +653,9 @@ lessonRouter.post('/', auth, async (req, res) => {
 
     await lesson.save();
 
+    console.log('✅ Lesson created:', lesson._id);
+    console.log('========================================');
+
     res.status(201).json({
       success: true,
       message: 'Lesson created successfully',
@@ -526,9 +683,15 @@ lessonRouter.put('/:lessonId', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lesson not found' });
     }
 
-    // Check permission
-    const isInstructor = lesson.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      isInstructor = lesson.instructorId?.toString() === userId?.toString();
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    const isAdmin = req.user.user_type === 'admin';
 
     if (!isInstructor && !isAdmin) {
       return res.status(403).json({ 
@@ -611,8 +774,15 @@ lessonRouter.delete('/:lessonId', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lesson not found' });
     }
 
-    const isInstructor = lesson.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      isInstructor = lesson.instructorId?.toString() === userId?.toString();
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    const isAdmin = req.user.user_type === 'admin';
 
     if (!isInstructor && !isAdmin) {
       return res.status(403).json({ 
@@ -660,8 +830,15 @@ lessonRouter.patch('/:lessonId/publish', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lesson not found' });
     }
 
-    const isInstructor = lesson.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      isInstructor = lesson.instructorId?.toString() === userId?.toString();
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    const isAdmin = req.user.user_type === 'admin';
 
     if (!isInstructor && !isAdmin) {
       return res.status(403).json({ 
@@ -699,8 +876,17 @@ lessonRouter.post('/reorder', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    const isInstructor = classData.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
+      const userIdStr = userId ? userId.toString() : '';
+      isInstructor = instructorIdStr === userIdStr;
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    const isAdmin = req.user.user_type === 'admin';
 
     if (!isInstructor && !isAdmin) {
       return res.status(403).json({ 
@@ -739,8 +925,17 @@ lessonRouter.get('/stats/:classId', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    const isInstructor = classData.instructorId.toString() === userId;
-    const isAdmin = req.user.userType === 'admin';
+    // ===== FIX: Compare ObjectIds safely =====
+    let isInstructor = false;
+    try {
+      const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
+      const userIdStr = userId ? userId.toString() : '';
+      isInstructor = instructorIdStr === userIdStr;
+    } catch (err) {
+      isInstructor = false;
+    }
+
+    const isAdmin = req.user.user_type === 'admin';
 
     if (!isInstructor && !isAdmin) {
       return res.status(403).json({ 
