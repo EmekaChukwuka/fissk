@@ -29,11 +29,11 @@ class LessonService {
       .sort({ order: 1 })
       .lean();
 
-    const progressItems = enrollment?.lessonProgress || [];
+    const lessonProgress = enrollment?.lessonProgress || [];
 
     return lessons.map(lesson => {
-      const progress = progressItems.find(
-        item => item.lessonId?.toString() === lesson._id.toString()
+      const progress = lessonProgress.find(
+        lp => lp.lessonId?.toString() === lesson._id.toString()
       );
       return {
         ...lesson,
@@ -49,9 +49,7 @@ class LessonService {
    * Get a single lesson with access check
    */
   static async getLesson(lessonId, userId) {
-    const lesson = await Lesson.findById(lessonId)
-      .populate('contentItems.quizId', 'title questions')
-      .lean();
+    const lesson = await Lesson.findById(lessonId).lean();
 
     if (!lesson) {
       throw new Error('Lesson not found');
@@ -65,7 +63,39 @@ class LessonService {
       throw new Error('You do not have access to this lesson');
     }
 
-    return lesson;
+    // Populate video and quiz details
+    const populatedContentItems = await Promise.all(
+      lesson.contentItems.map(async (item) => {
+        if (item.type === 'video' && item.videoId) {
+          const video = await Stream.findById(item.videoId).lean();
+          return {
+            ...item,
+            videoDetails: video ? {
+              muxPlaybackId: video.muxPlaybackId,
+              playbackUrl: video.muxPlaybackId ? `https://stream.mux.com/${video.muxPlaybackId}.m3u8` : null,
+              thumbnailUrl: video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` : null,
+              duration: video.duration,
+              filename: video.filename
+            } : null
+          };
+        }
+        if (item.type === 'quiz' && item.quizId) {
+          const quiz = await Quiz.findById(item.quizId)
+            .select('title description questionCount totalPoints settings')
+            .lean();
+          return {
+            ...item,
+            quizDetails: quiz
+          };
+        }
+        return item;
+      })
+    );
+
+    return {
+      ...lesson,
+      contentItems: populatedContentItems
+    };
   }
 
   /**
@@ -86,44 +116,49 @@ class LessonService {
       throw new Error('You must be enrolled in this class');
     }
 
+    // Calculate total required items
+    const requiredItems = lesson.contentItems.filter(item => item.isRequired);
+    const totalRequired = requiredItems.length;
+
     // Update lesson progress
     const existingIndex = enrollment.lessonProgress.findIndex(
-      l => l.lessonId.toString() === lessonId.toString()
+      lp => lp.lessonId.toString() === lessonId.toString()
     );
 
+    const progressData = {
+      lessonId: lesson._id,
+      completed: true,
+      completedAt: new Date(),
+      contentItemsCompleted: totalRequired,
+      totalContentItems: totalRequired,
+      progressPercentage: 100,
+      lastAccessed: new Date()
+    };
+
     if (existingIndex !== -1) {
-      enrollment.lessonProgress[existingIndex].completed = true;
-      enrollment.lessonProgress[existingIndex].completedAt = new Date();
-      enrollment.lessonProgress[existingIndex].progressPercentage = 100;
+      enrollment.lessonProgress[existingIndex] = progressData;
     } else {
-      enrollment.lessonProgress.push({
-        lessonId,
-        completed: true,
-        completedAt: new Date(),
-        progressPercentage: 100,
-        totalContentItems: lesson.contentItems.length,
-        contentItemsCompleted: lesson.contentItems.length
-      });
+      enrollment.lessonProgress.push(progressData);
     }
 
     // Update lesson stats
-    enrollment.completedLessons = enrollment.lessonProgress.filter(l => l.completed).length;
+    enrollment.completedLessons = enrollment.lessonProgress.filter(lp => lp.completed).length;
     enrollment.totalLessons = enrollment.lessonProgress.length;
 
-    const totalProgress = enrollment.lessonProgress.reduce((sum, l) => sum + l.progressPercentage, 0);
+    const totalProgress = enrollment.lessonProgress.reduce((sum, lp) => sum + lp.progressPercentage, 0);
     enrollment.lessonProgressPercentage = enrollment.lessonProgress.length > 0
       ? Math.round(totalProgress / enrollment.lessonProgress.length)
       : 0;
 
     // Add to progress items for overall progress
-    const existingProgress = enrollment.progressItems.find(
+    const existingProgressItem = enrollment.progressItems.find(
       item => item.itemType === 'lesson' && item.itemId.toString() === lessonId.toString()
     );
 
-    if (existingProgress) {
-      existingProgress.completed = true;
-      existingProgress.completedAt = new Date();
-      existingProgress.progressPercentage = 100;
+    if (existingProgressItem) {
+      existingProgressItem.completed = true;
+      existingProgressItem.completedAt = new Date();
+      existingProgressItem.progressPercentage = 100;
     } else {
       enrollment.progressItems.push({
         itemType: 'lesson',
@@ -131,18 +166,27 @@ class LessonService {
         itemTypeModel: 'Lesson',
         completed: true,
         completedAt: new Date(),
-        progressPercentage: 100
+        progressPercentage: 100,
+        timeSpentSeconds: 0
       });
     }
 
     await enrollment.save();
     await this.updateOverallProgress(enrollment._id);
 
-    return { success: true, message: 'Lesson marked as complete' };
+    return { 
+      success: true, 
+      message: 'Lesson marked as complete',
+      progress: {
+        lessonCompleted: true,
+        lessonProgressPercentage: 100,
+        overallProgress: enrollment.progress
+      }
+    };
   }
 
   /**
-   * Update overall course progress including videos, quizzes, assignments, and lessons
+   * Update overall course progress
    */
   static async updateOverallProgress(enrollmentId) {
     const enrollment = await Enrollment.findById(enrollmentId);
@@ -185,7 +229,7 @@ class LessonService {
       isPublished: true
     });
     totalItems += lessons.length;
-    const completedLessons = enrollment.lessonProgress.filter(l => l.completed).length;
+    const completedLessons = enrollment.lessonProgress.filter(lp => lp.completed).length;
     completedItems += completedLessons;
 
     const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
@@ -204,7 +248,7 @@ class LessonService {
    * Create a new lesson
    */
   static async createLesson(data, userId) {
-    const { classId, title, description, contentItems, order, isFreePreview } = data;
+    const { classId, title, description, contentItems, order, isFreePreview, isPublished } = data;
 
     const classData = await Class.findById(classId);
     if (!classData) {
@@ -215,10 +259,40 @@ class LessonService {
       throw new Error('Only the class instructor can create lessons');
     }
 
+    // Validate and enrich content items
+    if (contentItems && contentItems.length > 0) {
+      for (const item of contentItems) {
+        if (item.type === 'video' && item.videoId) {
+          const video = await Stream.findOne({ 
+            _id: item.videoId, 
+            streamClass: classId 
+          });
+          if (!video) {
+            throw new Error(`Video "${item.title}" not found or does not belong to this class`);
+          }
+          item.duration = video.duration || 0;
+        }
+        if (item.type === 'quiz' && item.quizId) {
+          const quiz = await Quiz.findOne({ 
+            _id: item.quizId, 
+            classId: classId 
+          });
+          if (!quiz) {
+            throw new Error(`Quiz "${item.title}" not found or does not belong to this class`);
+          }
+        }
+      }
+    }
+
+    // Calculate estimated time
     let estimatedTime = 0;
     if (contentItems) {
       contentItems.forEach(item => {
         if (item.duration) estimatedTime += item.duration;
+        if (item.type === 'text' && item.content) {
+          const wordCount = item.content.split(/\s+/).length;
+          estimatedTime += Math.ceil(wordCount / 100) * 2;
+        }
       });
     }
 
@@ -230,7 +304,8 @@ class LessonService {
       contentItems: contentItems || [],
       estimatedTime,
       order: order || 0,
-      isFreePreview: isFreePreview || false
+      isFreePreview: isFreePreview || false,
+      isPublished: isPublished !== undefined ? isPublished : true
     });
 
     await lesson.save();
@@ -251,9 +326,35 @@ class LessonService {
     }
 
     if (updates.contentItems) {
+      for (const item of updates.contentItems) {
+        if (item.type === 'video' && item.videoId) {
+          const video = await Stream.findOne({ 
+            _id: item.videoId, 
+            streamClass: lesson.classId 
+          });
+          if (!video) {
+            throw new Error(`Video "${item.title}" not found or does not belong to this class`);
+          }
+          item.duration = video.duration || 0;
+        }
+        if (item.type === 'quiz' && item.quizId) {
+          const quiz = await Quiz.findOne({ 
+            _id: item.quizId, 
+            classId: lesson.classId 
+          });
+          if (!quiz) {
+            throw new Error(`Quiz "${item.title}" not found or does not belong to this class`);
+          }
+        }
+      }
+
       let estimatedTime = 0;
       updates.contentItems.forEach(item => {
         if (item.duration) estimatedTime += item.duration;
+        if (item.type === 'text' && item.content) {
+          const wordCount = item.content.split(/\s+/).length;
+          estimatedTime += Math.ceil(wordCount / 100) * 2;
+        }
       });
       updates.estimatedTime = estimatedTime;
     }
@@ -283,7 +384,12 @@ class LessonService {
     // Remove lesson progress from enrollments
     await Enrollment.updateMany(
       { classId: lesson.classId },
-      { $pull: { progressItems: { itemType: 'lesson', itemId: lessonId } } }
+      { 
+        $pull: { 
+          progressItems: { itemType: 'lesson', itemId: lessonId },
+          lessonProgress: { lessonId: lessonId }
+        } 
+      }
     );
 
     await Lesson.findByIdAndDelete(lessonId);
@@ -311,7 +417,44 @@ class LessonService {
   }
 
   /**
-   * Get lesson progress summary for a student
+   * Get available videos for a class
+   */
+  static async getAvailableVideos(classId, userId) {
+    const classData = await Class.findById(classId);
+    if (!classData || classData.instructorId.toString() !== userId) {
+      throw new Error('Only the class instructor can access this');
+    }
+
+    const videos = await Stream.find({ streamClass: classId })
+      .select('_id name filename classTitle muxPlaybackId muxStatus duration createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return videos.filter(v => v.muxStatus === 'ready' && v.muxPlaybackId);
+  }
+
+  /**
+   * Get available quizzes for a class
+   */
+  static async getAvailableQuizzes(classId, userId) {
+    const classData = await Class.findById(classId);
+    if (!classData || classData.instructorId.toString() !== userId) {
+      throw new Error('Only the class instructor can access this');
+    }
+
+    const quizzes = await Quiz.find({ 
+      classId,
+      status: 'published'
+    })
+      .select('_id title description questionCount totalPoints createdAt')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return quizzes;
+  }
+
+  /**
+   * Get lesson progress for a student
    */
   static async getLessonProgress(classId, userId) {
     const enrollment = await Enrollment.findOne({ userId, classId });
@@ -329,11 +472,11 @@ class LessonService {
       isPublished: true
     }).sort({ order: 1 }).lean();
 
-    const progressItems = enrollment.lessonProgress || [];
+    const lessonProgress = enrollment.lessonProgress || [];
 
     const lessonsWithProgress = lessons.map(lesson => {
-      const progress = progressItems.find(
-        item => item.lessonId?.toString() === lesson._id.toString()
+      const progress = lessonProgress.find(
+        lp => lp.lessonId?.toString() === lesson._id.toString()
       );
       return {
         ...lesson,

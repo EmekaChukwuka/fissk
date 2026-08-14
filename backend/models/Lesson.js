@@ -1,5 +1,9 @@
 import mongoose from "mongoose";
 
+/**
+ * Content Item Schema - Each item within a lesson
+ * Supports: text, video (existing), quiz (existing), material, link, embed
+ */
 const ContentItemSchema = new mongoose.Schema({
   type: {
     type: String,
@@ -10,26 +14,24 @@ const ContentItemSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  // For text type - the actual content/notes
   content: {
     type: String,
-    default: '' // For text content, embed code, description
-  },
-  // Video specific
-  videoUrl: {
-    type: String,
     default: ''
   },
-  muxPlaybackId: {
-    type: String,
-    default: ''
+  // For video type - reference to existing video (Stream model)
+  videoId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Stream',
+    default: null
   },
-  // Quiz specific
+  // For quiz type - reference to existing quiz
   quizId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Quiz',
     default: null
   },
-  // Material/File specific
+  // For material/file type
   fileUrl: {
     type: String,
     default: ''
@@ -42,13 +44,13 @@ const ContentItemSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  // Assignment specific
+  // For assignment type
   assignmentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Assignment',
     default: null
   },
-  // Link specific
+  // For link type
   linkUrl: {
     type: String,
     default: ''
@@ -58,17 +60,17 @@ const ContentItemSchema = new mongoose.Schema({
     enum: ['_blank', '_self'],
     default: '_blank'
   },
-  // Embed specific (YouTube, Vimeo, etc.)
+  // For embed type (YouTube, Vimeo, etc.)
   embedCode: {
     type: String,
     default: ''
   },
-  // Duration in minutes
+  // Duration in minutes (for videos)
   duration: {
     type: Number,
     default: 0
   },
-  // Sorting order
+  // Sorting order within the lesson
   order: {
     type: Number,
     default: 0
@@ -93,25 +95,26 @@ const LessonSchema = new mongoose.Schema({
   },
   title: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   description: {
     type: String,
     default: ''
   },
-  // Lesson content items
+  // Array of content items (text, videos, quizzes, etc.)
   contentItems: [ContentItemSchema],
   // Estimated time to complete in minutes
   estimatedTime: {
     type: Number,
     default: 0
   },
-  // Order in the course
+  // Order in the course (for sequencing)
   order: {
     type: Number,
     default: 0
   },
-  // Is this lesson free preview?
+  // Is this lesson a free preview?
   isFreePreview: {
     type: Boolean,
     default: false
@@ -123,13 +126,19 @@ const LessonSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Indexes
+// Indexes for performance
 LessonSchema.index({ classId: 1, order: 1 });
 LessonSchema.index({ instructorId: 1 });
+LessonSchema.index({ isPublished: 1 });
 
 // Virtual for total items count
 LessonSchema.virtual('itemCount').get(function() {
   return this.contentItems ? this.contentItems.length : 0;
+});
+
+// Virtual for required items count
+LessonSchema.virtual('requiredItemCount').get(function() {
+  return this.contentItems ? this.contentItems.filter(item => item.isRequired).length : 0;
 });
 
 export default mongoose.model('Lesson', LessonSchema);
