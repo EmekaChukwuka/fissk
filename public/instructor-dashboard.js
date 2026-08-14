@@ -1215,6 +1215,145 @@ async toggleQuizPublish(quizId, currentStatus) {
     }
   }
 
+    /**
+     * Load lessons for a class (for instructor view)
+     */
+    async loadClassLessons(classId) {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${classId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load lessons');
+            }
+
+            const data = await response.json();
+            return data.lessons || [];
+        } catch (error) {
+            console.error('Load class lessons error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Render lessons in instructor class card
+     */
+    renderClassLessons(container, lessons, classId) {
+        if (!container) return;
+
+        if (!lessons || lessons.length === 0) {
+            container.innerHTML = `
+                <div class="no-lessons-small">
+                    <p>No lessons yet</p>
+                    <button class="btn btn-sm btn-primary create-lesson-btn" data-class-id="${classId}">
+                        + Create Lesson
+                    </button>
+                </div>
+            `;
+            const createBtn = container.querySelector('.create-lesson-btn');
+            if (createBtn) {
+                createBtn.addEventListener('click', () => {
+                    window.location.href = `instructor/lessons/create.html?classId=${classId}`;
+                });
+            }
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="class-lessons-list">
+                ${lessons.map(lesson => `
+                    <div class="class-lesson-item">
+                        <span class="lesson-title">${this.escapeHtml(lesson.title)}</span>
+                        <span class="lesson-stats">
+                            ${lesson.contentItems?.length || 0} items • 
+                            ${lesson.estimatedTime || 0} min
+                        </span>
+                        <span class="lesson-status-badge ${lesson.isPublished ? 'published' : 'draft'}">
+                            ${lesson.isPublished ? 'Published' : 'Draft'}
+                        </span>
+                        <div class="lesson-actions">
+                            <button class="btn btn-sm btn-outline edit-lesson-btn" data-lesson-id="${lesson._id}" title="Edit Lesson">✏️</button>
+                            <button class="btn btn-sm btn-success view-lesson-btn" data-lesson-id="${lesson._id}" title="View Lesson">👁️</button>
+                            <button class="btn btn-sm btn-danger delete-lesson-btn" data-lesson-id="${lesson._id}" title="Delete Lesson">🗑️</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            <button class="btn btn-sm btn-primary create-lesson-btn" data-class-id="${classId}" style="margin-top: 8px;">
+                + Add Lesson
+            </button>
+        `;
+
+        // Add event listeners
+        container.querySelectorAll('.edit-lesson-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const lessonId = btn.dataset.lessonId;
+                window.location.href = `instructor/lessons/edit.html?lessonId=${lessonId}`;
+            });
+        });
+
+        container.querySelectorAll('.view-lesson-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const lessonId = btn.dataset.lessonId;
+                window.location.href = `lesson.html?classId=${classId}&lessonId=${lessonId}`;
+            });
+        });
+
+        container.querySelectorAll('.delete-lesson-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const lessonId = btn.dataset.lessonId;
+                this.deleteLesson(lessonId);
+            });
+        });
+
+        container.querySelectorAll('.create-lesson-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const classId = btn.dataset.classId;
+                window.location.href = `instructor/lessons/create.html?classId=${classId}`;
+            });
+        });
+    }
+
+    /**
+    * Delete a lesson
+    */
+    async deleteLesson(lessonId) {
+        if (!confirm('Are you sure you want to delete this lesson? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete lesson');
+            }
+
+            const data = await response.json();
+            if (data.success) {
+                this.showMessage('✅ Lesson deleted successfully!', 'success');
+                await this.loadInstructorClasses();
+            } else {
+                this.showMessage('❌ ' + (data.message || 'Failed to delete lesson'), 'error');
+            }
+        } catch (error) {
+            console.error('Delete lesson error:', error);
+            this.showMessage('Failed to delete lesson', 'error');
+        }
+    }
+
   // ===== COPY TO CLIPBOARD =====
   copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {

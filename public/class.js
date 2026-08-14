@@ -2292,6 +2292,390 @@ class ClassManager {
         }
     }
 
+    /**
+     * Render lessons with detailed content
+     * This is the main lesson viewer for students
+     */
+    renderLessons() {
+        const container = document.getElementById('lessonsContainer');
+        if (!container) return;
+
+        if (!this.isEnrolled) {
+            container.innerHTML = `
+                <div class="access-locked">
+                    <div class="lock-icon">🔒</div>
+                    <h3>Enroll to Access Lessons</h3>
+                    <p>You need to be enrolled in this class to view lessons and study materials.</p>
+                    <button class="btn btn-primary" id="enrollForLessonsBtn">Enroll Now</button>
+                </div>
+            `;
+            const enrollBtn = container.querySelector('#enrollForLessonsBtn');
+            if (enrollBtn) {
+                enrollBtn.addEventListener('click', () => {
+                    this.handleEnrollment();
+                });
+            }
+            return;
+        }
+
+        if (!this.lessons || this.lessons.length === 0) {
+            container.innerHTML = `
+                <div class="no-lessons">
+                    <p>📚 No lessons available yet.</p>
+                    <p style="color: rgba(255,255,255,0.5); font-size: 0.9rem;">
+                        Check back later for new lessons from your instructor.
+                    </p>
+                </div>
+            `;
+            return;
+        }
+
+        // Show lessons as cards with click to view full lesson
+        container.innerHTML = `
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <span style="color: rgba(255,255,255,0.6); font-size: 0.9rem;">
+                        ${this.lessons.length} lessons available
+                    </span>
+                </div>
+            </div>
+            <div class="lessons-grid">
+                ${this.lessons.map((lesson, index) => `
+                    <div class="lesson-card ${lesson.completed ? 'completed' : ''}" 
+                        data-lesson-id="${lesson._id}"
+                        onclick="window.classManager.viewLesson('${lesson._id}')">
+                        <div class="lesson-number">Lesson ${index + 1}</div>
+                        <h4>${this.escapeHtml(lesson.title)}</h4>
+                        <p>${this.escapeHtml(lesson.description || 'No description')}</p>
+                        <div class="lesson-meta">
+                            <span>⏱️ ${lesson.estimatedTime || 0} min</span>
+                            <span>📝 ${lesson.contentItems?.length || 0} items</span>
+                            ${lesson.completed ? '<span class="completed-badge">✅ Completed</span>' : ''}
+                        </div>
+                        ${lesson.progressPercentage > 0 && !lesson.completed ? `
+                            <div class="progress-bar" style="margin-top: 8px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;">
+                                <div class="progress-fill" style="width: ${lesson.progressPercentage}%; height: 100%; background: linear-gradient(90deg, #8B5FBF, #6C3CE1); border-radius: 2px;"></div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    /**
+     * View a specific lesson in detail
+     */
+    async viewLesson(lessonId) {
+        try {
+            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load lesson');
+            }
+
+            const data = await response.json();
+            const lesson = data.lesson;
+
+            // Open in a modal or navigate to lesson page
+            this.showLessonDetail(lesson);
+        } catch (error) {
+            console.error('View lesson error:', error);
+            window.showToast('Failed to load lesson content', true);
+        }
+    }
+
+    /**
+     * Show lesson detail in a modal
+     */
+    showLessonDetail(lesson) {
+        // Create modal if it doesn't exist
+        let modal = document.getElementById('lessonDetailModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'lessonDetailModal';
+            modal.className = 'modal';
+            modal.style.display = 'none';
+            document.body.appendChild(modal);
+        }
+
+        // Build content items HTML
+        let itemsHTML = '';
+        let completedCount = 0;
+        const totalItems = lesson.contentItems?.length || 0;
+
+        if (lesson.contentItems && lesson.contentItems.length > 0) {
+            itemsHTML = lesson.contentItems.map((item, index) => {
+                const isCompleted = false; // We'll track this per item
+                
+                let itemContent = '';
+                switch (item.type) {
+                    case 'text':
+                        itemContent = `
+                            <div class="item-text-content">${this.escapeHtml(item.content || '')}</div>
+                        `;
+                        break;
+                    case 'video':
+                        const videoUrl = item.videoDetails?.playbackUrl || 
+                                        (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : '');
+                        itemContent = `
+                            <div class="item-video-wrapper">
+                                ${videoUrl ? `
+                                    <video controls>
+                                        <source src="${videoUrl}" type="application/x-mpegURL">
+                                    </video>
+                                ` : '<p style="color: rgba(255,255,255,0.5);">Video not available</p>'}
+                            </div>
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                        `;
+                        break;
+                    case 'quiz':
+                        const quizDetails = item.quizDetails || {};
+                        itemContent = `
+                            <div class="item-quiz-wrapper">
+                                <a href="quiz/take.html?quizId=${item.quizId?._id || item.quizId}" class="btn btn-primary" style="margin-right: 8px;">
+                                    📝 Take Quiz
+                                </a>
+                                ${quizDetails.questionCount ? `<span style="color: rgba(255,255,255,0.5); font-size: 0.85rem;">${quizDetails.questionCount} questions</span>` : ''}
+                                ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                            </div>
+                        `;
+                        break;
+                    case 'material':
+                        itemContent = `
+                            <div class="item-material-wrapper">
+                                ${item.fileUrl ? `
+                                    <a href="${item.fileUrl}" class="btn btn-outline" download style="margin-right: 8px;">
+                                        📥 Download ${item.fileName || 'File'}
+                                    </a>
+                                ` : '<p style="color: rgba(255,255,255,0.5);">Material not available</p>'}
+                                ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                            </div>
+                        `;
+                        break;
+                    case 'link':
+                        itemContent = `
+                            <div class="item-link-wrapper">
+                                <a href="${item.linkUrl}" target="${item.linkTarget || '_blank'}" class="btn btn-outline">
+                                    🔗 ${this.escapeHtml(item.title || 'Open Link')}
+                                </a>
+                                ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                            </div>
+                        `;
+                        break;
+                    case 'embed':
+                        itemContent = `
+                            <div class="item-embed-wrapper">
+                                ${item.embedCode ? item.embedCode : ''}
+                                ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                            </div>
+                        `;
+                        break;
+                    default:
+                        itemContent = `<p style="color: rgba(255,255,255,0.5);">Content type not supported</p>`;
+                }
+
+                const typeLabels = {
+                    'text': 'Text',
+                    'video': 'Video',
+                    'quiz': 'Quiz',
+                    'material': 'Material',
+                    'link': 'Link',
+                    'embed': 'Embed'
+                };
+
+                return `
+                    <div class="lesson-content-item" data-item-index="${index}">
+                        <div class="item-header">
+                            <span class="item-type-badge ${item.type}">${typeLabels[item.type] || item.type}</span>
+                            ${item.isRequired ? '<span style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">Required</span>' : '<span style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">Optional</span>'}
+                        </div>
+                        ${item.title ? `<div class="item-title">${this.escapeHtml(item.title)}</div>` : ''}
+                        ${itemContent}
+                        <div class="item-footer">
+                            ${item.duration ? `<span class="item-duration">⏱️ ${item.duration} min</span>` : ''}
+                            <button class="item-complete-btn incomplete" data-item-index="${index}">
+                                ${isCompleted ? '✅ Completed' : 'Mark as Read'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            itemsHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center; padding: 20px;">No content items in this lesson.</p>';
+        }
+
+        // Calculate progress
+        const progress = lesson.progressPercentage || 0;
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto; background: #1A1A2E; border-radius: 16px; padding: 32px;">
+                <span class="close-modal" onclick="document.getElementById('lessonDetailModal').style.display='none'">&times;</span>
+                
+                <div style="margin-bottom: 16px;">
+                    <h2 style="color: white; margin: 0;">${this.escapeHtml(lesson.title)}</h2>
+                    ${lesson.description ? `<p style="color: rgba(255,255,255,0.6); margin-top: 4px;">${this.escapeHtml(lesson.description)}</p>` : ''}
+                </div>
+
+                <div class="lesson-progress-container">
+                    <div class="progress-header">
+                        <h4>📊 Lesson Progress</h4>
+                        <span>${progress}% complete</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${progress}%;"></div>
+                    </div>
+                </div>
+
+                <div class="lesson-content-items">
+                    ${itemsHTML}
+                </div>
+
+                <button class="mark-lesson-complete-btn ${lesson.completed ? 'completed' : 'available'}" 
+                        id="markLessonCompleteBtn"
+                        ${lesson.completed ? 'disabled' : ''}>
+                    ${lesson.completed ? '✅ Lesson Completed' : '✅ Mark Lesson as Complete'}
+                </button>
+            </div>
+        `;
+
+        // Show modal
+        modal.style.display = 'flex';
+
+        // Add event listener for mark complete button
+        const completeBtn = document.getElementById('markLessonCompleteBtn');
+        if (completeBtn && !lesson.completed) {
+            completeBtn.addEventListener('click', () => {
+                this.markLessonComplete(lesson._id);
+            });
+        }
+
+        // Add event listeners for item complete buttons
+        modal.querySelectorAll('.item-complete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const itemIndex = parseInt(btn.dataset.itemIndex);
+                this.toggleItemComplete(lesson._id, itemIndex, btn);
+            });
+        });
+    }
+
+    /**
+     * Mark a lesson as complete
+     */
+    async markLessonComplete(lessonId) {
+        try {
+            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}/complete`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to mark lesson as complete');
+            }
+
+            const data = await response.json();
+            window.showToast('✅ Lesson completed!', false);
+
+            // Close modal and refresh
+            const modal = document.getElementById('lessonDetailModal');
+            if (modal) modal.style.display = 'none';
+
+            // Refresh lessons
+            await this.loadLessons();
+            this.renderLessons();
+
+        } catch (error) {
+            console.error('Mark complete error:', error);
+            window.showToast('Failed to mark lesson as complete', true);
+        }
+    }
+
+    /**
+     * Toggle individual item completion
+     */
+    async toggleItemComplete(lessonId, itemIndex, button) {
+        try {
+            // For now, just toggle the UI state
+            // In a full implementation, you'd call an API to mark individual items
+            const isCompleted = button.textContent.includes('Completed');
+            if (isCompleted) {
+                button.textContent = 'Mark as Read';
+                button.className = 'item-complete-btn incomplete';
+            } else {
+                button.textContent = '✅ Completed';
+                button.className = 'item-complete-btn completed';
+            }
+
+            // Show toast
+            window.showToast('Item marked as read', false);
+
+        } catch (error) {
+            console.error('Toggle item error:', error);
+            window.showToast('Failed to update item', true);
+        }
+    }
+
+    /**
+     * Load lessons with detailed content
+     */
+    async loadLessons() {
+        try {
+            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${this.classId}`, {
+                headers: { 
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load lessons');
+            }
+
+            const data = await response.json();
+            this.lessons = data.lessons || [];
+            console.log('Lessons loaded:', this.lessons.length);
+
+            // Update lesson progress in sidebar
+            this.updateLessonProgressSidebar();
+
+        } catch (error) {
+            console.error('Error loading lessons:', error);
+            this.lessons = [];
+        }
+    }
+
+    /**
+     * Update lesson progress in sidebar
+     */
+    updateLessonProgressSidebar() {
+        if (!this.lessons || this.lessons.length === 0) return;
+
+        const completed = this.lessons.filter(l => l.completed).length;
+        const total = this.lessons.length;
+        const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+        const progressBar = document.getElementById('classProgress');
+        const progressText = document.getElementById('progressText');
+
+        if (progressBar && progressText) {
+            // Don't override if we have better progress data
+            const currentProgress = parseInt(progressBar.style.width) || 0;
+            if (progress > currentProgress) {
+                progressBar.style.width = `${progress}%`;
+                progressText.textContent = `${progress}% Complete`;
+            }
+        }
+    }
+
     // ============================================================
     // ENROLLMENT METHOD
     // ============================================================

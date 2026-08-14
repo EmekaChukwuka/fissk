@@ -9,6 +9,7 @@ class InstructorClassDetails {
         this.currentVideoIndex = 0;
         this.videos = [];
         this.streams = [];
+        this.lessons = [];
         this.baseUrl = 'https://fissk-backend.onrender.com'; // Your backend URL
         
         // Redirect if no user
@@ -31,10 +32,14 @@ class InstructorClassDetails {
 
     async init() {
         try {
+            // Show loading states for all containers
+            this.showAllLoadingStates();
+            
             await this.loadClass();
             await this.loadVideos();
             await this.loadStudents();
             await this.loadStreams();
+            await this.loadLessons();
             this.bindTabs();
             this.setupEventHandlers();
         } catch (error) {
@@ -43,9 +48,174 @@ class InstructorClassDetails {
         }
     }
 
+    // ===== LOADING INDICATORS =====
+    showAllLoadingStates() {
+        this.showVideosLoading();
+        this.showStudentsLoading();
+        this.showStreamsLoading();
+        this.showLessonsLoading();
+        this.showMaterialsLoading();
+    }
+
+    showVideosLoading() {
+        const container = document.getElementById('videosContainer');
+        if (!container) return;
+        container.innerHTML = `
+            <div class="loading-container" style="grid-column: 1 / -1;">
+                <div class="loading-spinner-large"></div>
+                <p class="loading-text">Loading videos...</p>
+            </div>
+        `;
+    }
+
+    showStudentsLoading() {
+        const container = document.getElementById('studentsContainer');
+        if (!container) return;
+        container.innerHTML = `
+            <div class="loading-container">
+                <div class="loading-spinner-large"></div>
+                <p class="loading-text">Loading students...</p>
+            </div>
+        `;
+    }
+
+    showStreamsLoading() {
+        const container = document.getElementById('streamsContainer');
+        if (!container) return;
+        container.innerHTML = `
+            <div class="loading-container">
+                <div class="loading-spinner-large"></div>
+                <p class="loading-text">Loading streams...</p>
+            </div>
+        `;
+    }
+
+    showLessonsLoading() {
+        const container = document.getElementById('lessonsContainer');
+        if (!container) return;
+        container.innerHTML = `
+            <div class="loading-container" style="grid-column: 1 / -1;">
+                <div class="loading-spinner-large"></div>
+                <p class="loading-text">Loading lessons...</p>
+            </div>
+        `;
+    }
+
+    showMaterialsLoading() {
+        const container = document.getElementById('materialsContainer');
+        if (!container) return;
+        container.innerHTML = `
+            <div class="loading-container">
+                <div class="loading-spinner-large"></div>
+                <p class="loading-text">Loading materials...</p>
+            </div>
+        `;
+    }
+
+    // ===== SKELETON LOADERS FOR SPECIFIC SECTIONS =====
+    getVideosSkeleton() {
+        return `
+            <div class="skeleton-grid" style="grid-column: 1 / -1;">
+                ${Array(3).fill(0).map(() => `
+                    <div class="skeleton-card">
+                        <div class="skeleton-line" style="height: 120px; margin-bottom: 12px; border-radius: 8px;"></div>
+                        <div class="skeleton-line medium"></div>
+                        <div class="skeleton-line short"></div>
+                        <div class="skeleton-line long"></div>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
+                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    getStudentsSkeleton() {
+        return `
+            <div class="skeleton-table">
+                ${Array(4).fill(0).map(() => `
+                    <div class="skeleton-row">
+                        <div class="skeleton-cell"></div>
+                        <div class="skeleton-cell"></div>
+                        <div class="skeleton-cell"></div>
+                        <div class="skeleton-cell"></div>
+                        <div class="skeleton-cell"></div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    getStreamsSkeleton() {
+        return `
+            <div style="margin-top: 16px;">
+                ${Array(2).fill(0).map(() => `
+                    <div class="skeleton-card" style="margin-bottom: 12px;">
+                        <div class="skeleton-line medium"></div>
+                        <div class="skeleton-line short"></div>
+                        <div class="skeleton-line long"></div>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
+                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    getLessonsSkeleton() {
+        return `
+            <div class="skeleton-grid" style="grid-column: 1 / -1;">
+                ${Array(3).fill(0).map(() => `
+                    <div class="skeleton-card">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <div class="skeleton-line" style="flex: 1; height: 20px;"></div>
+                            <div class="skeleton-line" style="width: 80px; height: 20px;"></div>
+                        </div>
+                        <div class="skeleton-line medium"></div>
+                        <div class="skeleton-line long"></div>
+                        <div style="display: flex; gap: 12px; margin-top: 8px;">
+                            <div class="skeleton-line short"></div>
+                            <div class="skeleton-line short"></div>
+                            <div class="skeleton-line short"></div>
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
+                            <div class="skeleton-line" style="flex: 1; height: 28px;"></div>
+                            <div class="skeleton-line" style="flex: 1; height: 28px;"></div>
+                            <div class="skeleton-line" style="flex: 1; height: 28px;"></div>
+                            <div class="skeleton-line" style="flex: 1; height: 28px;"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    getMaterialsSkeleton() {
+        return `
+            <div class="skeleton-grid" style="grid-column: 1 / -1; margin-top: 16px;">
+                ${Array(3).fill(0).map(() => `
+                    <div class="skeleton-card">
+                        <div class="skeleton-line medium"></div>
+                        <div class="skeleton-line short"></div>
+                        <div class="skeleton-line long"></div>
+                        <div style="display: flex; gap: 8px; margin-top: 12px;">
+                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
+                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
     headers() {
         return {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.token}`
         };
     }
 
@@ -204,6 +374,24 @@ class InstructorClassDetails {
                 await this.updateClass();
             });
         }
+
+        // Create Lesson button
+        const createLessonBtn = document.getElementById('createLessonBtn');
+        if (createLessonBtn) {
+            createLessonBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.href = `instructor/lessons/create.html?classId=${this.classId}`;
+            });
+        }
+
+        // Manage Lessons button
+        const manageLessonsBtn = document.getElementById('manageLessonsBtn');
+        if (manageLessonsBtn) {
+            manageLessonsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.location.href = `instructor/lessons/manage.html?classId=${this.classId}`;
+            });
+        }
     }
 
     // ===== LOAD CLASS DETAILS =====
@@ -243,6 +431,9 @@ class InstructorClassDetails {
         if (!container) return;
 
         try {
+            // Show skeleton loader
+            container.innerHTML = this.getVideosSkeleton();
+
             // Use the /api/by-class/:classId endpoint
             const url = `${this.baseUrl}/api/by-class/${this.classId}`;
             const res = await fetch(url, {
@@ -464,6 +655,9 @@ class InstructorClassDetails {
         if (!container) return;
 
         try {
+            // Show skeleton loader
+            container.innerHTML = this.getStudentsSkeleton();
+
             const url = `${this.baseUrl}/register/instructor/classes/${this.classId}/students`;
             const res = await fetch(url, {
                 headers: this.headers()
@@ -532,6 +726,9 @@ class InstructorClassDetails {
         if (!container) return;
 
         try {
+            // Show skeleton loader
+            container.innerHTML = this.getStreamsSkeleton();
+
             const url = `${this.baseUrl}/register/instructor/classes/${this.classId}/streams`;
             const res = await fetch(url, {
                 headers: this.headers()
@@ -636,6 +833,159 @@ class InstructorClassDetails {
             if (btn) this.hideButtonSpinner(btn, '🗑️ Cancel');
         }
     }
+
+    // ============================================================
+    // LESSON METHODS
+    // ============================================================
+
+    // ===== LOAD LESSONS =====
+    async loadLessons() {
+        const container = document.getElementById('lessonsContainer');
+        if (!container) return;
+
+        try {
+            // Show skeleton loader
+            container.innerHTML = this.getLessonsSkeleton();
+
+            const url = `${this.baseUrl}/api/lessons/class/${this.classId}`;
+            const res = await fetch(url, {
+                headers: this.headers()
+            });
+            
+            if (!res.ok) {
+                throw new Error('Failed to load lessons');
+            }
+            
+            const data = await res.json();
+            this.lessons = data.lessons || [];
+
+            if (this.lessons.length === 0) {
+                container.innerHTML = `
+                    <div class="no-lessons-instructor">
+                        <span class="icon">📚</span>
+                        <p style="font-size: 1.2rem; color: #999;">No lessons created yet</p>
+                        <p style="color: #bbb;">Click "Create Lesson" to start building your course content</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = this.lessons.map((lesson, index) => `
+                <div class="lesson-card-instructor" data-lesson-id="${lesson._id}">
+                    <div class="lesson-header-instructor">
+                        <h4 class="lesson-title-instructor">${index + 1}. ${this.escapeHtml(lesson.title)}</h4>
+                        <span class="lesson-status-badge ${lesson.isPublished ? 'published' : 'draft'}">
+                            ${lesson.isPublished ? 'Published' : 'Draft'}
+                        </span>
+                    </div>
+                    ${lesson.description ? `<p class="lesson-desc-instructor">${this.escapeHtml(lesson.description)}</p>` : ''}
+                    <div class="lesson-meta-instructor">
+                        <span>📝 ${lesson.contentItems?.length || 0} items</span>
+                        <span>⏱️ ${lesson.estimatedTime || 0} min</span>
+                        <span>📅 ${lesson.createdAt ? new Date(lesson.createdAt).toLocaleDateString() : 'Unknown'}</span>
+                    </div>
+                    <div class="lesson-actions-instructor">
+                        <a href="instructor/lessons/edit.html?lessonId=${lesson._id}" class="btn-sm btn-primary">✏️ Edit</a>
+                        <a href="lesson.html?classId=${this.classId}&lessonId=${lesson._id}" class="btn-sm btn-outline" target="_blank">👁️ View</a>
+                        <button class="btn-sm ${lesson.isPublished ? 'btn-warning' : 'btn-success'} toggle-lesson-publish-btn" 
+                                data-lesson-id="${lesson._id}" 
+                                data-published="${lesson.isPublished}">
+                            ${lesson.isPublished ? '📥 Unpublish' : '📤 Publish'}
+                        </button>
+                        <button class="btn-sm btn-danger delete-lesson-btn" data-lesson-id="${lesson._id}">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add event listeners for lesson actions
+            container.querySelectorAll('.toggle-lesson-publish-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const lessonId = btn.dataset.lessonId;
+                    const currentStatus = btn.dataset.published === 'true';
+                    await this.toggleLessonPublish(lessonId, currentStatus);
+                });
+            });
+
+            container.querySelectorAll('.delete-lesson-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const lessonId = btn.dataset.lessonId;
+                    if (confirm('Are you sure you want to delete this lesson? This action cannot be undone.')) {
+                        await this.deleteLesson(lessonId);
+                    }
+                });
+            });
+
+        } catch (error) {
+            console.error('Load lessons error:', error);
+            container.innerHTML = `
+                <div class="no-lessons-instructor">
+                    <p style="color: #EF4444;">❌ Failed to load lessons: ${error.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    // ===== TOGGLE LESSON PUBLISH =====
+    async toggleLessonPublish(lessonId, currentStatus) {
+        const newStatus = !currentStatus;
+        const action = newStatus ? 'publish' : 'unpublish';
+        
+        try {
+            const btn = document.querySelector(`.toggle-lesson-publish-btn[data-lesson-id="${lessonId}"]`);
+            if (btn) this.showButtonSpinner(btn, 'Updating...');
+
+            const url = `${this.baseUrl}/api/lessons/${lessonId}/publish`;
+            const res = await fetch(url, {
+                method: 'PATCH',
+                headers: this.headers(),
+                body: JSON.stringify({ isPublished: newStatus })
+            });
+
+            if (!res.ok) throw new Error('Failed to update lesson status');
+
+            const data = await res.json();
+            this.showMessage(`✅ Lesson ${newStatus ? 'published' : 'unpublished'} successfully!`, 'success');
+            await this.loadLessons();
+
+        } catch (error) {
+            console.error('Toggle publish error:', error);
+            this.showMessage('❌ ' + error.message, 'error');
+        } finally {
+            const btn = document.querySelector(`.toggle-lesson-publish-btn[data-lesson-id="${lessonId}"]`);
+            if (btn) this.hideButtonSpinner(btn, btn.dataset.published === 'true' ? '📥 Unpublish' : '📤 Publish');
+        }
+    }
+
+    // ===== DELETE LESSON =====
+    async deleteLesson(lessonId) {
+        try {
+            const btn = document.querySelector(`.delete-lesson-btn[data-lesson-id="${lessonId}"]`);
+            if (btn) this.showButtonSpinner(btn, 'Deleting...');
+
+            const url = `${this.baseUrl}/api/lessons/${lessonId}`;
+            const res = await fetch(url, {
+                method: 'DELETE',
+                headers: this.headers()
+            });
+
+            if (!res.ok) throw new Error('Failed to delete lesson');
+
+            const data = await res.json();
+            this.showMessage('✅ Lesson deleted successfully!', 'success');
+            await this.loadLessons();
+
+        } catch (error) {
+            console.error('Delete lesson error:', error);
+            this.showMessage('❌ ' + error.message, 'error');
+        } finally {
+            const btn = document.querySelector(`.delete-lesson-btn[data-lesson-id="${lessonId}"]`);
+            if (btn) this.hideButtonSpinner(btn, '🗑️');
+        }
+    }
+
+    // ============================================================
+    // END LESSON METHODS
+    // ============================================================
 
     // ===== OPEN EDIT MODAL =====
     openEditModal() {

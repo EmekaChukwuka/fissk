@@ -6,6 +6,318 @@
 <title>Instructor Class Details - FISSK</title>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="instructor-dashboard.css">
+<style>
+    /* ===== LESSON STYLES ===== */
+    .lessons-grid-instructor {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+        margin-top: 16px;
+    }
+
+    .lesson-card-instructor {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        border: 1px solid #f0f0f0;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .lesson-card-instructor:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+        border-color: #8B5FBF;
+    }
+
+    .lesson-card-instructor .lesson-header-instructor {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 8px;
+    }
+
+    .lesson-card-instructor .lesson-title-instructor {
+        font-weight: 600;
+        color: #2D3748;
+        font-size: 1.05rem;
+        margin: 0;
+    }
+
+    .lesson-card-instructor .lesson-status-badge {
+        padding: 3px 12px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .lesson-card-instructor .lesson-status-badge.published {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .lesson-card-instructor .lesson-status-badge.draft {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .lesson-card-instructor .lesson-desc-instructor {
+        color: #718096;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin: 8px 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .lesson-card-instructor .lesson-meta-instructor {
+        display: flex;
+        gap: 16px;
+        font-size: 0.8rem;
+        color: #a0aec0;
+        margin-top: 8px;
+        flex-wrap: wrap;
+    }
+
+    .lesson-card-instructor .lesson-meta-instructor span {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .lesson-card-instructor .lesson-actions-instructor {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #f0f0f0;
+        flex-wrap: wrap;
+    }
+
+    .lesson-card-instructor .btn-sm {
+        padding: 5px 14px;
+        font-size: 0.78rem;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .lesson-card-instructor .btn-sm.btn-primary {
+        background: #8B5FBF;
+        color: white;
+    }
+    .lesson-card-instructor .btn-sm.btn-primary:hover {
+        background: #7A4BA6;
+    }
+
+    .lesson-card-instructor .btn-sm.btn-outline {
+        background: transparent;
+        border: 1px solid #8B5FBF;
+        color: #8B5FBF;
+    }
+    .lesson-card-instructor .btn-sm.btn-outline:hover {
+        background: #8B5FBF;
+        color: white;
+    }
+
+    .lesson-card-instructor .btn-sm.btn-success {
+        background: #10B981;
+        color: white;
+    }
+    .lesson-card-instructor .btn-sm.btn-success:hover {
+        background: #059669;
+    }
+
+    .lesson-card-instructor .btn-sm.btn-warning {
+        background: #F59E0B;
+        color: white;
+    }
+    .lesson-card-instructor .btn-sm.btn-warning:hover {
+        background: #D97706;
+    }
+
+    .lesson-card-instructor .btn-sm.btn-danger {
+        background: #EF4444;
+        color: white;
+    }
+    .lesson-card-instructor .btn-sm.btn-danger:hover {
+        background: #DC2626;
+    }
+
+    .no-lessons-instructor {
+        text-align: center;
+        padding: 40px 20px;
+        color: #6B7280;
+        background: #f8f9fa;
+        border-radius: 12px;
+        grid-column: 1 / -1;
+    }
+
+    .no-lessons-instructor .icon {
+        font-size: 48px;
+        display: block;
+        margin-bottom: 16px;
+    }
+
+    .section-header-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .section-header-actions h3 {
+        margin: 0;
+        color: #2D3748;
+    }
+
+    /* Make tabs scrollable on mobile */
+    .content-tabs {
+        display: flex;
+        gap: 4px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .content-tabs .tab-btn {
+        white-space: nowrap;
+        padding: 10px 20px;
+        flex-shrink: 0;
+    }
+
+    /* ===== LOADING INDICATORS ===== */
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 20px;
+        min-height: 200px;
+    }
+
+    .loading-spinner-large {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f0f0f0;
+        border-top: 4px solid #8B5FBF;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    .loading-text {
+        margin-top: 16px;
+        color: #6B7280;
+        font-size: 0.95rem;
+    }
+
+    .skeleton-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+        margin-top: 16px;
+    }
+
+    .skeleton-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid #f0f0f0;
+        min-height: 180px;
+    }
+
+    .skeleton-card .skeleton-line {
+        height: 12px;
+        background: #f0f0f0;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        animation: shimmer 1.5s ease-in-out infinite;
+    }
+
+    .skeleton-card .skeleton-line.short {
+        width: 60%;
+    }
+
+    .skeleton-card .skeleton-line.medium {
+        width: 80%;
+    }
+
+    .skeleton-card .skeleton-line.long {
+        width: 95%;
+    }
+
+    .skeleton-card .skeleton-line:last-child {
+        margin-bottom: 0;
+    }
+
+    .skeleton-table {
+        width: 100%;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        padding: 20px;
+    }
+
+    .skeleton-table .skeleton-row {
+        display: flex;
+        gap: 16px;
+        padding: 12px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .skeleton-table .skeleton-row .skeleton-cell {
+        flex: 1;
+        height: 16px;
+        background: #f0f0f0;
+        border-radius: 4px;
+        animation: shimmer 1.5s ease-in-out infinite;
+    }
+
+    .skeleton-table .skeleton-row .skeleton-cell:first-child {
+        flex: 0.5;
+    }
+
+    @keyframes shimmer {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 768px) {
+        .lessons-grid-instructor {
+            grid-template-columns: 1fr;
+        }
+        .section-header-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .section-header-actions .btn {
+            width: 100%;
+            text-align: center;
+        }
+        .skeleton-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
 </head>
 
 <body>
@@ -32,10 +344,10 @@
 <h1 id="className"></h1>
 <p id="classDescription" class="class-description" style="color:white;"></p>
  <div class="class-meta" style="color:white;">
-                        <span id="classLevel"></span>
-                        <span id="classDuration"></span>
-                        <span id="classStudents"></span>
-                    </div>
+    <span id="classLevel"></span>
+    <span id="classDuration"></span>
+    <span id="classStudents"></span>
+</div>
 <div class="class-actions">
 <button class="btn btn-primary" id="editClassBtn">Edit Class</button>
 <button class="btn btn-outline" id="deleteClassBtn" style="color:white;">Delete</button>
@@ -50,55 +362,81 @@
 <div class="container">
 
 <div class="content-tabs">
-<button class="tab-btn active" data-tab="videos">Videos</button>
-<button class="tab-btn" data-tab="students">Students</button>
-<button class="tab-btn" data-tab="streams">Live Streams</button>
-<button class="tab-btn" data-tab="materials">Materials</button>
+<button class="tab-btn active" data-tab="videos">🎥 Videos</button>
+<button class="tab-btn" data-tab="students">👥 Students</button>
+<button class="tab-btn" data-tab="streams">🔴 Live Streams</button>
+<button class="tab-btn" data-tab="lessons">📚 Lessons</button>
+<button class="tab-btn" data-tab="materials">📄 Materials</button>
 </div>
 
 <!-- VIDEOS -->
 <div id="videosTab" class="tab-content active">
 <button class="btn btn-primary" id="uploadVideoBtn">Upload Video</button><br><br>
-<div id="videosContainer" class="videos-grid"></div>
+<div id="videosContainer" class="videos-grid">
+    <!-- Loading indicator will be shown by JS -->
+</div>
 </div>
 
 <!-- STUDENTS -->
 <div id="studentsTab" class="tab-content">
-<div id="studentsContainer"></div>
+<div id="studentsContainer">
+    <!-- Loading indicator will be shown by JS -->
+</div>
 </div>
 
 <!-- STREAMS -->
 <div id="streamsTab" class="tab-content">
 <button class="btn btn-primary" id="scheduleStreamBtn">Schedule Stream</button>
-<div id="streamsContainer"></div>
+<div id="streamsContainer">
+    <!-- Loading indicator will be shown by JS -->
+</div>
+</div>
+
+<!-- LESSONS -->
+<div id="lessonsTab" class="tab-content">
+    <div class="section-header-actions">
+        <h3>📚 Course Lessons</h3>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <a href="instructor/lessons/manage.html?classId={{classId}}" class="btn btn-outline" id="manageLessonsBtn">
+                ⚙️ Manage Lessons
+            </a>
+            <a href="instructor/lessons/create.html?classId={{classId}}" class="btn btn-primary" id="createLessonBtn">
+                + Create Lesson
+            </a>
+        </div>
+    </div>
+    <div id="lessonsContainer" class="lessons-grid-instructor">
+        <!-- Lessons will be loaded here -->
+    </div>
 </div>
 
 <!-- MATERIALS -->
 <div id="materialsTab" class="tab-content">
 <button class="btn btn-primary" id="uploadMaterialBtn">Upload Material</button>
-<div id="materialsContainer"></div>
+<div id="materialsContainer">
+    <!-- Loading indicator will be shown by JS -->
+</div>
 </div>
 
 </div>
 </section>
 
 
-    <!-- Video Modal -->
-    <div id="videoModal" class="modal">
-        <div class="modal-content video-modal">
-         
-
-            <span class="close-modal">&times;</span><br>
-            <video id="videoPlayer" controls>
-                Your browser does not support the video tag.
-            </video>
-            <div class="video-info">
-                <h3 id="videoTitle"></h3>
-                <p id="videoDescription"></p>
-            </div>
+<!-- Video Modal -->
+<div id="videoModal" class="modal">
+    <div class="modal-content video-modal">
+        <span class="close-modal">&times;</span><br>
+        <video id="videoPlayer" controls>
+            Your browser does not support the video tag.
+        </video>
+        <div class="video-info">
+            <h3 id="videoTitle"></h3>
+            <p id="videoDescription"></p>
         </div>
     </div>
-    <!-- Schedule Stream Modal -->
+</div>
+
+<!-- Schedule Stream Modal -->
 <div id="scheduleStreamModal" class="modal">
     <div class="modal-content">
         <span class="close-modal">&times;</span>
@@ -123,6 +461,7 @@
         </form>
     </div>
 </div>
+
 <!-- Edit Class Modal -->
 <div id="editClassModal" class="modal">
     <div class="modal-content">

@@ -5,12 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Lessons - FISSK Online Academy</title>
     <link rel="stylesheet" href="../../styles.css">
-    <link rel="stylesheet" href="../../css/lesson.css">
     <link rel="icon" href="../../fissklogo.jpg">
     <style>
         .manage-page {
             padding: 100px 0 60px;
-            background: var(--gray-light);
+            background: #f5f5f5;
             min-height: 100vh;
         }
 
@@ -25,7 +24,11 @@
 
         .manage-header h1 {
             font-size: 1.8rem;
-            color: var(--text-dark);
+            color: #2D3748;
+        }
+        .manage-header p {
+            color: #6B7280;
+            margin: 4px 0 0;
         }
 
         .manage-stats {
@@ -46,12 +49,12 @@
         .manage-stat .stat-value {
             font-size: 1.8rem;
             font-weight: 700;
-            color: var(--text-dark);
+            color: #2D3748;
         }
 
         .manage-stat .stat-label {
             font-size: 0.8rem;
-            color: var(--text-light);
+            color: #6B7280;
         }
 
         .lesson-table-container {
@@ -119,7 +122,6 @@
             background: #8B5FBF;
             color: white;
         }
-
         .btn-sm.btn-primary:hover {
             background: #7A4BA6;
         }
@@ -129,17 +131,31 @@
             border: 1px solid #8B5FBF;
             color: #8B5FBF;
         }
-
         .btn-sm.btn-outline:hover {
             background: #8B5FBF;
             color: white;
+        }
+
+        .btn-sm.btn-success {
+            background: #10B981;
+            color: white;
+        }
+        .btn-sm.btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-sm.btn-warning {
+            background: #F59E0B;
+            color: white;
+        }
+        .btn-sm.btn-warning:hover {
+            background: #D97706;
         }
 
         .btn-sm.btn-danger {
             background: #EF4444;
             color: white;
         }
-
         .btn-sm.btn-danger:hover {
             background: #DC2626;
         }
@@ -147,13 +163,24 @@
         .no-lessons {
             text-align: center;
             padding: 60px 20px;
-            color: var(--text-light);
+            color: #6B7280;
         }
 
         .no-lessons .icon {
             font-size: 48px;
             display: block;
             margin-bottom: 16px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 16px;
+            color: #8B5FBF;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .back-link:hover {
+            text-decoration: underline;
         }
 
         @media (max-width: 768px) {
@@ -166,6 +193,10 @@
             .manage-stats {
                 grid-template-columns: repeat(2, 1fr);
             }
+            .manage-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
         }
     </style>
 </head>
@@ -175,7 +206,7 @@
         <div class="nav-container">
             <div class="nav-logo">
                 <h2>FISSK</h2>
-                <span>Instructor Portal</span>
+                <span>Lesson Manager</span>
             </div>
             <ul class="nav-menu">
                 <li><a href="../../instructor-dashboard.html" class="nav-link">Dashboard</a></li>
@@ -194,12 +225,14 @@
 
     <section class="manage-page">
         <div class="container">
+            <a href="../../instructor-dashboard.html#classes" class="back-link">← Back to Dashboard</a>
+
             <div class="manage-header">
                 <div>
                     <h1>📚 Manage Lessons</h1>
-                    <p style="color: var(--text-light);">Organize your course content</p>
+                    <p id="classInfo">Loading class information...</p>
                 </div>
-                <a href="create.html?classId={classId}" class="btn btn-primary" id="createLessonBtn">+ Create New Lesson</a>
+                <a href="create.html" class="btn btn-primary" id="createLessonBtn">+ Create New Lesson</a>
             </div>
 
             <div class="manage-stats" id="statsContainer">
@@ -214,6 +247,10 @@
                 <div class="manage-stat">
                     <div class="stat-value" id="draftLessons">0</div>
                     <div class="stat-label">Drafts</div>
+                </div>
+                <div class="manage-stat">
+                    <div class="stat-value" id="totalItems">0</div>
+                    <div class="stat-label">Content Items</div>
                 </div>
             </div>
 
@@ -231,7 +268,7 @@
                     </thead>
                     <tbody id="lessonsBody">
                         <tr>
-                            <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-light);">
+                            <td colspan="6" style="text-align: center; padding: 40px; color: #6B7280;">
                                 Loading lessons...
                             </td>
                         </tr>
@@ -241,7 +278,6 @@
         </div>
     </section>
 
-    <script src="../../js/quiz/quiz-core.js"></script>
-    <script src="../../js/lesson-manager.js"></script>
+    <script src="manage.js"></script>
 </body>
 </html>

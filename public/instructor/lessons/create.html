@@ -5,97 +5,275 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Lesson - FISSK Online Academy</title>
     <link rel="stylesheet" href="../../styles.css">
-    <link rel="stylesheet" href="../../css/lesson.css">
     <link rel="icon" href="../../fissklogo.jpg">
+    <style>
+        .lesson-builder {
+            padding: 80px 0 40px;
+            background: var(--gray-light);
+            min-height: 100vh;
+        }
+        .lesson-builder .container {
+            max-width: 900px;
+        }
+        .builder-card {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .builder-card h1 {
+            margin-bottom: 24px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-dark);
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: border-color 0.3s ease;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .content-items-section {
+            margin: 24px 0;
+            padding: 16px;
+            background: var(--gray-light);
+            border-radius: 12px;
+        }
+        .content-items-section h3 {
+            margin-bottom: 16px;
+            font-size: 1.1rem;
+        }
+        .content-item-row {
+            display: flex;
+            gap: 12px;
+            padding: 10px 14px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            border: 1px solid var(--border);
+        }
+        .content-item-row .item-type-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .content-item-row .item-type-badge.text { background: #3B82F6; color: white; }
+        .content-item-row .item-type-badge.video { background: #EF4444; color: white; }
+        .content-item-row .item-type-badge.quiz { background: #F59E0B; color: white; }
+        .content-item-row .item-type-badge.material { background: #10B981; color: white; }
+        .content-item-row .item-type-badge.link { background: #8B5FBF; color: white; }
+        .content-item-row .item-type-badge.embed { background: #6B7280; color: white; }
+        .content-item-row .item-title {
+            flex: 1;
+            font-weight: 500;
+        }
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-sm.btn-outline {
+            background: transparent;
+            border: 1px solid #8B5FBF;
+            color: #8B5FBF;
+        }
+        .btn-sm.btn-outline:hover {
+            background: #8B5FBF;
+            color: white;
+        }
+        .btn-sm.btn-danger {
+            background: #EF4444;
+            color: white;
+        }
+        .btn-sm.btn-danger:hover {
+            background: #DC2626;
+        }
+        .add-content-btn {
+            padding: 8px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .add-content-btn:hover {
+            background: var(--primary-dark);
+        }
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+        .form-actions .btn {
+            padding: 10px 32px;
+        }
+        .empty-items {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-light);
+        }
+
+        /* ===== MODAL STYLES ===== */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            padding: 32px;
+            border-radius: 16px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        .close-modal {
+            position: absolute;
+            top: 12px;
+            right: 18px;
+            font-size: 1.8rem;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.3s ease;
+            line-height: 1;
+        }
+        .close-modal:hover {
+            color: #333;
+        }
+        .modal-content h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .modal-content .form-group {
+            margin-bottom: 16px;
+        }
+        .modal-content .form-actions {
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+            margin-top: 8px;
+        }
+        .modal-content .checkbox-group {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .modal-content .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 400;
+            cursor: pointer;
+        }
+        .modal-content .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #8B5FBF;
+        }
+
+        @media (max-width: 768px) {
+            .builder-card { padding: 20px; }
+            .content-item-row { flex-direction: column; align-items: stretch; }
+            .modal-content { padding: 20px; }
+        }
+    </style>
 </head>
 <body>
-    <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-logo">
                 <h2>FISSK</h2>
-                <span>Lesson Builder</span>
+                <span>Instructor Portal</span>
             </div>
             <ul class="nav-menu">
-                <li><a href="../../instructor-dashboard.html" class="nav-link">Dashboard</a></li>
-                <li><a href="../../classes.html" class="nav-link">Classes</a></li>
+                <li><a href="../instructor-dashboard.html" class="nav-link">📊 Dashboard</a></li>
+                <li><a href="../classes.html" class="nav-link">📚 Classes</a></li>
                 <li class="nav-user">
                     <div class="user-dropdown" id="user-dropdown"></div>
                 </li>
             </ul>
-            <div class="hamburger">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
+            <div class="hamburger"><span></span><span></span><span></span></div>
         </div>
     </nav>
 
     <section class="lesson-builder">
         <div class="container">
-            <div class="builder-header">
-                <h1>📚 Create New Lesson</h1>
-                <div class="builder-actions">
-                    <button class="btn btn-outline" id="previewBtn">👁️ Preview</button>
-                    <button class="btn btn-success" id="saveBtn">💾 Save Lesson</button>
-                </div>
-            </div>
-
-            <!-- Lesson Info -->
-            <div class="builder-section lesson-info">
-                <div class="form-group">
-                    <label for="lessonTitle">Lesson Title *</label>
-                    <input type="text" id="lessonTitle" placeholder="e.g., Introduction to French Verbs">
-                </div>
-                <div class="form-group">
-                    <label for="lessonDescription">Description</label>
-                    <textarea id="lessonDescription" rows="2" placeholder="What will students learn in this lesson?"></textarea>
-                </div>
-                <div class="form-row">
+            <div class="builder-card">
+                <h1 id="pageTitle">📚 Create New Lesson</h1>
+                <form id="lessonForm">
                     <div class="form-group">
-                        <label for="lessonOrder">Order</label>
-                        <input type="number" id="lessonOrder" value="1" min="1">
+                        <label>Lesson Title *</label>
+                        <input type="text" id="lessonTitle" placeholder="e.g., Introduction to French Grammar" required>
                     </div>
-                    <div class="form-group checkbox-group">
-                        <label>
-                            <input type="checkbox" id="isFreePreview"> Free Preview
-                        </label>
-                        <label>
-                            <input type="checkbox" id="isPublished" checked> Published
-                        </label>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="lessonDescription" rows="3" placeholder="Brief description of this lesson"></textarea>
                     </div>
-                </div>
-            </div>
 
-            <!-- Content Items -->
-            <div class="builder-section content-section">
-                <div class="content-header">
-                    <h3>📋 Lesson Content</h3>
-                    <button class="btn btn-primary" id="addContentBtn">+ Add Content</button>
-                </div>
-                <div id="contentItemsList" class="content-items-list">
-                    <div class="empty-content">
-                        <p>📝 No content added yet</p>
-                        <p class="empty-sub">Click "Add Content" to start building your lesson</p>
+                    <div class="content-items-section">
+                        <h3>📝 Content Items</h3>
+                        <div id="contentItemsContainer">
+                            <div class="empty-items">No content items added yet. Click "Add Content" to get started.</div>
+                        </div>
+                        <button type="button" class="add-content-btn" id="addContentBtn">+ Add Content</button>
                     </div>
-                </div>
-            </div>
 
-            <!-- Footer -->
-            <div class="builder-footer">
-                <button class="btn btn-outline" id="discardBtn">🗑️ Discard</button>
-                <div>
-                    <button class="btn btn-outline" id="previewBtn2">👁️ Preview</button>
-                    <button class="btn btn-success" id="saveBtn2">💾 Save Lesson</button>
-                </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="isPublished" checked>
+                            Publish this lesson
+                        </label>
+                        <small style="color: var(--text-light); display: block; margin-top: 4px;">Unpublished lessons are only visible to instructors.</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary" id="saveLessonBtn">💾 Save Lesson</button>
+                        <button type="button" class="btn btn-outline" onclick="window.location.href='../instructor-dashboard.html#classes'">Cancel</button>
+                    </div>
+                </form>
             </div>
         </div>
     </section>
 
-    <!-- Content Item Modal -->
+    <!-- ===== CONTENT MODAL ===== -->
     <div id="contentModal" class="modal">
-        <div class="modal-content" style="max-width: 650px; max-height: 90vh; overflow-y: auto;">
-            <span class="close-modal" onclick="document.getElementById('contentModal').style.display='none'">&times;</span>
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
             <h2 id="contentModalTitle">Add Content</h2>
             <form id="contentForm">
                 <div class="form-group">
@@ -105,7 +283,6 @@
                         <option value="video">🎥 Video</option>
                         <option value="quiz">📝 Quiz</option>
                         <option value="material">📄 Material</option>
-                        <option value="assignment">✍️ Assignment</option>
                         <option value="link">🔗 Link</option>
                         <option value="embed">🎬 Embed</option>
                     </select>
@@ -114,43 +291,61 @@
                     <label>Title *</label>
                     <input type="text" id="contentTitle" placeholder="Content title">
                 </div>
-                <div class="form-group" id="contentTextField">
-                    <label>Content</label>
-                    <textarea id="contentText" rows="4" placeholder="Write your content here..."></textarea>
+                
+                <!-- Dynamic fields -->
+                <div id="textField">
+                    <div class="form-group">
+                        <label>Content</label>
+                        <textarea id="contentText" rows="4" placeholder="Write your lesson notes here..."></textarea>
+                    </div>
                 </div>
-                <div class="form-group" id="videoFields" style="display:none;">
-                    <label>Video URL</label>
-                    <input type="text" id="videoUrl" placeholder="https://example.com/video.mp4">
-                    <label style="margin-top: 8px;">Mux Playback ID</label>
-                    <input type="text" id="muxPlaybackId" placeholder="e.g., r2Z8QZTe4su38j004rYPHTFzxre2Xr9BYQGfSGaLTixo">
-                    <label style="margin-top: 8px;">Duration (minutes)</label>
-                    <input type="number" id="contentDuration" value="5" min="1">
+                <div id="videoField" style="display:none;">
+                    <div class="form-group">
+                        <label>Select Video</label>
+                        <select id="videoSelect">
+                            <option value="">Select a recorded video...</option>
+                        </select>
+                        <small style="color: #6B7280; display: block; margin-top: 4px;">Only recorded livestream videos are available.</small>
+                    </div>
                 </div>
-                <div class="form-group" id="quizFields" style="display:none;">
-                    <label>Quiz ID</label>
-                    <input type="text" id="quizId" placeholder="Quiz ID (from quiz management)">
+                <div id="quizField" style="display:none;">
+                    <div class="form-group">
+                        <label>Select Quiz</label>
+                        <select id="quizSelect">
+                            <option value="">Select a quiz...</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group" id="materialFields" style="display:none;">
-                    <label>File URL</label>
-                    <input type="text" id="fileUrl" placeholder="https://example.com/file.pdf">
-                    <label style="margin-top: 8px;">File Name</label>
-                    <input type="text" id="fileName" placeholder="document.pdf">
-                    <label style="margin-top: 8px;">File Size (KB)</label>
-                    <input type="number" id="fileSize" value="0" min="0">
+                <div id="materialField" style="display:none;">
+                    <div class="form-group">
+                        <label>File URL</label>
+                        <input type="text" id="fileUrl" placeholder="https://example.com/file.pdf">
+                    </div>
+                    <div class="form-group">
+                        <label>File Name</label>
+                        <input type="text" id="fileName" placeholder="document.pdf">
+                    </div>
                 </div>
-                <div class="form-group" id="linkFields" style="display:none;">
-                    <label>Link URL *</label>
-                    <input type="url" id="linkUrl" placeholder="https://example.com">
-                    <label style="margin-top: 8px;">Open in</label>
-                    <select id="linkTarget">
-                        <option value="_blank">New Tab</option>
-                        <option value="_self">Same Tab</option>
-                    </select>
+                <div id="linkField" style="display:none;">
+                    <div class="form-group">
+                        <label>Link URL *</label>
+                        <input type="url" id="linkUrl" placeholder="https://example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Open in</label>
+                        <select id="linkTarget">
+                            <option value="_blank">New Tab</option>
+                            <option value="_self">Same Tab</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="form-group" id="embedFields" style="display:none;">
-                    <label>Embed Code</label>
-                    <textarea id="embedCode" rows="3" placeholder="&lt;iframe src=&quot;https://www.youtube.com/embed/...&quot;&gt;&lt;/iframe&gt;"></textarea>
+                <div id="embedField" style="display:none;">
+                    <div class="form-group">
+                        <label>Embed Code</label>
+                        <textarea id="embedCode" rows="3" placeholder='&lt;iframe src="https://www.youtube.com/embed/..."&gt;&lt;/iframe&gt;'></textarea>
+                    </div>
                 </div>
+
                 <div class="form-group checkbox-group">
                     <label>
                         <input type="checkbox" id="isRequired" checked> Required to complete lesson
@@ -164,18 +359,6 @@
         </div>
     </div>
 
-    <!-- Preview Modal -->
-    <div id="previewModal" class="modal">
-        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
-            <span class="close-modal" onclick="document.getElementById('previewModal').style.display='none'">&times;</span>
-            <h2>👁️ Lesson Preview</h2>
-            <div id="previewContent">
-                <p style="text-align: center; padding: 20px; color: var(--text-light);">Loading preview...</p>
-            </div>
-        </div>
-    </div>
-
-    <script src="../../js/quiz/quiz-core.js"></script>
-    <script src="../../js/lesson-manager.js"></script>
+    <script src="create.js"></script>
 </body>
 </html>
