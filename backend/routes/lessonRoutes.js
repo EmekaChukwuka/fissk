@@ -2,9 +2,13 @@ import express from 'express';
 import Lesson from '../models/Lesson.js';
 import Class from '../models/Class.js';
 import Enrollment from '../models/Enrollment.js';
-import Stream from '../models/Stream.js';
+import Stream from '../models/Stream.js';  // Wrapper class
 import Quiz from '../models/Quiz.js';
 import { auth } from '../middleware/auth.js';
+
+// Get the Mongoose model from the wrapper class
+// The wrapper class exports Stream as default, but we need the model
+// We can use Stream.getClassVideos() which is a static method
 
 const lessonRouter = express.Router();
 
@@ -186,7 +190,9 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
     const populatedContentItems = await Promise.all(
       lesson.contentItems.map(async (item) => {
         if (item.type === 'video' && item.contentId) {
-          const video = await Stream.findById(item.contentId).lean();
+          // Use Stream.getClassVideos or direct model access
+          // We'll use the wrapper class's getById method
+          const video = await Stream.getById(item.contentId);
           return {
             ...item,
             videoDetails: video ? {
@@ -394,6 +400,8 @@ lessonRouter.get('/instructor/class/:classId', auth, async (req, res) => {
 /**
  * Get available videos for a class (for lesson builder)
  * GET /api/lessons/available-videos/:classId
+ * 
+ * FIXED: Using Stream.getClassVideos() which is a static method in the wrapper class
  */
 lessonRouter.get('/available-videos/:classId', auth, async (req, res) => {
   try {
@@ -446,15 +454,9 @@ lessonRouter.get('/available-videos/:classId', auth, async (req, res) => {
 
     console.log('✅ Access granted');
 
-    // Get all videos (streams) for this class that are ready
-    const videos = await Stream.find({ 
-      streamClass: classId,
-      muxStatus: 'ready',
-      muxPlaybackId: { $exists: true, $ne: null }
-    })
-      .select('_id name filename classTitle muxPlaybackId muxStatus duration createdAt')
-      .sort({ createdAt: -1 })
-      .lean();
+    // ===== FIX: Use Stream.getClassVideos() which is a static method =====
+    // This method returns an array of video objects with the proper structure
+    const videos = await Stream.getClassVideos(classId);
 
     console.log(`Found ${videos.length} videos for class ${classId}`);
     console.log('========================================');
@@ -597,10 +599,7 @@ lessonRouter.post('/', auth, async (req, res) => {
       for (const item of contentItems) {
         // For videos, verify the video exists and belongs to this class
         if (item.type === 'video' && item.contentId) {
-          const video = await Stream.findOne({ 
-            _id: item.contentId, 
-            streamClass: classId 
-          });
+          const video = await Stream.getById(item.contentId);
           if (!video) {
             return res.status(400).json({
               success: false,
@@ -704,10 +703,7 @@ lessonRouter.put('/:lessonId', auth, async (req, res) => {
     if (updates.contentItems) {
       for (const item of updates.contentItems) {
         if (item.type === 'video' && item.contentId) {
-          const video = await Stream.findOne({ 
-            _id: item.contentId, 
-            streamClass: lesson.classId 
-          });
+          const video = await Stream.getById(item.contentId);
           if (!video) {
             return res.status(400).json({
               success: false,
@@ -1012,9 +1008,9 @@ async function updateOverallProgress(enrollmentId) {
   let totalItems = 0;
   let completedItems = 0;
 
-  // Videos
-  const streams = await Stream.find({ streamClass: enrollment.classId });
-  totalItems += streams.length;
+  // Videos - use Stream.getClassVideos to get videos
+  const videos = await Stream.getClassVideos(enrollment.classId);
+  totalItems += videos.length;
   const completedVideos = enrollment.progressItems.filter(
     item => item.itemType === 'video' && item.completed
   ).length;

@@ -153,6 +153,7 @@ class LessonBuilder {
                 const quizData = await quizRes.json();
                 this.availableQuizzes = quizData.quizzes || [];
                 console.log(`Loaded ${this.availableQuizzes.length} quizzes`);
+                console.log(` this.availableQuizzes:`, this.availableQuizzes);
             } else {
                 if (quizRes.status === 401) {
                     localStorage.removeItem('token');
