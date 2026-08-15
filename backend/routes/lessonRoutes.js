@@ -123,11 +123,54 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
 /**
- * Get a single lesson with full content
- * GET /api/lessons/:lessonId
+ * Helper function to parse duration string to minutes (number)
  */
+function parseDurationToMinutes(durationStr) {
+    if (!durationStr) return 0;
+    
+    // If it's already a number, return it
+    if (typeof durationStr === 'number') return durationStr;
+    
+    const str = String(durationStr).trim();
+    
+    // Try to parse as a simple number
+    const num = parseFloat(str);
+    if (!isNaN(num) && str.match(/^\d+$/)) {
+        return num;
+    }
+    
+    // Try to parse "X min, Y sec" format
+    const minSecMatch = str.match(/(\d+)\s*min\s*[,.]?\s*(\d+)\s*sec/i);
+    if (minSecMatch) {
+        const mins = parseInt(minSecMatch[1]);
+        const secs = parseInt(minSecMatch[2]);
+        return mins + (secs / 60);
+    }
+    
+    // Try to parse "X min" format
+    const minMatch = str.match(/(\d+)\s*min/i);
+    if (minMatch) {
+        return parseInt(minMatch[1]);
+    }
+    
+    // Try to parse "X:Y" format (mm:ss)
+    const timeMatch = str.match(/(\d+):(\d+)/);
+    if (timeMatch) {
+        const mins = parseInt(timeMatch[1]);
+        const secs = parseInt(timeMatch[2]);
+        return mins + (secs / 60);
+    }
+    
+    // If all else fails, try to extract any number
+    const anyNum = str.match(/\d+/);
+    if (anyNum) {
+        return parseInt(anyNum[0]);
+    }
+    
+    return 0;
+}
+
 /**
  * Get a single lesson with full content
  * GET /api/lessons/:lessonId
@@ -189,23 +232,29 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
 
     console.log('✅ Access granted');
 
-    // Populate video and quiz details - FIX: Include the actual IDs
+    // Populate video and quiz details - FIX: Parse duration to number
     const populatedContentItems = await Promise.all(
       lesson.contentItems.map(async (item) => {
         if (item.type === 'video' && item.contentId) {
           const video = await Stream.getById(item.contentId);
-          console.log(video)
+          console.log('Video data:', video);
+          
+          // Parse the video duration to a number
+          const durationInMinutes = parseDurationToMinutes(video?.duration);
+          console.log(`Parsed duration: "${video?.duration}" -> ${durationInMinutes} minutes`);
+          
           return {
             ...item,
-            // Keep the original contentId
             contentId: item.contentId,
             videoId: item.contentId,
+            // IMPORTANT: Set duration to the parsed number
+            duration: durationInMinutes,
             videoDetails: video ? {
               _id: video._id,
               muxPlaybackId: video.muxPlaybackId,
               playbackUrl: video.muxPlaybackId ? `https://stream.mux.com/${video.muxPlaybackId}.m3u8` : null,
               thumbnailUrl: video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` : null,
-              duration: video.duration,
+              duration: durationInMinutes,
               filename: video.filename,
               title: video.classTitle || video.name
             } : null
@@ -217,9 +266,8 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
             .lean();
           return {
             ...item,
-            // KEEP the contentId - this is the quiz ID!
             contentId: item.contentId,
-            quizId: item.contentId, // Also set quizId for frontend compatibility
+            quizId: item.contentId,
             quizDetails: quiz ? {
               _id: quiz._id,
               title: quiz.title,
@@ -565,7 +613,6 @@ lessonRouter.get('/available-quizzes/:classId', auth, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
 /**
  * Create a lesson
  * POST /api/lessons
@@ -589,7 +636,6 @@ lessonRouter.post('/', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
@@ -611,7 +657,8 @@ lessonRouter.post('/', auth, async (req, res) => {
 
     console.log('✅ User is instructor/admin');
 
-    // Validate content items
+    // Validate and clean content items - ensure duration is a number
+    const cleanedContentItems = [];
     if (contentItems && contentItems.length > 0) {
       for (const item of contentItems) {
         // For videos, verify the video exists and belongs to this class
@@ -623,11 +670,13 @@ lessonRouter.post('/', auth, async (req, res) => {
               message: `Video "${item.title}" not found or does not belong to this class`
             });
           }
-          // Set duration from video
-          item.duration = video.duration || 0;
-        }
-        // For quizzes, verify the quiz exists and belongs to this class
-        if (item.type === 'quiz' && item.contentId) {
+          // Parse duration to number
+          const durationInMinutes = parseDurationToMinutes(video.duration);
+          cleanedContentItems.push({
+            ...item,
+            duration: durationInMinutes // Ensure duration is a number
+          });
+        } else if (item.type === 'quiz' && item.contentId) {
           const quiz = await Quiz.findOne({ 
             _id: item.contentId, 
             classId: classId 
@@ -638,30 +687,38 @@ lessonRouter.post('/', auth, async (req, res) => {
               message: `Quiz "${item.title}" not found or does not belong to this class`
             });
           }
+          cleanedContentItems.push({
+            ...item,
+            duration: 0 // Quizzes don't have duration
+          });
+        } else {
+          // For text, material, link, embed - ensure duration is a number
+          cleanedContentItems.push({
+            ...item,
+            duration: item.duration || 0
+          });
         }
       }
     }
 
     // Calculate estimated time
     let estimatedTime = 0;
-    if (contentItems) {
-      contentItems.forEach(item => {
-        if (item.duration) estimatedTime += item.duration;
-        // Text items add 1 minute per 100 words
-        if (item.type === 'text' && item.content) {
-          const wordCount = item.content.split(/\s+/).length;
-          estimatedTime += Math.ceil(wordCount / 100);
-        }
-      });
-    }
+    cleanedContentItems.forEach(item => {
+      if (item.duration) estimatedTime += item.duration;
+      // Text items add 1 minute per 100 words
+      if (item.type === 'text' && item.content) {
+        const wordCount = item.content.split(/\s+/).length;
+        estimatedTime += Math.ceil(wordCount / 100);
+      }
+    });
 
     const lesson = new Lesson({
       classId,
       instructorId: userId,
       title,
       description: description || '',
-      contentItems: contentItems || [],
-      estimatedTime,
+      contentItems: cleanedContentItems,
+      estimatedTime: Math.round(estimatedTime), // Ensure it's a number
       order: order || 0,
       isFreePreview: isFreePreview || false,
       isPublished: isPublished !== undefined ? isPublished : true
@@ -683,7 +740,6 @@ lessonRouter.post('/', auth, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-
 /**
  * Update a lesson
  * PUT /api/lessons/:lessonId
@@ -699,7 +755,6 @@ lessonRouter.put('/:lessonId', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lesson not found' });
     }
 
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       isInstructor = lesson.instructorId?.toString() === userId?.toString();
@@ -716,8 +771,10 @@ lessonRouter.put('/:lessonId', auth, async (req, res) => {
       });
     }
 
-    // Validate content items if being updated
+    // Validate and clean content items if being updated
+    let cleanedContentItems = null;
     if (updates.contentItems) {
+      cleanedContentItems = [];
       for (const item of updates.contentItems) {
         if (item.type === 'video' && item.contentId) {
           const video = await Stream.getById(item.contentId);
@@ -727,9 +784,12 @@ lessonRouter.put('/:lessonId', auth, async (req, res) => {
               message: `Video "${item.title}" not found or does not belong to this class`
             });
           }
-          item.duration = video.duration || 0;
-        }
-        if (item.type === 'quiz' && item.contentId) {
+          const durationInMinutes = parseDurationToMinutes(video.duration);
+          cleanedContentItems.push({
+            ...item,
+            duration: durationInMinutes
+          });
+        } else if (item.type === 'quiz' && item.contentId) {
           const quiz = await Quiz.findOne({ 
             _id: item.contentId, 
             classId: lesson.classId 
@@ -740,19 +800,29 @@ lessonRouter.put('/:lessonId', auth, async (req, res) => {
               message: `Quiz "${item.title}" not found or does not belong to this class`
             });
           }
+          cleanedContentItems.push({
+            ...item,
+            duration: 0
+          });
+        } else {
+          cleanedContentItems.push({
+            ...item,
+            duration: item.duration || 0
+          });
         }
       }
 
       // Recalculate estimated time
       let estimatedTime = 0;
-      updates.contentItems.forEach(item => {
+      cleanedContentItems.forEach(item => {
         if (item.duration) estimatedTime += item.duration;
         if (item.type === 'text' && item.content) {
           const wordCount = item.content.split(/\s+/).length;
           estimatedTime += Math.ceil(wordCount / 100);
         }
       });
-      updates.estimatedTime = estimatedTime;
+      updates.estimatedTime = Math.round(estimatedTime);
+      updates.contentItems = cleanedContentItems;
     }
 
     const updatedLesson = await Lesson.findByIdAndUpdate(

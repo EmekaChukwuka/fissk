@@ -1,3 +1,4 @@
+// models/Lesson.js - FIXED
 import mongoose from "mongoose";
 
 /**
@@ -65,7 +66,7 @@ const ContentItemSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  // Duration in minutes (for videos)
+  // Duration in minutes (for videos) - MUST BE A NUMBER
   duration: {
     type: Number,
     default: 0
@@ -104,9 +105,9 @@ const LessonSchema = new mongoose.Schema({
   },
   // Array of content items (text, videos, quizzes, etc.)
   contentItems: [ContentItemSchema],
-  // Estimated time to complete in minutes
+  // Estimated time to complete in minutes - MUST BE A NUMBER
   estimatedTime: {
-    type: String,
+    type: Number,
     default: 0
   },
   // Order in the course (for sequencing)
