@@ -106,7 +106,7 @@ const LessonSchema = new mongoose.Schema({
   contentItems: [ContentItemSchema],
   // Estimated time to complete in minutes
   estimatedTime: {
-    type: Number,
+    type: String,
     default: 0
   },
   // Order in the course (for sequencing)
