@@ -1,4 +1,4 @@
-// instructor/lessons/create.js - Lesson Builder
+// instructor/lessons/create.js - Lesson Builder (FIXED - Duration handling)
 class LessonBuilder {
     constructor() {
         this.user = JSON.parse(localStorage.getItem('user'));
@@ -19,13 +19,11 @@ class LessonBuilder {
     }
 
     async init() {
-        // Check authentication
         if (!this.user || !this.token) {
             window.location.href = '../../login.html';
             return;
         }
 
-        // Check if classId is provided
         if (!this.classId) {
             alert('No class selected. Please go back to your dashboard.');
             window.location.href = '../../instructor-dashboard.html#classes';
@@ -34,13 +32,11 @@ class LessonBuilder {
 
         this.loadUserData();
         
-        // First try to verify the class belongs to this instructor
         const classValid = await this.verifyClassAccess();
         if (!classValid) {
             return;
         }
 
-        // Load available content
         await this.loadAvailableContent();
 
         if (this.isEdit) {
@@ -53,9 +49,6 @@ class LessonBuilder {
         this.setupEventListeners();
     }
 
-    /**
-     * Verify the instructor has access to this class
-     */
     async verifyClassAccess() {
         try {
             const response = await fetch(`https://fissk-backend.onrender.com/register/instructor/classes/${this.classId}`, {
@@ -119,10 +112,8 @@ class LessonBuilder {
         try {
             console.log(`Loading available content for class ${this.classId}...`);
 
-            // Show loading state in selects
             this.updateSelectsLoading(true);
 
-            // Load available videos
             const videoRes = await fetch(`https://fissk-backend.onrender.com/api/lessons/available-videos/${this.classId}`, {
                 headers: { 
                     'Authorization': `Bearer ${this.token}`,
@@ -134,6 +125,7 @@ class LessonBuilder {
                 const videoData = await videoRes.json();
                 this.availableVideos = videoData.videos || [];
                 console.log(`Loaded ${this.availableVideos.length} videos`);
+                console.log('Video data sample:', this.availableVideos[0]);
             } else {
                 if (videoRes.status === 401) {
                     localStorage.removeItem('token');
@@ -144,7 +136,6 @@ class LessonBuilder {
                 this.availableVideos = [];
             }
 
-            // Load available quizzes
             const quizRes = await fetch(`https://fissk-backend.onrender.com/api/lessons/available-quizzes/${this.classId}`, {
                 headers: { 
                     'Authorization': `Bearer ${this.token}`,
@@ -156,7 +147,6 @@ class LessonBuilder {
                 const quizData = await quizRes.json();
                 this.availableQuizzes = quizData.quizzes || [];
                 console.log(`Loaded ${this.availableQuizzes.length} quizzes`);
-                console.log('this.availableQuizzes:', this.availableQuizzes);
             } else {
                 if (quizRes.status === 401) {
                     localStorage.removeItem('token');
@@ -167,7 +157,6 @@ class LessonBuilder {
                 this.availableQuizzes = [];
             }
 
-            // Update selects with loaded data
             this.updateSelectsLoading(false);
             this.populateSelects();
 
@@ -176,7 +165,6 @@ class LessonBuilder {
             this.updateSelectsLoading(false);
             this.populateSelects();
             
-            // Show a non-blocking warning
             const warningMsg = document.createElement('div');
             warningMsg.style.cssText = `
                 background: #fff3cd;
@@ -217,11 +205,6 @@ class LessonBuilder {
     }
 
     populateSelects() {
-        console.log('🔄 Populating selects...');
-        console.log('Available videos:', this.availableVideos);
-        console.log('Available quizzes:', this.availableQuizzes);
-
-        // Populate video select
         const videoSelect = document.getElementById('videoSelect');
         if (videoSelect) {
             if (!this.availableVideos || this.availableVideos.length === 0) {
@@ -236,33 +219,22 @@ class LessonBuilder {
                     `).join('')}
                 `;
             }
-            console.log('✅ Video select populated with', this.availableVideos.length, 'options');
-        } else {
-            console.warn('⚠️ Video select element not found');
         }
 
-        // Populate quiz select
         const quizSelect = document.getElementById('quizSelect');
         if (quizSelect) {
             if (!this.availableQuizzes || this.availableQuizzes.length === 0) {
                 quizSelect.innerHTML = `
                     <option value="">No quizzes available</option>
                 `;
-                console.log('ℹ️ No quizzes available to populate');
             } else {
                 quizSelect.innerHTML = `
                     <option value="">Select a quiz...</option>
-                    ${this.availableQuizzes.map(q => {
-                        const title = q.title || 'Untitled Quiz';
-                        const questions = q.questionCount || 0;
-                        return `<option value="${q._id}">${this.escapeHtml(title)} (${questions} questions)</option>`;
-                    }).join('')}
+                    ${this.availableQuizzes.map(q => `
+                        <option value="${q._id}">${this.escapeHtml(q.title)} (${q.questionCount || 0} questions)</option>
+                    `).join('')}
                 `;
-                console.log('✅ Quiz select populated with', this.availableQuizzes.length, 'options');
-                console.log('Quiz select HTML:', quizSelect.innerHTML);
             }
-        } else {
-            console.warn('⚠️ Quiz select element not found');
         }
     }
 
@@ -309,7 +281,6 @@ class LessonBuilder {
     }
 
     setupEventListeners() {
-        // Add content button - opens the modal
         const addContentBtn = document.getElementById('addContentBtn');
         if (addContentBtn) {
             addContentBtn.addEventListener('click', () => {
@@ -317,7 +288,6 @@ class LessonBuilder {
             });
         }
 
-        // Form submission
         const lessonForm = document.getElementById('lessonForm');
         if (lessonForm) {
             lessonForm.addEventListener('submit', (e) => {
@@ -326,7 +296,6 @@ class LessonBuilder {
             });
         }
 
-        // Close modal buttons
         document.querySelectorAll('.close-modal').forEach(btn => {
             btn.addEventListener('click', () => {
                 const modal = btn.closest('.modal');
@@ -334,7 +303,6 @@ class LessonBuilder {
             });
         });
 
-        // Close modal on outside click
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
@@ -343,7 +311,6 @@ class LessonBuilder {
             });
         });
 
-        // Content type change in modal
         const contentType = document.getElementById('contentType');
         if (contentType) {
             contentType.addEventListener('change', () => {
@@ -351,7 +318,6 @@ class LessonBuilder {
             });
         }
 
-        // Content form submission
         const contentForm = document.getElementById('contentForm');
         if (contentForm) {
             contentForm.addEventListener('submit', (e) => {
@@ -367,7 +333,6 @@ class LessonBuilder {
         
         const typeValue = type.value;
         
-        // Hide all fields
         const textField = document.getElementById('textField');
         const videoField = document.getElementById('videoField');
         const quizField = document.getElementById('quizField');
@@ -382,19 +347,16 @@ class LessonBuilder {
         if (linkField) linkField.style.display = 'none';
         if (embedField) embedField.style.display = 'none';
 
-        // Show relevant fields
         switch (typeValue) {
             case 'text':
                 if (textField) textField.style.display = 'block';
                 break;
             case 'video':
                 if (videoField) videoField.style.display = 'block';
-                // Refresh video select when showing
                 this.populateSelects();
                 break;
             case 'quiz':
                 if (quizField) quizField.style.display = 'block';
-                // Refresh quiz select when showing
                 this.populateSelects();
                 break;
             case 'material':
@@ -416,7 +378,6 @@ class LessonBuilder {
             return;
         }
 
-        // Reset form
         const contentForm = document.getElementById('contentForm');
         if (contentForm) contentForm.reset();
         
@@ -441,7 +402,6 @@ class LessonBuilder {
             if (contentTitleEl) contentTitleEl.value = data.title || '';
             if (isRequiredEl) isRequiredEl.checked = data.isRequired !== false;
 
-            // Set specific fields
             switch (data.type) {
                 case 'text':
                     const contentText = document.getElementById('contentText');
@@ -482,8 +442,6 @@ class LessonBuilder {
 
         this.toggleContentFields();
         modal.style.display = 'flex';
-        
-        // Make sure selects are populated when modal opens
         this.populateSelects();
     }
 
@@ -509,6 +467,7 @@ class LessonBuilder {
         let content = '';
         let contentId = null;
         let additional = {};
+        let duration = 0;
 
         switch (typeValue) {
             case 'text':
@@ -521,6 +480,11 @@ class LessonBuilder {
                 if (!contentId) {
                     alert('Please select a video');
                     return;
+                }
+                // Find the selected video and get its duration as a number
+                const selectedVideo = this.availableVideos.find(v => v._id === contentId);
+                if (selectedVideo) {
+                    duration = this.parseDurationToMinutes(selectedVideo.duration);
                 }
                 break;
             case 'quiz':
@@ -560,6 +524,7 @@ class LessonBuilder {
             contentId: contentId,
             isRequired,
             order: this.contentItems.length,
+            duration: duration || 0, // Ensure duration is a number
             ...additional
         };
 
@@ -596,7 +561,6 @@ class LessonBuilder {
             </div>
         `).join('');
 
-        // Edit buttons
         container.querySelectorAll('.edit-item-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const index = parseInt(btn.dataset.index);
@@ -604,7 +568,6 @@ class LessonBuilder {
             });
         });
 
-        // Remove buttons
         container.querySelectorAll('.remove-item-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const index = parseInt(btn.dataset.index);
@@ -614,6 +577,65 @@ class LessonBuilder {
                 }
             });
         });
+    }
+
+    /**
+     * Convert duration string to minutes (number)
+     * Handles formats like: "4 min, 22 sec", "5:30", "10", "04 min, 22 sec1"
+     */
+    parseDurationToMinutes(durationStr) {
+        if (!durationStr) return 0;
+        
+        // If it's already a number, return it
+        if (typeof durationStr === 'number') return durationStr;
+        
+        const str = String(durationStr).trim();
+        console.log('Parsing duration string:', str);
+        
+        // Try to parse as a simple number
+        const num = parseFloat(str);
+        if (!isNaN(num) && str.match(/^\d+$/)) {
+            return num;
+        }
+        
+        // Try to parse "X min, Y sec" format
+        const minSecMatch = str.match(/(\d+)\s*min\s*[,.]?\s*(\d+)\s*sec/i);
+        if (minSecMatch) {
+            const mins = parseInt(minSecMatch[1]);
+            const secs = parseInt(minSecMatch[2]);
+            const result = mins + (secs / 60);
+            console.log(`Parsed "${str}" as ${result} minutes`);
+            return result;
+        }
+        
+        // Try to parse "X min" format
+        const minMatch = str.match(/(\d+)\s*min/i);
+        if (minMatch) {
+            const result = parseInt(minMatch[1]);
+            console.log(`Parsed "${str}" as ${result} minutes`);
+            return result;
+        }
+        
+        // Try to parse "X:Y" format (mm:ss)
+        const timeMatch = str.match(/(\d+):(\d+)/);
+        if (timeMatch) {
+            const mins = parseInt(timeMatch[1]);
+            const secs = parseInt(timeMatch[2]);
+            const result = mins + (secs / 60);
+            console.log(`Parsed "${str}" as ${result} minutes`);
+            return result;
+        }
+        
+        // If all else fails, try to extract any number
+        const anyNum = str.match(/\d+/);
+        if (anyNum) {
+            const result = parseInt(anyNum[0]);
+            console.log(`Parsed "${str}" as ${result} minutes (fallback)`);
+            return result;
+        }
+        
+        console.log(`Could not parse "${str}", returning 0`);
+        return 0;
     }
 
     async saveLesson() {
@@ -630,18 +652,41 @@ class LessonBuilder {
             return;
         }
 
-        // Clean up content items
-        const items = this.contentItems.map((item, index) => ({
-            type: item.type || 'text',
-            title: item.title || `Item ${index + 1}`,
-            content: item.content || '',
-            contentId: item.contentId || null,
-            order: index,
-            isRequired: item.isRequired !== false,
-            duration: item.duration || 0,
-            fileName: item.fileName || '',
-            linkTarget: item.linkTarget || '_blank'
-        }));
+        // Clean up content items and ensure duration is a number
+        const items = this.contentItems.map((item, index) => {
+            // Ensure duration is a number - parse it if it's a string
+            let duration = 0;
+            if (item.duration) {
+                duration = this.parseDurationToMinutes(item.duration);
+                //console.log(duration)
+            }
+            
+            return {
+                type: item.type || 'text',
+                title: item.title || `Item ${index + 1}`,
+                content: item.content || '',
+                contentId: item.contentId || null,
+                order: index,
+                isRequired: item.isRequired !== false,
+                duration: duration, // Now always a number
+                fileName: item.fileName || '',
+                linkTarget: item.linkTarget || '_blank'
+            };
+        });
+
+        // Calculate estimated time - sum of all durations
+        let estimatedTime = 0;
+        items.forEach(item => {
+            if (item.duration) estimatedTime += item.duration;
+            // Text items add 1 minute per 100 words (rough estimate)
+            if (item.type === 'text' && item.content) {
+                const wordCount = item.content.split(/\s+/).length;
+                estimatedTime += Math.ceil(wordCount / 100);
+            }
+        });
+
+        // Ensure estimatedTime is a number and round it
+        estimatedTime = Math.round(estimatedTime);
 
         const payload = {
             classId: this.classId,
@@ -650,8 +695,13 @@ class LessonBuilder {
             contentItems: items,
             order: 0,
             isFreePreview: false,
-            isPublished
+            isPublished,
+            estimatedTime: estimatedTime
         };
+
+        console.log('Saving lesson payload:');
+        console.log('Duration values:', items.map(i => ({ title: i.title, type: i.type, duration: i.duration })));
+        console.log('Estimated time:', estimatedTime);
 
         const saveBtn = document.getElementById('saveLessonBtn');
         if (saveBtn) {
@@ -682,8 +732,16 @@ class LessonBuilder {
                     window.location.href = '../../login.html';
                     return;
                 }
-                const error = await response.json();
-                throw new Error(error.message || 'Failed to save lesson');
+                const errorText = await response.text();
+                console.error('Server error response:', errorText);
+                let errorMessage = 'Failed to save lesson';
+                try {
+                    const errorJson = JSON.parse(errorText);
+                    errorMessage = errorJson.message || errorMessage;
+                } catch (e) {
+                    errorMessage = errorText || errorMessage;
+                }
+                throw new Error(errorMessage);
             }
 
             const data = await response.json();

@@ -194,6 +194,7 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
       lesson.contentItems.map(async (item) => {
         if (item.type === 'video' && item.contentId) {
           const video = await Stream.getById(item.contentId);
+          console.log(item)
           return {
             ...item,
             // Keep the original contentId
