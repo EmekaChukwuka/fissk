@@ -1,4 +1,4 @@
-// models/Lesson.js - FIXED
+// models/Lesson.js - FIXED with contentId
 import mongoose from "mongoose";
 
 /**
@@ -19,6 +19,18 @@ const ContentItemSchema = new mongoose.Schema({
   content: {
     type: String,
     default: ''
+  },
+  // ===== ADDED: contentId - Generic ID for any content type =====
+  contentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    refPath: 'contentIdModel',
+    default: null
+  },
+  // ===== ADDED: contentIdModel - Determines which collection to reference =====
+  contentIdModel: {
+    type: String,
+    enum: ['Stream', 'Quiz', 'Assignment', null],
+    default: null
   },
   // For video type - reference to existing video (Stream model)
   videoId: {

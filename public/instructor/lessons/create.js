@@ -1,4 +1,4 @@
-// instructor/lessons/create.js - Lesson Builder (FIXED - Duration handling)
+// instructor/lessons/create.js - Lesson Builder (FIXED - contentId preservation)
 class LessonBuilder {
     constructor() {
         this.user = JSON.parse(localStorage.getItem('user'));
@@ -10,6 +10,7 @@ class LessonBuilder {
         this.availableQuizzes = [];
         this.isEdit = !!this.lessonId;
         this.isLoading = true;
+        this.editingIndex = -1;
         this.init();
     }
 
@@ -486,6 +487,7 @@ class LessonBuilder {
                 if (selectedVideo) {
                     duration = this.parseDurationToMinutes(selectedVideo.duration);
                 }
+                console.log('Video selected - contentId:', contentId);
                 break;
             case 'quiz':
                 const quizSelect = document.getElementById('quizSelect');
@@ -494,6 +496,7 @@ class LessonBuilder {
                     alert('Please select a quiz');
                     return;
                 }
+                console.log('Quiz selected - contentId:', contentId);
                 break;
             case 'material':
                 const fileUrl = document.getElementById('fileUrl');
@@ -521,12 +524,14 @@ class LessonBuilder {
             type: typeValue,
             title,
             content: content || '',
-            contentId: contentId,
+            contentId: contentId, // CRITICAL: This must be set for videos and quizzes
             isRequired,
             order: this.contentItems.length,
-            duration: duration || 0, // Ensure duration is a number
+            duration: duration || 0,
             ...additional
         };
+
+        console.log('Saving content item:', item);
 
         if (this.editingIndex >= 0) {
             item.order = this.contentItems[this.editingIndex].order;
@@ -586,19 +591,16 @@ class LessonBuilder {
     parseDurationToMinutes(durationStr) {
         if (!durationStr) return 0;
         
-        // If it's already a number, return it
         if (typeof durationStr === 'number') return durationStr;
         
         const str = String(durationStr).trim();
         console.log('Parsing duration string:', str);
         
-        // Try to parse as a simple number
         const num = parseFloat(str);
         if (!isNaN(num) && str.match(/^\d+$/)) {
             return num;
         }
         
-        // Try to parse "X min, Y sec" format
         const minSecMatch = str.match(/(\d+)\s*min\s*[,.]?\s*(\d+)\s*sec/i);
         if (minSecMatch) {
             const mins = parseInt(minSecMatch[1]);
@@ -608,7 +610,6 @@ class LessonBuilder {
             return result;
         }
         
-        // Try to parse "X min" format
         const minMatch = str.match(/(\d+)\s*min/i);
         if (minMatch) {
             const result = parseInt(minMatch[1]);
@@ -616,7 +617,6 @@ class LessonBuilder {
             return result;
         }
         
-        // Try to parse "X:Y" format (mm:ss)
         const timeMatch = str.match(/(\d+):(\d+)/);
         if (timeMatch) {
             const mins = parseInt(timeMatch[1]);
@@ -626,7 +626,6 @@ class LessonBuilder {
             return result;
         }
         
-        // If all else fails, try to extract any number
         const anyNum = str.match(/\d+/);
         if (anyNum) {
             const result = parseInt(anyNum[0]);
@@ -652,41 +651,43 @@ class LessonBuilder {
             return;
         }
 
-        // Clean up content items and ensure duration is a number
+        // Clean up content items - IMPORTANT: Preserve contentId for videos and quizzes
         const items = this.contentItems.map((item, index) => {
-            // Ensure duration is a number - parse it if it's a string
+            // Ensure duration is a number
             let duration = 0;
             if (item.duration) {
                 duration = this.parseDurationToMinutes(item.duration);
-                //console.log(duration)
             }
+            
+            console.log('Saving item:', {
+                type: item.type,
+                title: item.title,
+                contentId: item.contentId,
+                content: item.content
+            });
             
             return {
                 type: item.type || 'text',
                 title: item.title || `Item ${index + 1}`,
                 content: item.content || '',
-                contentId: item.contentId || null,
+                contentId: item.contentId || null, // IMPORTANT: Keep the contentId
                 order: index,
                 isRequired: item.isRequired !== false,
-                duration: duration, // Now always a number
+                duration: duration,
                 fileName: item.fileName || '',
                 linkTarget: item.linkTarget || '_blank'
             };
         });
 
-        // Calculate estimated time - sum of all durations
+        // Calculate estimated time
         let estimatedTime = 0;
         items.forEach(item => {
             if (item.duration) estimatedTime += item.duration;
-            // Text items add 1 minute per 100 words (rough estimate)
             if (item.type === 'text' && item.content) {
                 const wordCount = item.content.split(/\s+/).length;
                 estimatedTime += Math.ceil(wordCount / 100);
             }
         });
-
-        // Ensure estimatedTime is a number and round it
-        estimatedTime = Math.round(estimatedTime);
 
         const payload = {
             classId: this.classId,
@@ -696,12 +697,10 @@ class LessonBuilder {
             order: 0,
             isFreePreview: false,
             isPublished,
-            estimatedTime: estimatedTime
+            estimatedTime: Math.round(estimatedTime)
         };
 
-        console.log('Saving lesson payload:');
-        console.log('Duration values:', items.map(i => ({ title: i.title, type: i.type, duration: i.duration })));
-        console.log('Estimated time:', estimatedTime);
+        console.log('Saving lesson payload:', JSON.stringify(payload, null, 2));
 
         const saveBtn = document.getElementById('saveLessonBtn');
         if (saveBtn) {

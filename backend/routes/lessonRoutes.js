@@ -217,24 +217,30 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
 
     console.log('✅ Access granted');
 
+    // ===== FIX: Populate content items using contentId =====
     const populatedContentItems = await Promise.all(
       lesson.contentItems.map(async (item) => {
-        if (item.type === 'video' && item.contentId) {
-          const video = await Stream.getById(item.contentId);
+        // Use contentId first, fallback to videoId/quizId
+        const videoId = item.contentId || item.videoId;
+        const quizId = item.contentId || item.quizId;
+        
+        // ===== VIDEO =====
+        if (item.type === 'video' && videoId) {
+          console.log('📹 Fetching video with ID:', videoId);
+          const video = await Stream.getById(videoId);
           console.log('Video found:', video);
           
           const durationInMinutes = parseDurationToMinutes(video?.duration);
           console.log(`Parsed duration: "${video?.duration}" -> ${durationInMinutes} minutes`);
           
-          // Get thumbnail URL from Mux
           const thumbnailUrl = video?.muxPlaybackId 
             ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` 
             : null;
           
           return {
             ...item,
-            contentId: item.contentId,
-            videoId: item.contentId,
+            contentId: videoId,
+            videoId: videoId,
             duration: durationInMinutes,
             muxPlaybackId: video?.muxPlaybackId || null,
             muxStatus: video?.muxStatus || 'unknown',
@@ -251,14 +257,18 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
             } : null
           };
         }
-        if (item.type === 'quiz' && item.contentId) {
-          const quiz = await Quiz.findById(item.contentId)
+        
+        // ===== QUIZ =====
+        if (item.type === 'quiz' && quizId) {
+          console.log('📝 Fetching quiz with ID:', quizId);
+          const quiz = await Quiz.findById(quizId)
             .select('_id title description questionCount totalPoints settings status')
             .lean();
+          console.log('Quiz found:', quiz);
           return {
             ...item,
-            contentId: item.contentId,
-            quizId: item.contentId,
+            contentId: quizId,
+            quizId: quizId,
             quizDetails: quiz ? {
               _id: quiz._id,
               title: quiz.title,
