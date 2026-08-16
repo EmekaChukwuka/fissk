@@ -2852,35 +2852,47 @@ showLessonDetail(lesson) {
                         <div class="item-text-content" style="color: rgba(255,255,255,0.9); white-space: pre-wrap;">${this.escapeHtml(item.content || '')}</div>
                     `;
                     break;
-                case 'video':
-                    const videoUrl = item.videoDetails?.playbackUrl || 
-                                    (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : null) ||
-                                    (item.videoDetails?.muxPlaybackId ? `https://stream.mux.com/${item.videoDetails.muxPlaybackId}.m3u8` : null);
-                    
-                    const isReady = item.muxStatus === 'ready' || item.videoDetails?.muxStatus === 'ready';
-                    const thumbnailUrl = item.thumbnailUrl || item.videoDetails?.thumbnailUrl;
-                    
-                    console.log('Video URL:', videoUrl);
-                    console.log('Is ready:', isReady);
-                    
-                    itemContent = `
-                        <div class="item-video-wrapper">
-                            ${videoUrl && isReady ? `
-                                <video controls style="max-width: 100%; border-radius: 8px; width: 100%;">
-                                    <source src="${videoUrl}" type="application/x-mpegURL">
-                                    Your browser does not support the video tag.
-                                </video>
-                            ` : `
-                                <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 8px; text-align: center; color: rgba(255,255,255,0.5);">
-                                    <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🎬</span>
-                                    <p>${videoUrl ? 'Video is processing...' : 'Video not available'}</p>
-                                    ${item.title ? `<p style="font-size: 0.85rem; margin-top: 4px;">${this.escapeHtml(item.title)}</p>` : ''}
-                                </div>
-                            `}
-                        </div>
-                        ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                    `;
-                    break;
+               case 'video':
+    // Get video URL from multiple sources
+    const videoUrl = item.videoDetails?.playbackUrl || 
+                    (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : null) ||
+                    (item.videoDetails?.muxPlaybackId ? `https://stream.mux.com/${item.videoDetails.muxPlaybackId}.m3u8` : null);
+    
+    const isReady = item.muxStatus === 'ready' || 
+                   item.videoDetails?.muxStatus === 'ready';
+    
+    const thumbnailUrl = item.thumbnailUrl || item.videoDetails?.thumbnailUrl;
+    
+    console.log('Video URL:', videoUrl);
+    console.log('Is ready:', isReady);
+    console.log('Mux status:', item.muxStatus, item.videoDetails?.muxStatus);
+    
+    // ===== FIX: Always show video tag if URL exists =====
+    if (videoUrl) {
+        itemContent = `
+            <div class="item-video-wrapper">
+                <video controls style="max-width: 100%; border-radius: 8px; width: 100%;" poster="${thumbnailUrl || ''}">
+                    <source src="${videoUrl}" type="application/x-mpegURL">
+                    Your browser does not support the video tag.
+                </video>
+                ${!isReady ? '<p style="color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-top: 4px;">⏳ Video is still processing, but you can try playing it.</p>' : ''}
+            </div>
+            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+        `;
+    } else {
+        // No video URL - show placeholder
+        itemContent = `
+            <div class="item-video-wrapper">
+                <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 8px; text-align: center; color: rgba(255,255,255,0.5);">
+                    <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🎬</span>
+                    <p>Video not available</p>
+                    ${item.title ? `<p style="font-size: 0.85rem; margin-top: 4px;">${this.escapeHtml(item.title)}</p>` : ''}
+                </div>
+            </div>
+            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+        `;
+    }
+    break;
                 case 'quiz':
                     const quizId = getQuizId(item);
                     const quizDetails = item.quizDetails || {};
