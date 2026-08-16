@@ -545,12 +545,13 @@ class ClassManager {
     }
     
 
-
-    /**
+/**
  * Show lesson detail in a modal
  */
 showLessonDetail(lesson) {
-    // Create modal if it doesn't exist
+    console.log('Showing lesson detail:', lesson);
+    console.log('Content items:', lesson.contentItems);
+
     let modal = document.getElementById('lessonDetailModal');
     if (!modal) {
         modal = document.createElement('div');
@@ -562,50 +563,93 @@ showLessonDetail(lesson) {
 
     // Build content items HTML
     let itemsHTML = '';
-    let completedCount = 0;
     const totalItems = lesson.contentItems?.length || 0;
+
+    const getQuizId = (item) => {
+        return item.contentId || item.quizId?._id || item.quizId || null;
+    };
 
     if (lesson.contentItems && lesson.contentItems.length > 0) {
         itemsHTML = lesson.contentItems.map((item, index) => {
-            const isCompleted = false;
-            
             let itemContent = '';
+            
+            console.log('Rendering item:', item.type, item);
+
             switch (item.type) {
                 case 'text':
                     itemContent = `
-                        <div class="item-text-content" style="color: rgba(255,255,255,0.9);">${this.escapeHtml(item.content || '')}</div>
+                        <div class="item-text-content" style="color: rgba(255,255,255,0.9); white-space: pre-wrap;">${this.escapeHtml(item.content || '')}</div>
                     `;
                     break;
                 case 'video':
-                    // Get the correct video ID - use contentId or videoId
-                    const videoId = item.contentId || item.videoId;
+                    // ===== FIX: Get video URL from multiple sources =====
                     const videoUrl = item.videoDetails?.playbackUrl || 
-                                    (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : '');
-                    itemContent = `
-                        <div class="item-video-wrapper">
-                            ${videoUrl ? `
-                                <video controls style="max-width: 100%; border-radius: 8px;">
+                                    (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : null) ||
+                                    (item.videoDetails?.muxPlaybackId ? `https://stream.mux.com/${item.videoDetails.muxPlaybackId}.m3u8` : null);
+                    
+                    // ===== FIX: Check if video is ready =====
+                    // If muxStatus is 'ready' or if there's a playback URL, it should work
+                    const isReady = item.muxStatus === 'ready' || 
+                                   item.videoDetails?.muxStatus === 'ready' ||
+                                   (videoUrl && item.muxStatus !== 'preparing' && item.muxStatus !== 'uploading');
+                    
+                    const thumbnailUrl = item.thumbnailUrl || item.videoDetails?.thumbnailUrl;
+                    
+                    console.log('Video URL:', videoUrl);
+                    console.log('Is ready:', isReady);
+                    console.log('Mux status:', item.muxStatus, item.videoDetails?.muxStatus);
+                    
+                    // ===== FIX: Always show video tag if URL exists, even if status is unknown =====
+                    if (videoUrl) {
+                        itemContent = `
+                            <div class="item-video-wrapper">
+                                <video controls style="max-width: 100%; border-radius: 8px; width: 100%;" poster="${thumbnailUrl || ''}">
                                     <source src="${videoUrl}" type="application/x-mpegURL">
+                                    Your browser does not support the video tag.
                                 </video>
-                            ` : '<p style="color: rgba(255,255,255,0.5);">Video not available</p>'}
-                        </div>
-                        ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                    `;
+                                ${isReady ? '' : '<p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin-top: 4px;">⏳ Video is still processing, but you can try playing it.</p>'}
+                            </div>
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                        `;
+                    } else {
+                        // No video URL - show placeholder
+                        itemContent = `
+                            <div class="item-video-wrapper">
+                                <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 8px; text-align: center; color: rgba(255,255,255,0.5);">
+                                    <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🎬</span>
+                                    <p>Video not available</p>
+                                    ${item.title ? `<p style="font-size: 0.85rem; margin-top: 4px;">${this.escapeHtml(item.title)}</p>` : ''}
+                                </div>
+                            </div>
+                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
+                        `;
+                    }
                     break;
                 case 'quiz':
-                    // FIX: Get the correct quiz ID - use contentId or quizId
-                    const quizId = item.contentId || item.quizId?._id || item.quizId;
+                    const quizId = getQuizId(item);
                     const quizDetails = item.quizDetails || {};
+                    
+                    console.log('Quiz item:', item);
+                    console.log('Quiz ID:', quizId);
+                    console.log('Quiz Details:', quizDetails);
+                    
                     itemContent = `
                         <div class="item-quiz-wrapper">
                             ${quizId ? `
-                                <a href="quiz/take.html?quizId=${quizId}" class="btn btn-primary" style="margin-right: 8px; background: #8B5FBF; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                                <a href="quiz/take.html?quizId=${quizId}" 
+                                   class="btn btn-primary" 
+                                   style="margin-right: 8px; background: #8B5FBF; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
                                     📝 Take Quiz
                                 </a>
+                                <span style="color: rgba(255,255,255,0.4); font-size: 0.85rem; margin-left: 8px;">
+                                    ${quizDetails.questionCount || 0} questions
+                                </span>
                             ` : `
-                                <span style="color: rgba(255,255,255,0.5);">Quiz not available</span>
+                                <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 8px; text-align: center; color: rgba(255,255,255,0.4);">
+                                    <span style="font-size: 1.5rem; display: block; margin-bottom: 4px;">📝</span>
+                                    <p>Quiz not available</p>
+                                </div>
                             `}
-                            ${quizDetails.questionCount ? `<span style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-left: 8px;">${quizDetails.questionCount} questions</span>` : ''}
                             ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
                         </div>
                     `;
@@ -685,11 +729,11 @@ showLessonDetail(lesson) {
         itemsHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center; padding: 20px;">No content items in this lesson.</p>';
     }
 
-    // Calculate progress
     const progress = lesson.progressPercentage || 0;
+    const isCompleted = lesson.completed || false;
 
     modal.innerHTML = `
-        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto; background: #1A1A2E; border-radius: 16px; padding: 32px; border: 1px solid rgba(255,255,255,0.1);">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto; background: #1A1A2E; border-radius: 16px; padding: 32px; border: 1px solid rgba(255,255,255,0.1); position: relative;">
             <span class="close-modal" onclick="document.getElementById('lessonDetailModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; cursor: pointer; color: rgba(255,255,255,0.6); transition: color 0.3s ease; z-index: 10;">&times;</span>
             
             <div style="margin-bottom: 16px;">
@@ -711,23 +755,30 @@ showLessonDetail(lesson) {
                 ${itemsHTML}
             </div>
 
-            <button class="mark-lesson-complete-btn ${lesson.completed ? 'completed' : 'available'}" 
+            <button class="mark-lesson-complete-btn ${isCompleted ? 'completed' : 'available'}" 
                     id="markLessonCompleteBtn"
-                    ${lesson.completed ? 'disabled' : ''}
-                    style="padding: 12px 32px; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s ease; width: 100%; margin-top: 20px; ${lesson.completed ? 'background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); cursor: default;' : 'background: #10B981; color: white;'}">
-                ${lesson.completed ? '✅ Lesson Completed' : '✅ Mark Lesson as Complete'}
+                    ${isCompleted ? 'disabled' : ''}
+                    style="padding: 12px 32px; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s ease; width: 100%; margin-top: 20px; ${isCompleted ? 'background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); cursor: default;' : 'background: #10B981; color: white;'}">
+                ${isCompleted ? '✅ Lesson Completed' : '✅ Mark Lesson as Complete'}
             </button>
         </div>
     `;
 
-    // Show modal
     modal.style.display = 'flex';
 
-    // Add event listener for mark complete button
+    // Add event listener for mark complete button with loading state
     const completeBtn = document.getElementById('markLessonCompleteBtn');
-    if (completeBtn && !lesson.completed) {
+    if (completeBtn && !isCompleted) {
         completeBtn.addEventListener('click', () => {
-            this.markLessonComplete(lesson._id);
+            const originalText = completeBtn.textContent;
+            completeBtn.disabled = true;
+            completeBtn.innerHTML = `
+                <span class="spinner" style="display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                Saving...
+            `;
+            completeBtn.style.opacity = '0.7';
+            
+            this.markLessonComplete(lesson._id, completeBtn, originalText);
         });
     }
 
@@ -740,7 +791,6 @@ showLessonDetail(lesson) {
         });
     });
 }
-
 
     // ============================================================
     // LESSON METHODS
@@ -2614,8 +2664,7 @@ showLessonDetail(lesson) {
             </div>
         `;
     }
-
-  /**
+/**
  * View a specific lesson in detail
  */
 async viewLesson(lessonId) {
@@ -2628,6 +2677,54 @@ async viewLesson(lessonId) {
         }
 
         console.log('Viewing lesson:', lessonId);
+
+        // ===== SHOW LOADING IN MODAL =====
+        const modal = document.getElementById('lessonDetailModal');
+        if (!modal) {
+            const newModal = document.createElement('div');
+            newModal.id = 'lessonDetailModal';
+            newModal.className = 'modal';
+            newModal.style.display = 'flex';
+            newModal.innerHTML = `
+                <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto; background: #1A1A2E; border-radius: 16px; padding: 32px; border: 1px solid rgba(255,255,255,0.1); position: relative; display: flex; align-items: center; justify-content: center; min-height: 300px;">
+                    <div style="text-align: center; color: white;">
+                        <div class="loading-spinner-large" style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #8B5FBF; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+                        <p style="color: rgba(255,255,255,0.7);">Loading lesson content...</p>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(newModal);
+            
+            if (!document.getElementById('spinnerStyles')) {
+                const style = document.createElement('style');
+                style.id = 'spinnerStyles';
+                style.textContent = `
+                    @keyframes spin {
+                        to { transform: rotate(360deg); }
+                    }
+                    .loading-spinner-large {
+                        width: 50px;
+                        height: 50px;
+                        border: 4px solid rgba(255,255,255,0.1);
+                        border-top: 4px solid #8B5FBF;
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        } else {
+            modal.style.display = 'flex';
+            const content = modal.querySelector('.modal-content');
+            if (content) {
+                content.innerHTML = `
+                    <div style="text-align: center; color: white; padding: 40px; display: flex; align-items: center; justify-content: center; min-height: 200px; flex-direction: column;">
+                        <div class="loading-spinner-large" style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #8B5FBF; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+                        <p style="color: rgba(255,255,255,0.7);">Loading lesson content...</p>
+                    </div>
+                `;
+            }
+        }
 
         const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}`, {
             headers: {
@@ -2653,12 +2750,11 @@ async viewLesson(lessonId) {
         console.log('Lesson data received:', lesson);
         console.log('Content items:', lesson.contentItems);
 
-        // Ensure quiz and video items have proper IDs
+        // ===== FIX: Ensure video and quiz items have proper IDs and data =====
         if (lesson.contentItems) {
             lesson.contentItems = lesson.contentItems.map(item => {
                 if (item.type === 'quiz') {
                     const quizId = item.contentId || item.quizId || null;
-                    console.log('Quiz item:', item, 'Quiz ID:', quizId);
                     return {
                         ...item,
                         contentId: quizId,
@@ -2670,14 +2766,23 @@ async viewLesson(lessonId) {
                     };
                 }
                 if (item.type === 'video') {
-                    // Ensure video has proper playback data
-                    const playbackId = item.muxPlaybackId || item.videoDetails?.muxPlaybackId;
+                    // ===== FIX: Ensure video data is properly set =====
+                    const playbackId = item.muxPlaybackId || item.videoDetails?.muxPlaybackId || null;
+                    const muxStatus = item.muxStatus || item.videoDetails?.muxStatus || 'unknown';
+                    
+                    console.log('Video item:', item);
+                    console.log('Playback ID:', playbackId);
+                    console.log('Mux Status:', muxStatus);
+                    
                     return {
                         ...item,
                         muxPlaybackId: playbackId,
+                        muxStatus: muxStatus,
                         videoDetails: {
                             ...item.videoDetails,
-                            playbackUrl: playbackId ? `https://stream.mux.com/${playbackId}.m3u8` : null
+                            playbackUrl: playbackId ? `https://stream.mux.com/${playbackId}.m3u8` : null,
+                            muxPlaybackId: playbackId,
+                            muxStatus: muxStatus
                         }
                     };
                 }
@@ -2689,8 +2794,28 @@ async viewLesson(lessonId) {
     } catch (error) {
         console.error('View lesson error:', error);
         window.showToast('Failed to load lesson content', true);
+        
+        const modal = document.getElementById('lessonDetailModal');
+        if (modal) {
+            const content = modal.querySelector('.modal-content');
+            if (content) {
+                content.innerHTML = `
+                    <div style="text-align: center; color: white; padding: 40px;">
+                        <span style="font-size: 3rem; display: block; margin-bottom: 16px;">❌</span>
+                        <p style="color: rgba(255,255,255,0.7);">Failed to load lesson content</p>
+                        <button class="btn btn-primary" onclick="window.classManager.viewLesson('${lessonId}')" style="margin-top: 16px; background: #8B5FBF; color: white; border: none; padding: 10px 24px; border-radius: 8px; cursor: pointer;">
+                            Retry
+                        </button>
+                        <button class="btn btn-outline" onclick="document.getElementById('lessonDetailModal').style.display='none'" style="margin-top: 16px; margin-left: 8px; background: transparent; color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.2); padding: 10px 24px; border-radius: 8px; cursor: pointer;">
+                            Close
+                        </button>
+                    </div>
+                `;
+            }
+        }
     }
 }
+
 /**
  * Show lesson detail in a modal
  */
@@ -2707,6 +2832,7 @@ showLessonDetail(lesson) {
         document.body.appendChild(modal);
     }
 
+    // Build content items HTML
     let itemsHTML = '';
     const totalItems = lesson.contentItems?.length || 0;
 
@@ -2727,7 +2853,6 @@ showLessonDetail(lesson) {
                     `;
                     break;
                 case 'video':
-                    // Get video URL from multiple possible sources
                     const videoUrl = item.videoDetails?.playbackUrl || 
                                     (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : null) ||
                                     (item.videoDetails?.muxPlaybackId ? `https://stream.mux.com/${item.videoDetails.muxPlaybackId}.m3u8` : null);
@@ -2861,6 +2986,7 @@ showLessonDetail(lesson) {
     }
 
     const progress = lesson.progressPercentage || 0;
+    const isCompleted = lesson.completed || false;
 
     modal.innerHTML = `
         <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto; background: #1A1A2E; border-radius: 16px; padding: 32px; border: 1px solid rgba(255,255,255,0.1); position: relative;">
@@ -2885,24 +3011,36 @@ showLessonDetail(lesson) {
                 ${itemsHTML}
             </div>
 
-            <button class="mark-lesson-complete-btn ${lesson.completed ? 'completed' : 'available'}" 
+            <button class="mark-lesson-complete-btn ${isCompleted ? 'completed' : 'available'}" 
                     id="markLessonCompleteBtn"
-                    ${lesson.completed ? 'disabled' : ''}
-                    style="padding: 12px 32px; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s ease; width: 100%; margin-top: 20px; ${lesson.completed ? 'background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); cursor: default;' : 'background: #10B981; color: white;'}">
-                ${lesson.completed ? '✅ Lesson Completed' : '✅ Mark Lesson as Complete'}
+                    ${isCompleted ? 'disabled' : ''}
+                    style="padding: 12px 32px; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s ease; width: 100%; margin-top: 20px; ${isCompleted ? 'background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); cursor: default;' : 'background: #10B981; color: white;'}">
+                ${isCompleted ? '✅ Lesson Completed' : '✅ Mark Lesson as Complete'}
             </button>
         </div>
     `;
 
     modal.style.display = 'flex';
 
+    // Add event listener for mark complete button with loading state
     const completeBtn = document.getElementById('markLessonCompleteBtn');
-    if (completeBtn && !lesson.completed) {
+    if (completeBtn && !isCompleted) {
         completeBtn.addEventListener('click', () => {
-            this.markLessonComplete(lesson._id);
+            // Show loading on button
+            const originalText = completeBtn.textContent;
+            completeBtn.disabled = true;
+            completeBtn.innerHTML = `
+                <span class="spinner" style="display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
+                Saving...
+            `;
+            completeBtn.style.opacity = '0.7';
+            
+            // Call mark complete
+            this.markLessonComplete(lesson._id, completeBtn, originalText);
         });
     }
 
+    // Add event listeners for item complete buttons
     modal.querySelectorAll('.item-complete-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -2911,39 +3049,63 @@ showLessonDetail(lesson) {
         });
     });
 }
-    /**
-     * Mark a lesson as complete
-     */
-    async markLessonComplete(lessonId) {
-        try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}/complete`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
 
-            if (!response.ok) {
-                throw new Error('Failed to mark lesson as complete');
+/**
+ * Mark a lesson as complete
+ */
+async markLessonComplete(lessonId, button = null, originalText = null) {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.showToast('Please login to mark lesson as complete', true);
+            window.location.href = 'login.html';
+            return;
+        }
+
+        const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}/complete`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
             }
+        });
 
-            const data = await response.json();
-            window.showToast('✅ Lesson completed!', false);
+        if (!response.ok) {
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.showToast('Session expired. Please login again.', true);
+                window.location.href = 'login.html';
+                return;
+            }
+            throw new Error('Failed to mark lesson as complete');
+        }
 
-            // Close modal and refresh
-            const modal = document.getElementById('lessonDetailModal');
-            if (modal) modal.style.display = 'none';
+        const data = await response.json();
+        window.showToast('✅ Lesson completed!', false);
 
-            // Refresh lessons
-            await this.loadLessons();
-            this.renderLessons();
+        // Close modal and refresh
+        const modal = document.getElementById('lessonDetailModal');
+        if (modal) modal.style.display = 'none';
 
-        } catch (error) {
-            console.error('Mark complete error:', error);
-            window.showToast('Failed to mark lesson as complete', true);
+        // Refresh lessons
+        await this.loadLessons();
+        this.renderLessons();
+
+    } catch (error) {
+        console.error('Mark complete error:', error);
+        window.showToast('Failed to mark lesson as complete', true);
+        
+        // Reset button if provided
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = originalText || '✅ Mark Lesson as Complete';
+            button.style.opacity = '1';
+            button.style.background = '#10B981';
+            button.style.color = 'white';
         }
     }
+}
 
     /**
      * Toggle individual item completion
