@@ -2,15 +2,57 @@ import express from 'express';
 import Lesson from '../models/Lesson.js';
 import Class from '../models/Class.js';
 import Enrollment from '../models/Enrollment.js';
-import Stream from '../models/Stream.js';  // Wrapper class
+import Stream from '../models/Stream.js';
 import Quiz from '../models/Quiz.js';
 import { auth } from '../middleware/auth.js';
 
-// Get the Mongoose model from the wrapper class
-// The wrapper class exports Stream as default, but we need the model
-// We can use Stream.getClassVideos() which is a static method
-
 const lessonRouter = express.Router();
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+/**
+ * Helper function to parse duration string to minutes (number)
+ */
+function parseDurationToMinutes(durationStr) {
+    if (!durationStr) return 0;
+    
+    if (typeof durationStr === 'number') return durationStr;
+    
+    const str = String(durationStr).trim();
+    
+    const num = parseFloat(str);
+    if (!isNaN(num) && str.match(/^\d+$/)) {
+        return num;
+    }
+    
+    const minSecMatch = str.match(/(\d+)\s*min\s*[,.]?\s*(\d+)\s*sec/i);
+    if (minSecMatch) {
+        const mins = parseInt(minSecMatch[1]);
+        const secs = parseInt(minSecMatch[2]);
+        return mins + (secs / 60);
+    }
+    
+    const minMatch = str.match(/(\d+)\s*min/i);
+    if (minMatch) {
+        return parseInt(minMatch[1]);
+    }
+    
+    const timeMatch = str.match(/(\d+):(\d+)/);
+    if (timeMatch) {
+        const mins = parseInt(timeMatch[1]);
+        const secs = parseInt(timeMatch[2]);
+        return mins + (secs / 60);
+    }
+    
+    const anyNum = str.match(/\d+/);
+    if (anyNum) {
+        return parseInt(anyNum[0]);
+    }
+    
+    return 0;
+}
 
 // ============================================================
 // STUDENT ENDPOINTS
@@ -32,7 +74,6 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
     console.log('userId:', userId);
     console.log('user_type:', req.user.user_type);
 
-    // Check if class exists
     const classData = await Class.findById(classId);
     if (!classData) {
       return res.status(404).json({ success: false, message: 'Class not found' });
@@ -41,7 +82,6 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
     console.log('✅ Class found:', classData.title);
     console.log('Class instructorId:', classData.instructorId);
 
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
@@ -53,11 +93,9 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
       isInstructor = false;
     }
 
-    // Check if admin (using user_type from token)
     const isAdmin = req.user.user_type === 'admin';
     console.log('Is admin?', isAdmin);
 
-    // Check enrollment
     let enrollment = null;
     try {
       enrollment = await Enrollment.findOne({ userId, classId });
@@ -66,7 +104,6 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
       console.error('Error checking enrollment:', err);
     }
 
-    // If not instructor, not admin, and not enrolled, deny access
     if (!isInstructor && !isAdmin && !enrollment) {
       console.log('❌ Access denied - not instructor, not admin, not enrolled');
       return res.status(403).json({ 
@@ -77,7 +114,6 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
 
     console.log('✅ User has access to lessons');
 
-    // Build query - instructors and admins see all, students see only published
     const query = { classId };
     if (!isInstructor && !isAdmin) {
       query.isPublished = true;
@@ -92,7 +128,6 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
 
     console.log(`Found ${lessons.length} lessons for class ${classId}`);
 
-    // Get user progress
     const lessonProgress = enrollment?.lessonProgress || [];
 
     const lessonsWithProgress = lessons.map(lesson => {
@@ -123,53 +158,6 @@ lessonRouter.get('/class/:classId', auth, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-/**
- * Helper function to parse duration string to minutes (number)
- */
-function parseDurationToMinutes(durationStr) {
-    if (!durationStr) return 0;
-    
-    // If it's already a number, return it
-    if (typeof durationStr === 'number') return durationStr;
-    
-    const str = String(durationStr).trim();
-    
-    // Try to parse as a simple number
-    const num = parseFloat(str);
-    if (!isNaN(num) && str.match(/^\d+$/)) {
-        return num;
-    }
-    
-    // Try to parse "X min, Y sec" format
-    const minSecMatch = str.match(/(\d+)\s*min\s*[,.]?\s*(\d+)\s*sec/i);
-    if (minSecMatch) {
-        const mins = parseInt(minSecMatch[1]);
-        const secs = parseInt(minSecMatch[2]);
-        return mins + (secs / 60);
-    }
-    
-    // Try to parse "X min" format
-    const minMatch = str.match(/(\d+)\s*min/i);
-    if (minMatch) {
-        return parseInt(minMatch[1]);
-    }
-    
-    // Try to parse "X:Y" format (mm:ss)
-    const timeMatch = str.match(/(\d+):(\d+)/);
-    if (timeMatch) {
-        const mins = parseInt(timeMatch[1]);
-        const secs = parseInt(timeMatch[2]);
-        return mins + (secs / 60);
-    }
-    
-    // If all else fails, try to extract any number
-    const anyNum = str.match(/\d+/);
-    if (anyNum) {
-        return parseInt(anyNum[0]);
-    }
-    
-    return 0;
-}
 
 /**
  * Get a single lesson with full content
@@ -192,7 +180,6 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
 
     console.log('Lesson found:', lesson.title);
 
-    // Check access
     const classData = await Class.findById(lesson.classId);
     
     let isInstructor = false;
@@ -212,7 +199,6 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
     console.log('Is enrolled?', !!enrollment);
     console.log('Is free preview?', lesson.isFreePreview);
 
-    // Allow if instructor, admin, enrolled student, or free preview
     if (!isInstructor && !isAdmin && !enrollment && !lesson.isFreePreview) {
       console.log('❌ Access denied');
       return res.status(403).json({ 
@@ -221,7 +207,6 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
       });
     }
 
-    // If student and lesson is not published, deny access
     if (!isInstructor && !isAdmin && !lesson.isPublished) {
       console.log('❌ Lesson not published');
       return res.status(403).json({ 
@@ -232,31 +217,37 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
 
     console.log('✅ Access granted');
 
-    // Populate video and quiz details - FIX: Parse duration to number
     const populatedContentItems = await Promise.all(
       lesson.contentItems.map(async (item) => {
         if (item.type === 'video' && item.contentId) {
           const video = await Stream.getById(item.contentId);
-          console.log('Video data:', video);
+          console.log('Video found:', video);
           
-          // Parse the video duration to a number
           const durationInMinutes = parseDurationToMinutes(video?.duration);
           console.log(`Parsed duration: "${video?.duration}" -> ${durationInMinutes} minutes`);
+          
+          // Get thumbnail URL from Mux
+          const thumbnailUrl = video?.muxPlaybackId 
+            ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` 
+            : null;
           
           return {
             ...item,
             contentId: item.contentId,
             videoId: item.contentId,
-            // IMPORTANT: Set duration to the parsed number
             duration: durationInMinutes,
+            muxPlaybackId: video?.muxPlaybackId || null,
+            muxStatus: video?.muxStatus || 'unknown',
+            thumbnailUrl: thumbnailUrl,
             videoDetails: video ? {
               _id: video._id,
               muxPlaybackId: video.muxPlaybackId,
               playbackUrl: video.muxPlaybackId ? `https://stream.mux.com/${video.muxPlaybackId}.m3u8` : null,
-              thumbnailUrl: video.muxPlaybackId ? `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5` : null,
+              thumbnailUrl: thumbnailUrl,
               duration: durationInMinutes,
               filename: video.filename,
-              title: video.classTitle || video.name
+              title: video.classTitle || video.name,
+              muxStatus: video.muxStatus
             } : null
           };
         }
@@ -282,7 +273,6 @@ lessonRouter.get('/:lessonId', auth, async (req, res) => {
       })
     );
 
-    // Get user progress for this lesson
     const progress = enrollment?.lessonProgress?.find(
       lp => lp.lessonId.toString() === lessonId.toString()
     );
@@ -320,7 +310,6 @@ lessonRouter.post('/:lessonId/complete', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lesson not found' });
     }
 
-    // Check enrollment
     const enrollment = await Enrollment.findOne({ 
       userId, 
       classId: lesson.classId 
@@ -333,11 +322,9 @@ lessonRouter.post('/:lessonId/complete', auth, async (req, res) => {
       });
     }
 
-    // Calculate total required items
     const requiredItems = lesson.contentItems.filter(item => item.isRequired !== false);
     const totalRequired = requiredItems.length;
 
-    // Update or create lesson progress
     const existingIndex = enrollment.lessonProgress.findIndex(
       lp => lp.lessonId.toString() === lessonId.toString()
     );
@@ -358,7 +345,6 @@ lessonRouter.post('/:lessonId/complete', auth, async (req, res) => {
       enrollment.lessonProgress.push(progressData);
     }
 
-    // Update lesson stats
     enrollment.completedLessons = enrollment.lessonProgress.filter(lp => lp.completed).length;
     enrollment.totalLessons = enrollment.lessonProgress.length;
 
@@ -367,7 +353,6 @@ lessonRouter.post('/:lessonId/complete', auth, async (req, res) => {
       ? Math.round(totalProgress / enrollment.lessonProgress.length)
       : 0;
 
-    // Also add to progressItems for overall course progress
     const existingProgressItem = enrollment.progressItems.find(
       item => item.itemType === 'lesson' && item.itemId.toString() === lessonId.toString()
     );
@@ -389,8 +374,6 @@ lessonRouter.post('/:lessonId/complete', auth, async (req, res) => {
     }
 
     await enrollment.save();
-
-    // Update overall course progress
     await updateOverallProgress(enrollment._id);
 
     res.json({
@@ -427,7 +410,6 @@ lessonRouter.get('/instructor/class/:classId', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
@@ -465,8 +447,6 @@ lessonRouter.get('/instructor/class/:classId', auth, async (req, res) => {
 /**
  * Get available videos for a class (for lesson builder)
  * GET /api/lessons/available-videos/:classId
- * 
- * FIXED: Using Stream.getClassVideos() which is a static method in the wrapper class
  */
 lessonRouter.get('/available-videos/:classId', auth, async (req, res) => {
   try {
@@ -480,7 +460,6 @@ lessonRouter.get('/available-videos/:classId', auth, async (req, res) => {
     console.log('userId:', userId);
     console.log('user_type:', req.user.user_type);
 
-    // Check if class exists
     const classData = await Class.findById(classId);
     if (!classData) {
       console.log('❌ Class not found');
@@ -493,7 +472,6 @@ lessonRouter.get('/available-videos/:classId', auth, async (req, res) => {
     console.log('✅ Class found:', classData.title);
     console.log('Class instructorId:', classData.instructorId);
 
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
@@ -508,7 +486,6 @@ lessonRouter.get('/available-videos/:classId', auth, async (req, res) => {
     const isAdmin = req.user.user_type === 'admin';
     console.log('Is admin?', isAdmin);
 
-    // Check if user is instructor or admin
     if (!isInstructor && !isAdmin) {
       console.log('❌ Access denied - not instructor or admin');
       return res.status(403).json({ 
@@ -519,8 +496,6 @@ lessonRouter.get('/available-videos/:classId', auth, async (req, res) => {
 
     console.log('✅ Access granted');
 
-    // ===== FIX: Use Stream.getClassVideos() which is a static method =====
-    // This method returns an array of video objects with the proper structure
     const videos = await Stream.getClassVideos(classId);
 
     console.log(`Found ${videos.length} videos for class ${classId}`);
@@ -554,7 +529,6 @@ lessonRouter.get('/available-quizzes/:classId', auth, async (req, res) => {
     console.log('userId:', userId);
     console.log('user_type:', req.user.user_type);
 
-    // Check if class exists
     const classData = await Class.findById(classId);
     if (!classData) {
       console.log('❌ Class not found');
@@ -567,7 +541,6 @@ lessonRouter.get('/available-quizzes/:classId', auth, async (req, res) => {
     console.log('✅ Class found:', classData.title);
     console.log('Class instructorId:', classData.instructorId);
 
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
@@ -582,7 +555,6 @@ lessonRouter.get('/available-quizzes/:classId', auth, async (req, res) => {
     const isAdmin = req.user.user_type === 'admin';
     console.log('Is admin?', isAdmin);
 
-    // Check if user is instructor or admin
     if (!isInstructor && !isAdmin) {
       console.log('❌ Access denied - not instructor or admin');
       return res.status(403).json({ 
@@ -593,7 +565,6 @@ lessonRouter.get('/available-quizzes/:classId', auth, async (req, res) => {
 
     console.log('✅ Access granted');
 
-    // Get all quizzes for this class (including drafts for instructor)
     const quizzes = await Quiz.find({ classId })
       .select('_id title description questionCount totalPoints status createdAt')
       .sort({ createdAt: -1 })
@@ -613,6 +584,7 @@ lessonRouter.get('/available-quizzes/:classId', auth, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 /**
  * Create a lesson
  * POST /api/lessons
@@ -630,7 +602,6 @@ lessonRouter.post('/', auth, async (req, res) => {
     console.log('user_type:', req.user.user_type);
     console.log('title:', title);
 
-    // Check if user is instructor of this class
     const classData = await Class.findById(classId);
     if (!classData) {
       return res.status(404).json({ success: false, message: 'Class not found' });
@@ -657,11 +628,9 @@ lessonRouter.post('/', auth, async (req, res) => {
 
     console.log('✅ User is instructor/admin');
 
-    // Validate and clean content items - ensure duration is a number
     const cleanedContentItems = [];
     if (contentItems && contentItems.length > 0) {
       for (const item of contentItems) {
-        // For videos, verify the video exists and belongs to this class
         if (item.type === 'video' && item.contentId) {
           const video = await Stream.getById(item.contentId);
           if (!video) {
@@ -670,11 +639,10 @@ lessonRouter.post('/', auth, async (req, res) => {
               message: `Video "${item.title}" not found or does not belong to this class`
             });
           }
-          // Parse duration to number
           const durationInMinutes = parseDurationToMinutes(video.duration);
           cleanedContentItems.push({
             ...item,
-            duration: durationInMinutes // Ensure duration is a number
+            duration: durationInMinutes
           });
         } else if (item.type === 'quiz' && item.contentId) {
           const quiz = await Quiz.findOne({ 
@@ -689,10 +657,9 @@ lessonRouter.post('/', auth, async (req, res) => {
           }
           cleanedContentItems.push({
             ...item,
-            duration: 0 // Quizzes don't have duration
+            duration: 0
           });
         } else {
-          // For text, material, link, embed - ensure duration is a number
           cleanedContentItems.push({
             ...item,
             duration: item.duration || 0
@@ -701,11 +668,9 @@ lessonRouter.post('/', auth, async (req, res) => {
       }
     }
 
-    // Calculate estimated time
     let estimatedTime = 0;
     cleanedContentItems.forEach(item => {
       if (item.duration) estimatedTime += item.duration;
-      // Text items add 1 minute per 100 words
       if (item.type === 'text' && item.content) {
         const wordCount = item.content.split(/\s+/).length;
         estimatedTime += Math.ceil(wordCount / 100);
@@ -718,7 +683,7 @@ lessonRouter.post('/', auth, async (req, res) => {
       title,
       description: description || '',
       contentItems: cleanedContentItems,
-      estimatedTime: Math.round(estimatedTime), // Ensure it's a number
+      estimatedTime: Math.round(estimatedTime),
       order: order || 0,
       isFreePreview: isFreePreview || false,
       isPublished: isPublished !== undefined ? isPublished : true
@@ -740,6 +705,7 @@ lessonRouter.post('/', auth, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 /**
  * Update a lesson
  * PUT /api/lessons/:lessonId
@@ -771,7 +737,6 @@ lessonRouter.put('/:lessonId', auth, async (req, res) => {
       });
     }
 
-    // Validate and clean content items if being updated
     let cleanedContentItems = null;
     if (updates.contentItems) {
       cleanedContentItems = [];
@@ -812,7 +777,6 @@ lessonRouter.put('/:lessonId', auth, async (req, res) => {
         }
       }
 
-      // Recalculate estimated time
       let estimatedTime = 0;
       cleanedContentItems.forEach(item => {
         if (item.duration) estimatedTime += item.duration;
@@ -857,7 +821,6 @@ lessonRouter.delete('/:lessonId', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lesson not found' });
     }
 
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       isInstructor = lesson.instructorId?.toString() === userId?.toString();
@@ -874,7 +837,6 @@ lessonRouter.delete('/:lessonId', auth, async (req, res) => {
       });
     }
 
-    // Remove lesson progress from enrollments
     await Enrollment.updateMany(
       { classId: lesson.classId },
       { 
@@ -913,7 +875,6 @@ lessonRouter.patch('/:lessonId/publish', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Lesson not found' });
     }
 
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       isInstructor = lesson.instructorId?.toString() === userId?.toString();
@@ -959,7 +920,6 @@ lessonRouter.post('/reorder', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
@@ -978,7 +938,6 @@ lessonRouter.post('/reorder', auth, async (req, res) => {
       });
     }
 
-    // Update each lesson's order
     for (const item of lessonOrders) {
       await Lesson.findByIdAndUpdate(item.id, { order: item.order });
     }
@@ -1008,7 +967,6 @@ lessonRouter.get('/stats/:classId', auth, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Class not found' });
     }
 
-    // ===== FIX: Compare ObjectIds safely =====
     let isInstructor = false;
     try {
       const instructorIdStr = classData.instructorId ? classData.instructorId.toString() : '';
@@ -1031,7 +989,6 @@ lessonRouter.get('/stats/:classId', auth, async (req, res) => {
     const publishedLessons = await Lesson.countDocuments({ classId, isPublished: true });
     const draftLessons = totalLessons - publishedLessons;
 
-    // Get total content items
     const lessons = await Lesson.find({ classId }).lean();
     let totalContentItems = 0;
     let totalEstimatedTime = 0;
@@ -1041,7 +998,6 @@ lessonRouter.get('/stats/:classId', auth, async (req, res) => {
       totalEstimatedTime += lesson.estimatedTime || 0;
     });
 
-    // Get student completion stats
     const enrollments = await Enrollment.find({ classId });
     let totalStudents = enrollments.length;
     let completedLessonsCount = 0;
@@ -1095,7 +1051,6 @@ async function updateOverallProgress(enrollmentId) {
   let totalItems = 0;
   let completedItems = 0;
 
-  // Videos - use Stream.getClassVideos to get videos
   const videos = await Stream.getClassVideos(enrollment.classId);
   totalItems += videos.length;
   const completedVideos = enrollment.progressItems.filter(
@@ -1103,7 +1058,6 @@ async function updateOverallProgress(enrollmentId) {
   ).length;
   completedItems += completedVideos;
 
-  // Quizzes
   const quizzes = await Quiz.find({
     classId: enrollment.classId,
     status: 'published'
@@ -1112,7 +1066,6 @@ async function updateOverallProgress(enrollmentId) {
   const completedQuizzes = enrollment.quizProgress.filter(q => q.completedAt).length;
   completedItems += completedQuizzes;
 
-  // Lessons
   const lessons = await Lesson.find({
     classId: enrollment.classId,
     isPublished: true

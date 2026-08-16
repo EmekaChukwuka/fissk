@@ -2572,7 +2572,7 @@ showLessonDetail(lesson) {
 
         if (!this.lessons || this.lessons.length === 0) {
             container.innerHTML = `
-                <div class="no-lessons">
+                <div class="no-lessons" style="color:black;">
                     <p>📚 No lessons available yet.</p>
                     <p style="color: rgba(255,255,255,0.5); font-size: 0.9rem;">
                         Check back later for new lessons from your instructor.
@@ -2595,7 +2595,7 @@ showLessonDetail(lesson) {
                 ${this.lessons.map((lesson, index) => `
                     <div class="lesson-card ${lesson.completed ? 'completed' : ''}" 
                         data-lesson-id="${lesson._id}"
-                        onclick="window.classManager.viewLesson('${lesson._id}')">
+                        onclick="window.classManager.viewLesson('${lesson._id}')" style="color:black;">
                         <div class="lesson-number">Lesson ${index + 1}</div>
                         <h4>${this.escapeHtml(lesson.title)}</h4>
                         <p>${this.escapeHtml(lesson.description || 'No description')}</p>
@@ -2615,10 +2615,7 @@ showLessonDetail(lesson) {
         `;
     }
 
-    /**
-     * View a specific lesson in detail
-     */
-   /**
+  /**
  * View a specific lesson in detail
  */
 async viewLesson(lessonId) {
@@ -2629,6 +2626,8 @@ async viewLesson(lessonId) {
             window.location.href = 'login.html';
             return;
         }
+
+        console.log('Viewing lesson:', lessonId);
 
         const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}`, {
             headers: {
@@ -2651,39 +2650,54 @@ async viewLesson(lessonId) {
         const data = await response.json();
         const lesson = data.lesson;
 
-        // FIX: Ensure quiz items have proper IDs
+        console.log('Lesson data received:', lesson);
+        console.log('Content items:', lesson.contentItems);
+
+        // Ensure quiz and video items have proper IDs
         if (lesson.contentItems) {
             lesson.contentItems = lesson.contentItems.map(item => {
                 if (item.type === 'quiz') {
-                    // The quiz ID could be in contentId or quizId
-                    const quizId = item.contentId || 
-                                  (item.quizId?._id) || 
-                                  (typeof item.quizId === 'string' ? item.quizId : null);
+                    const quizId = item.contentId || item.quizId || null;
+                    console.log('Quiz item:', item, 'Quiz ID:', quizId);
                     return {
                         ...item,
+                        contentId: quizId,
                         quizId: quizId,
-                        contentId: quizId
+                        quizDetails: {
+                            ...item.quizDetails,
+                            _id: quizId
+                        }
+                    };
+                }
+                if (item.type === 'video') {
+                    // Ensure video has proper playback data
+                    const playbackId = item.muxPlaybackId || item.videoDetails?.muxPlaybackId;
+                    return {
+                        ...item,
+                        muxPlaybackId: playbackId,
+                        videoDetails: {
+                            ...item.videoDetails,
+                            playbackUrl: playbackId ? `https://stream.mux.com/${playbackId}.m3u8` : null
+                        }
                     };
                 }
                 return item;
             });
         }
 
-        // Open in a modal or navigate to lesson page
         this.showLessonDetail(lesson);
     } catch (error) {
         console.error('View lesson error:', error);
         window.showToast('Failed to load lesson content', true);
     }
 }
-    /**
-     * Show lesson detail in a modal
-     */
 /**
  * Show lesson detail in a modal
  */
 showLessonDetail(lesson) {
-    // Create modal if it doesn't exist
+    console.log('Showing lesson detail:', lesson);
+    console.log('Content items:', lesson.contentItems);
+
     let modal = document.getElementById('lessonDetailModal');
     if (!modal) {
         modal = document.createElement('div');
@@ -2693,11 +2707,9 @@ showLessonDetail(lesson) {
         document.body.appendChild(modal);
     }
 
-    // Build content items HTML
     let itemsHTML = '';
     const totalItems = lesson.contentItems?.length || 0;
 
-    // Get the correct quiz ID helper
     const getQuizId = (item) => {
         return item.contentId || item.quizId?._id || item.quizId || null;
     };
@@ -2705,6 +2717,9 @@ showLessonDetail(lesson) {
     if (lesson.contentItems && lesson.contentItems.length > 0) {
         itemsHTML = lesson.contentItems.map((item, index) => {
             let itemContent = '';
+            
+            console.log('Rendering item:', item.type, item);
+
             switch (item.type) {
                 case 'text':
                     itemContent = `
@@ -2712,34 +2727,60 @@ showLessonDetail(lesson) {
                     `;
                     break;
                 case 'video':
+                    // Get video URL from multiple possible sources
                     const videoUrl = item.videoDetails?.playbackUrl || 
-                                    (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : '');
+                                    (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : null) ||
+                                    (item.videoDetails?.muxPlaybackId ? `https://stream.mux.com/${item.videoDetails.muxPlaybackId}.m3u8` : null);
+                    
+                    const isReady = item.muxStatus === 'ready' || item.videoDetails?.muxStatus === 'ready';
+                    const thumbnailUrl = item.thumbnailUrl || item.videoDetails?.thumbnailUrl;
+                    
+                    console.log('Video URL:', videoUrl);
+                    console.log('Is ready:', isReady);
+                    
                     itemContent = `
                         <div class="item-video-wrapper">
-                            ${videoUrl ? `
+                            ${videoUrl && isReady ? `
                                 <video controls style="max-width: 100%; border-radius: 8px; width: 100%;">
                                     <source src="${videoUrl}" type="application/x-mpegURL">
                                     Your browser does not support the video tag.
                                 </video>
-                            ` : '<p style="color: rgba(255,255,255,0.5);">Video not available</p>'}
+                            ` : `
+                                <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 8px; text-align: center; color: rgba(255,255,255,0.5);">
+                                    <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🎬</span>
+                                    <p>${videoUrl ? 'Video is processing...' : 'Video not available'}</p>
+                                    ${item.title ? `<p style="font-size: 0.85rem; margin-top: 4px;">${this.escapeHtml(item.title)}</p>` : ''}
+                                </div>
+                            `}
                         </div>
                         ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
                     `;
                     break;
                 case 'quiz':
-                    // FIX: Get the correct quiz ID
                     const quizId = getQuizId(item);
                     const quizDetails = item.quizDetails || {};
+                    
+                    console.log('Quiz item:', item);
+                    console.log('Quiz ID:', quizId);
+                    console.log('Quiz Details:', quizDetails);
+                    
                     itemContent = `
                         <div class="item-quiz-wrapper">
                             ${quizId ? `
-                                <a href="quiz/take.html?quizId=${quizId}" class="btn btn-primary" style="margin-right: 8px; background: #8B5FBF; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
+                                <a href="quiz/take.html?quizId=${quizId}" 
+                                   class="btn btn-primary" 
+                                   style="margin-right: 8px; background: #8B5FBF; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
                                     📝 Take Quiz
                                 </a>
+                                <span style="color: rgba(255,255,255,0.4); font-size: 0.85rem; margin-left: 8px;">
+                                    ${quizDetails.questionCount || 0} questions
+                                </span>
                             ` : `
-                                <span style="color: rgba(255,255,255,0.5);">Quiz ID not found</span>
+                                <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 8px; text-align: center; color: rgba(255,255,255,0.4);">
+                                    <span style="font-size: 1.5rem; display: block; margin-bottom: 4px;">📝</span>
+                                    <p>Quiz not available</p>
+                                </div>
                             `}
-                            ${quizDetails.questionCount ? `<span style="color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-left: 8px;">${quizDetails.questionCount} questions</span>` : ''}
                             ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
                         </div>
                     `;
@@ -2819,7 +2860,6 @@ showLessonDetail(lesson) {
         itemsHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center; padding: 20px;">No content items in this lesson.</p>';
     }
 
-    // Calculate progress
     const progress = lesson.progressPercentage || 0;
 
     modal.innerHTML = `
@@ -2854,10 +2894,8 @@ showLessonDetail(lesson) {
         </div>
     `;
 
-    // Show modal
     modal.style.display = 'flex';
 
-    // Add event listener for mark complete button
     const completeBtn = document.getElementById('markLessonCompleteBtn');
     if (completeBtn && !lesson.completed) {
         completeBtn.addEventListener('click', () => {
@@ -2865,7 +2903,6 @@ showLessonDetail(lesson) {
         });
     }
 
-    // Add event listeners for item complete buttons
     modal.querySelectorAll('.item-complete-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
