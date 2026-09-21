@@ -2867,7 +2867,6 @@ showLessonDetail(lesson) {
     console.log('Is ready:', isReady);
     console.log('Mux status:', item.muxStatus, item.videoDetails?.muxStatus);
     
-    // ===== FIX: Always show video tag if URL exists =====
     if (videoUrl) {
         itemContent = `
             <div class="item-video-wrapper">
