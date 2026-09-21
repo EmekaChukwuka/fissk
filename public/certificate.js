@@ -47,7 +47,7 @@
     // ===== LOAD CERTIFICATES =====
     async function loadCertificates() {
         try {
-            const response = await fetch('https://fissk-backend.onrender.com/api/certificates/user', {
+            const response = await fetch('https://fissk.onrender.com/api/certificates/user', {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 
@@ -132,7 +132,7 @@
     // ===== VIEW CERTIFICATE =====
     async function viewCertificate(certId) {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/certificates/${certId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/certificates/${certId}`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 
@@ -224,7 +224,7 @@
     async function downloadCertificate(certId) {
         try {
             // Open in new tab for printing/saving
-            const url = `https://fissk-backend.onrender.com/api/certificates/${certId}/download`;
+            const url = `https://fissk.onrender.com/api/certificates/${certId}/download`;
             window.open(url, '_blank');
             showToast('📥 Certificate opened in new tab. You can save it as PDF.', 'success');
         } catch (error) {

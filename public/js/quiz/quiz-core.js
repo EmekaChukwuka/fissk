@@ -3,7 +3,7 @@
 // ============================================================
 
 // ===== BACKEND URL =====
-const BACKEND_URL = 'https://fissk-backend.onrender.com';
+const BACKEND_URL = 'https://fissk.onrender.com';
 
 const QUIZ_API = {
     base: `${BACKEND_URL}/api/quizzes`,

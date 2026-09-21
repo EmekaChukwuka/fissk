@@ -57,7 +57,7 @@ class LessonEditor {
             }
 
             // Load available videos
-            const videoRes = await fetch(`https://fissk-backend.onrender.com/api/lessons/available-videos/${this.classId}`, {
+            const videoRes = await fetch(`https://fissk.onrender.com/api/lessons/available-videos/${this.classId}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (videoRes.ok) {
@@ -66,7 +66,7 @@ class LessonEditor {
             }
 
             // Load available quizzes
-            const quizRes = await fetch(`https://fissk-backend.onrender.com/api/lessons/available-quizzes/${this.classId}`, {
+            const quizRes = await fetch(`https://fissk.onrender.com/api/lessons/available-quizzes/${this.classId}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             if (quizRes.ok) {
@@ -106,7 +106,7 @@ class LessonEditor {
 
     async loadLessonData() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${this.lessonId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/${this.lessonId}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
 
@@ -444,7 +444,7 @@ class LessonEditor {
         saveBtn.textContent = '⏳ Saving...';
 
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${this.lessonId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/${this.lessonId}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
@@ -477,7 +477,7 @@ class LessonEditor {
         }
 
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${this.lessonId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/${this.lessonId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,

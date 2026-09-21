@@ -3,7 +3,7 @@ class AdminApp {
     constructor() {
         this.token = localStorage.getItem('token');
         this.user = JSON.parse(localStorage.getItem('user'));
-        this.baseUrl = 'https://fissk-backend.onrender.com';
+        this.baseUrl = 'https://fissk.onrender.com';
         
         // Check if user is logged in and is admin
         if (!this.token || !this.user || this.user.user_type !== 'admin') {

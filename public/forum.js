@@ -90,7 +90,7 @@ const forumUI = {
   },
 
   async loadStats() {
-    const res = await fetch("https://fissk-backend.onrender.com/forum-api/stats", { headers: this.headers() });
+    const res = await fetch("https://fissk.onrender.com/forum-api/stats", { headers: this.headers() });
     const stats = await res.json();
 
     totalTopics.textContent = stats.totalTopics;
@@ -100,7 +100,7 @@ const forumUI = {
   },
 
   async loadCategories() {
-    const res = await fetch("https://fissk-backend.onrender.com/forum-api/categories", { headers: this.headers() });
+    const res = await fetch("https://fissk.onrender.com/forum-api/categories", { headers: this.headers() });
     const cats = await res.json();
 
     categoriesList.innerHTML = cats.map(c => `
@@ -127,7 +127,7 @@ topicCategory.innerHTML =
     const { search, sort, category } = this.state;
 
     const res = await fetch(
-      `https://fissk-backend.onrender.com/forum-api/topics?search=${search}&sort=${sort}&category=${category}`,
+      `https://fissk.onrender.com/forum-api/topics?search=${search}&sort=${sort}&category=${category}`,
       { headers: this.headers() }
     );
     const topics = await res.json();
@@ -162,7 +162,7 @@ topicCategory.innerHTML =
   },
 
   async loadActivity() {
-    const res = await fetch(`https://fissk-backend.onrender.com/forum-api/activity/${userId}`, { headers: this.headers() });
+    const res = await fetch(`https://fissk.onrender.com/forum-api/activity/${userId}`, { headers: this.headers() });
     const data = await res.json();
 
     const topics =  `
@@ -189,7 +189,7 @@ topicCategory.innerHTML =
 
 async loadCategoriesForSelect() {
     try {
-        const response = await fetch('https://fissk-backend.onrender.com/forum-api/categories');
+        const response = await fetch('https://fissk.onrender.com/forum-api/categories');
         if (response.ok) {
             const categories = await response.json();
             const select = document.getElementById('topicCategory');
@@ -247,7 +247,7 @@ async loadCategoriesForSelect() {
     const title = e.title;
     const content = e.content;
     const categoryId = e.categoryId ;
-    const res = await fetch("https://fissk-backend.onrender.com/forum-api/topics", {
+    const res = await fetch("https://fissk.onrender.com/forum-api/topics", {
       method: "POST",
        headers: {
                     'Content-Type': 'application/json'

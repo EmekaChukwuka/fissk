@@ -52,7 +52,7 @@ class LessonBuilder {
 
     async verifyClassAccess() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/register/instructor/classes/${this.classId}`, {
+            const response = await fetch(`https://fissk.onrender.com/register/instructor/classes/${this.classId}`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
@@ -115,7 +115,7 @@ class LessonBuilder {
 
             this.updateSelectsLoading(true);
 
-            const videoRes = await fetch(`https://fissk-backend.onrender.com/api/lessons/available-videos/${this.classId}`, {
+            const videoRes = await fetch(`https://fissk.onrender.com/api/lessons/available-videos/${this.classId}`, {
                 headers: { 
                     'Authorization': `Bearer ${this.token}`,
                     'Content-Type': 'application/json'
@@ -137,7 +137,7 @@ class LessonBuilder {
                 this.availableVideos = [];
             }
 
-            const quizRes = await fetch(`https://fissk-backend.onrender.com/api/lessons/available-quizzes/${this.classId}`, {
+            const quizRes = await fetch(`https://fissk.onrender.com/api/lessons/available-quizzes/${this.classId}`, {
                 headers: { 
                     'Authorization': `Bearer ${this.token}`,
                     'Content-Type': 'application/json'
@@ -241,7 +241,7 @@ class LessonBuilder {
 
     async loadLessonData() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${this.lessonId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/${this.lessonId}`, {
                 headers: { 
                     'Authorization': `Bearer ${this.token}`,
                     'Content-Type': 'application/json'
@@ -710,8 +710,8 @@ class LessonBuilder {
 
         try {
             const url = this.isEdit 
-                ? `https://fissk-backend.onrender.com/api/lessons/${this.lessonId}`
-                : 'https://fissk-backend.onrender.com/api/lessons';
+                ? `https://fissk.onrender.com/api/lessons/${this.lessonId}`
+                : 'https://fissk.onrender.com/api/lessons';
             
             const method = this.isEdit ? 'PUT' : 'POST';
 

@@ -116,7 +116,7 @@
     // ===== LOAD LESSONS FOR MANAGEMENT =====
     async function loadLessonsForManagement() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${state.classId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/class/${state.classId}`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 
@@ -183,7 +183,7 @@
     // ===== LOAD LESSON FOR EDITING =====
     async function loadLessonForEditing() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${state.lessonId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/${state.lessonId}`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 
@@ -402,8 +402,8 @@
 
         const isEditing = state.isEditing && state.lessonId;
         const url = isEditing
-            ? `https://fissk-backend.onrender.com/api/lessons/${state.lessonId}`
-            : 'https://fissk-backend.onrender.com/api/lessons';
+            ? `https://fissk.onrender.com/api/lessons/${state.lessonId}`
+            : 'https://fissk.onrender.com/api/lessons';
         const method = isEditing ? 'PUT' : 'POST';
 
         try {
@@ -462,7 +462,7 @@
         if (!id) return;
 
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${id}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });

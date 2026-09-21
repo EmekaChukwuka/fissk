@@ -119,7 +119,7 @@
     // ===== LOAD LESSONS =====
     async function loadLessons() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${state.classId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/class/${state.classId}`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 
@@ -340,7 +340,7 @@
         if (lesson.completed) return;
 
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lesson._id}/complete`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/${lesson._id}/complete`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${state.token}`,

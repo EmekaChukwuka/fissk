@@ -51,7 +51,7 @@ class LessonManager {
 
     async loadClassInfo() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/register/class/${this.classId}`, {
+            const response = await fetch(`https://fissk.onrender.com/register/class/${this.classId}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
 
@@ -68,7 +68,7 @@ class LessonManager {
 
     async loadLessons() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/instructor/class/${this.classId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/instructor/class/${this.classId}`, {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
 
@@ -172,7 +172,7 @@ class LessonManager {
         if (!confirm(`Are you sure you want to ${action} this lesson?`)) return;
 
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}/publish`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/${lessonId}/publish`, {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
@@ -197,7 +197,7 @@ class LessonManager {
         if (!confirm('⚠️ Are you sure you want to delete this lesson? This action cannot be undone.')) return;
 
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/${lessonId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${this.token}`,

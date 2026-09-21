@@ -84,7 +84,7 @@
             console.log('Loading results for attempt:', state.attemptId);
             
             const response = await fetch(
-                `https://fissk-backend.onrender.com/api/quizzes/attempt/${state.attemptId}`,
+                `https://fissk.onrender.com/api/quizzes/attempt/${state.attemptId}`,
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`,

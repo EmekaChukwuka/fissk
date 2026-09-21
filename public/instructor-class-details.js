@@ -10,7 +10,7 @@ class InstructorClassDetails {
         this.videos = [];
         this.streams = [];
         this.lessons = [];
-        this.baseUrl = 'https://fissk-backend.onrender.com'; // Your backend URL
+        this.baseUrl = 'https://fissk.onrender.com'; // Your backend URL
         
         // Redirect if no user
         if (!this.currentUser) {

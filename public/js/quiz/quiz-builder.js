@@ -231,7 +231,7 @@
     // ===== LOAD QUIZ FOR EDITING =====
     async function loadQuizForEditing() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${state.quizId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/quizzes/${state.quizId}`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 
@@ -511,8 +511,8 @@
 
         const isEditing = state.isEditing && state.quizId;
         const url = isEditing 
-            ? `https://fissk-backend.onrender.com/api/quizzes/${state.quizId}`
-            : 'https://fissk-backend.onrender.com/api/quizzes';
+            ? `https://fissk.onrender.com/api/quizzes/${state.quizId}`
+            : 'https://fissk.onrender.com/api/quizzes';
         const method = isEditing ? 'PUT' : 'POST';
 
         try {
@@ -569,7 +569,7 @@
     // ===== PUBLISH QUIZ =====
     async function publishQuiz(quizId) {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${quizId}/publish`, {
+            const response = await fetch(`https://fissk.onrender.com/api/quizzes/${quizId}/publish`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });

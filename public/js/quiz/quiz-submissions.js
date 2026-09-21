@@ -64,7 +64,7 @@
     // ===== LOAD QUIZ INFO =====
     async function loadQuizInfo() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${state.quizId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/quizzes/${state.quizId}`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 
@@ -84,7 +84,7 @@
     // ===== LOAD SUBMISSIONS =====
     async function loadSubmissions() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${state.quizId}/submissions`, {
+            const response = await fetch(`https://fissk.onrender.com/api/quizzes/${state.quizId}/submissions`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 
@@ -204,7 +204,7 @@
     // ===== OPEN GRADING MODAL =====
     async function openGradingModal(attemptId) {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/attempt/${attemptId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/quizzes/attempt/${attemptId}`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 
@@ -311,7 +311,7 @@
 
             // Save each grade
             for (const grade of grades) {
-                const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/attempt/${attemptId}/grade`, {
+                const response = await fetch(`https://fissk.onrender.com/api/quizzes/attempt/${attemptId}/grade`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${state.token}`,

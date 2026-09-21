@@ -119,7 +119,7 @@ class ClassesManager {
         try {
             
 
-             const response = await fetch('https://fissk-backend.onrender.com/register/classes-on-homepage');
+             const response = await fetch('https://fissk.onrender.com/register/classes-on-homepage');
     
     const data =await response.json();
     console.log(data);

@@ -70,9 +70,9 @@ async function loadTopic() {
         // Try the class-specific endpoint first if we have a classId
         let url;
         if (classId) {
-            url = `https://fissk-backend.onrender.com/forum-api/class/${classId}/topics/${topicId}`;
+            url = `https://fissk.onrender.com/forum-api/class/${classId}/topics/${topicId}`;
         } else {
-            url = `https://fissk-backend.onrender.com/forum-api/topics/${topicId}`;
+            url = `https://fissk.onrender.com/forum-api/topics/${topicId}`;
         }
         
         console.log('Fetching topic from:', url);
@@ -183,9 +183,9 @@ async function loadReplies() {
     try {
         let url;
         if (classId) {
-            url = `https://fissk-backend.onrender.com/forum-api/class/${classId}/topics/${topicId}/replies`;
+            url = `https://fissk.onrender.com/forum-api/class/${classId}/topics/${topicId}/replies`;
         } else {
-            url = `https://fissk-backend.onrender.com/forum-api/topics/${topicId}/replies`;
+            url = `https://fissk.onrender.com/forum-api/topics/${topicId}/replies`;
         }
         
         const response = await fetch(url, {
@@ -263,9 +263,9 @@ async function addReply(content) {
     try {
         let url;
         if (classId) {
-            url = `https://fissk-backend.onrender.com/forum-api/class/${classId}/topics/${topicId}/replies`;
+            url = `https://fissk.onrender.com/forum-api/class/${classId}/topics/${topicId}/replies`;
         } else {
-            url = `https://fissk-backend.onrender.com/forum-api/topics/${topicId}/replies`;
+            url = `https://fissk.onrender.com/forum-api/topics/${topicId}/replies`;
         }
         
         const response = await fetch(url, {
@@ -304,9 +304,9 @@ async function likeReply(replyIndex) {
     try {
         let url;
         if (classId) {
-            url = `https://fissk-backend.onrender.com/forum-api/replies/${topicId}/${replyIndex}/like`;
+            url = `https://fissk.onrender.com/forum-api/replies/${topicId}/${replyIndex}/like`;
         } else {
-            url = `https://fissk-backend.onrender.com/forum-api/replies/${topicId}/${replyIndex}/like`;
+            url = `https://fissk.onrender.com/forum-api/replies/${topicId}/${replyIndex}/like`;
         }
         
         const response = await fetch(url, {
@@ -339,9 +339,9 @@ async function markAsBestAnswer(replyIndex) {
     try {
         let url;
         if (classId) {
-            url = `https://fissk-backend.onrender.com/forum-api/replies/${topicId}/${replyIndex}/best`;
+            url = `https://fissk.onrender.com/forum-api/replies/${topicId}/${replyIndex}/best`;
         } else {
-            url = `https://fissk-backend.onrender.com/forum-api/replies/${topicId}/${replyIndex}/best`;
+            url = `https://fissk.onrender.com/forum-api/replies/${topicId}/${replyIndex}/best`;
         }
         
         const response = await fetch(url, {
@@ -371,9 +371,9 @@ async function deleteReply(replyIndex) {
     try {
         let url;
         if (classId) {
-            url = `https://fissk-backend.onrender.com/forum-api/delete-reply/${topicId}/${replyIndex}`;
+            url = `https://fissk.onrender.com/forum-api/delete-reply/${topicId}/${replyIndex}`;
         } else {
-            url = `https://fissk-backend.onrender.com/forum-api/delete-reply/${topicId}/${replyIndex}`;
+            url = `https://fissk.onrender.com/forum-api/delete-reply/${topicId}/${replyIndex}`;
         }
         
         const response = await fetch(url, {
@@ -402,9 +402,9 @@ async function deleteTopic() {
     try {
         let url;
         if (classId) {
-            url = `https://fissk-backend.onrender.com/forum-api/class/${classId}/topics/${topicId}`;
+            url = `https://fissk.onrender.com/forum-api/class/${classId}/topics/${topicId}`;
         } else {
-            url = `https://fissk-backend.onrender.com/forum-api/delete-post/${topicId}`;
+            url = `https://fissk.onrender.com/forum-api/delete-post/${topicId}`;
         }
         
         const response = await fetch(url, {

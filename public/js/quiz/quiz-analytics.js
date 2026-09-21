@@ -63,7 +63,7 @@
     // ===== LOAD QUIZ INFO =====
     async function loadQuizInfo() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${state.quizId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/quizzes/${state.quizId}`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 
@@ -83,7 +83,7 @@
     // ===== LOAD ANALYTICS =====
     async function loadAnalytics() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${state.quizId}/analytics`, {
+            const response = await fetch(`https://fissk.onrender.com/api/quizzes/${state.quizId}/analytics`, {
                 headers: { 'Authorization': `Bearer ${state.token}` }
             });
 

@@ -18,14 +18,14 @@ class ClassesManager {
 
     async loadClasses() {
         try {
-            const response = await fetch('https://fissk-backend.onrender.com/register/classes');
+            const response = await fetch('https://fissk.onrender.com/register/classes');
             const data = await response.json();
             console.log('Classes loaded:', data);
             
             const coursesArray = data.classes;
             if (coursesArray && coursesArray.length !== 0) {
                 if (this.user && this.user.email) {
-                    const enrolledResponse = await fetch('https://fissk-backend.onrender.com/register/get-user-classes', {
+                    const enrolledResponse = await fetch('https://fissk.onrender.com/register/get-user-classes', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email: this.user.email })
@@ -205,7 +205,7 @@ class ClassesManager {
         try {
             let instructorName = 'Staff';
             if (classItem.instructorId) {
-                const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
+                const response = await fetch('https://fissk.onrender.com/register/classes/instructor', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ instructor_id: classItem.instructorId }),
@@ -281,7 +281,7 @@ class ClassesManager {
 
         // Free enrollment
         try {
-            const response = await fetch('https://fissk-backend.onrender.com/register/join-class', {
+            const response = await fetch('https://fissk.onrender.com/register/join-class', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ classId: classId, email: this.user.email })

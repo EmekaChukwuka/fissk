@@ -88,7 +88,7 @@ class InstructorDashboard {
 
 async loadInstructorClasses() {
     try {
-        const res = await fetch('https://fissk-backend.onrender.com/register/instructor/classes', {
+        const res = await fetch('https://fissk.onrender.com/register/instructor/classes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: this.currentUser.id })
@@ -234,7 +234,7 @@ renderRecentActivity(activities) {
  async loadInstructorStats() {
     try {
         const id = this.currentUser.id;
-        const res = await fetch('https://fissk-backend.onrender.com/register/instructor/stats', {
+        const res = await fetch('https://fissk.onrender.com/register/instructor/stats', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id })
@@ -281,7 +281,7 @@ renderRecentActivity(activities) {
 
 async loadEnrollments(classId = '') {
     try {
-        const res = await fetch(`https://fissk-backend.onrender.com/register/instructor/enrollments`, {
+        const res = await fetch(`https://fissk.onrender.com/register/instructor/enrollments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ instructorId: this.currentUser.id })
@@ -402,7 +402,7 @@ renderEnrollments(items) {
         isFree: isFree || price === 0
       };
 
-      const res = await fetch('https://fissk-backend.onrender.com/register/create-class', {
+      const res = await fetch('https://fissk.onrender.com/register/create-class', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -444,7 +444,7 @@ renderEnrollments(items) {
         return;
       }
 
-      const res = await fetch('https://fissk-backend.onrender.com/api/payout/earnings', {
+      const res = await fetch('https://fissk.onrender.com/api/payout/earnings', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -580,7 +580,7 @@ renderEnrollments(items) {
         return;
       }
 
-      const res = await fetch('https://fissk-backend.onrender.com/api/payout/earnings', {
+      const res = await fetch('https://fissk.onrender.com/api/payout/earnings', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -695,7 +695,7 @@ async loadClassQuizzes(classId) {
 
         console.log(`Loading quizzes for class ${classId}`);
 
-        const res = await fetch(`https://fissk-backend.onrender.com/api/quizzes/class/${classId}`, {
+        const res = await fetch(`https://fissk.onrender.com/api/quizzes/class/${classId}`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -855,7 +855,7 @@ async deleteQuiz(quizId) {
             return;
         }
 
-        const res = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${quizId}`, {
+        const res = await fetch(`https://fissk.onrender.com/api/quizzes/${quizId}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -901,7 +901,7 @@ async toggleQuizPublish(quizId, currentStatus) {
 
         const newStatus = currentStatus === 'published' ? 'draft' : 'published';
 
-        const res = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${quizId}/publish`, {
+        const res = await fetch(`https://fissk.onrender.com/api/quizzes/${quizId}/publish`, {
             method: 'PATCH',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -954,7 +954,7 @@ async toggleQuizPublish(quizId, currentStatus) {
         return;
       }
 
-      const res = await fetch('https://fissk-backend.onrender.com/api/payout/withdraw', {
+      const res = await fetch('https://fissk.onrender.com/api/payout/withdraw', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1028,7 +1028,7 @@ async toggleQuizPublish(quizId, currentStatus) {
           return;
         }
 
-        const res = await fetch('https://fissk-backend.onrender.com/api/payout/bank-details', {
+        const res = await fetch('https://fissk.onrender.com/api/payout/bank-details', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -1056,7 +1056,7 @@ async toggleQuizPublish(quizId, currentStatus) {
   // ===== STREAMS WITH MEETING URL =====
   async loadInstructorStreams() {
     try {
-      const res = await fetch('https://fissk-backend.onrender.com/register/instructor/streams', {
+      const res = await fetch('https://fissk.onrender.com/register/instructor/streams', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: this.currentUser.id })
@@ -1069,7 +1069,7 @@ async toggleQuizPublish(quizId, currentStatus) {
       
       const scheduledWithMeetingIds = await Promise.all(scheduled.map(async (s) => {
         try {
-          const meetingRes = await fetch(`https://fissk-backend.onrender.com/api/livekit/session/meeting/${s.id}`);
+          const meetingRes = await fetch(`https://fissk.onrender.com/api/livekit/session/meeting/${s.id}`);
           const meetingData = await meetingRes.json();
           if (meetingData.success && meetingData.meetingId) {
             return { ...s, meetingId: meetingData.meetingId };
@@ -1175,7 +1175,7 @@ async toggleQuizPublish(quizId, currentStatus) {
 
       this.showMessage('Generating meeting link...', 'success');
       
-      const response = await fetch('https://fissk-backend.onrender.com/api/livekit/create-session', {
+      const response = await fetch('https://fissk.onrender.com/api/livekit/create-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1221,7 +1221,7 @@ async toggleQuizPublish(quizId, currentStatus) {
     async loadClassLessons(classId) {
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${classId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/class/${classId}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -1329,7 +1329,7 @@ async toggleQuizPublish(quizId, currentStatus) {
 
         try {
             const token = localStorage.getItem('token');
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}`, {
+            const response = await fetch(`https://fissk.onrender.com/api/lessons/${lessonId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -1435,7 +1435,7 @@ async toggleQuizPublish(quizId, currentStatus) {
       
       const id = this.currentUser.id;
       
-      const res = await fetch('https://fissk-backend.onrender.com/register/instructor/schedule-stream', {
+      const res = await fetch('https://fissk.onrender.com/register/instructor/schedule-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ payload: payloadData, id })

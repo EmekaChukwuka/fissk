@@ -98,7 +98,7 @@
 
         async loadEnrolledClasses() {
             try {
-                const response = await fetch('https://fissk-backend.onrender.com/register/get-user-classes', {
+                const response = await fetch('https://fissk.onrender.com/register/get-user-classes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: this.user.email })
@@ -121,7 +121,7 @@
 
         async loadLiveSessions() {
             try {
-                const response = await fetch('https://fissk-backend.onrender.com/register/dashboard/live-sessions', {
+                const response = await fetch('https://fissk.onrender.com/register/dashboard/live-sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: this.user.id })
@@ -372,7 +372,7 @@ renderLiveSessions() {
         async loadQuizHistory() {
             try {
                 const token = localStorage.getItem('token');
-                const response = await fetch('https://fissk-backend.onrender.com/api/quizzes/attempts/user', {
+                const response = await fetch('https://fissk.onrender.com/api/quizzes/attempts/user', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
