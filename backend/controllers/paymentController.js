@@ -181,13 +181,9 @@ export const initializePayment = async (req, res) => {
     });
   }
 };
-
-// ===== VERIFY PAYMENT  =====
 export const verifyPayment = async (req, res) => {
   try {
     const { reference } = req.body;
-
-    console.log(`🔍 Verifying payment reference: ${reference}`);
 
     if (!reference) {
       return res.status(400).json({
@@ -198,11 +194,9 @@ export const verifyPayment = async (req, res) => {
 
     // Find payment record
     const payment = await Payment.findOne({ reference })
-      .populate('user', 'firstName lastName email')
-      .populate('class', 'title')
-      .populate('instructor', 'firstName lastName');
-
-    console.log('Payment found:', payment ? 'Yes' : 'No');
+      .populate('user')
+      .populate('class')
+      .populate('instructor');
 
     if (!payment) {
       return res.status(404).json({
@@ -211,12 +205,14 @@ export const verifyPayment = async (req, res) => {
       });
     }
 
-    // If already successful, return success
+    console.log('Verifying payment:', reference);
+    console.log('Current status:', payment.status);
+
+    // If already successful, return success (idempotent)
     if (payment.status === 'success') {
       const enrollment = await Enrollment.findOne({
         userId: payment.user._id,
-        classId: payment.class._id,
-        paymentStatus: 'paid'
+        classId: payment.class._id
       });
 
       return res.json({
@@ -254,47 +250,101 @@ export const verifyPayment = async (req, res) => {
       });
     }
 
-    // Payment successful - update records
+    // ============================================================
+    // PAYMENT SUCCESSFUL - CREDIT EVERYONE
+    // ============================================================
+
+    // 1. Update payment record
     payment.status = 'success';
     payment.paystackData = result.data;
     payment.paidAt = new Date();
     await payment.save();
+    console.log('✅ Payment status updated to success');
 
-    // Update enrollment
+    // 2. Update enrollment
     const enrollment = await Enrollment.findOneAndUpdate(
-      { paymentReference: reference },
+      { userId: payment.user._id, classId: payment.class._id },
       {
         paymentStatus: 'paid',
         paidAt: new Date(),
         accessType: 'paid'
       },
-      { new: true, upsert: true }
+      { new: true }
     );
+    console.log('✅ Enrollment updated');
 
-    // Update class stats
+    // 3. Update class stats
     await Class.findByIdAndUpdate(payment.class._id, {
-      $inc: { 
+      $inc: {
         totalSales: 1,
         totalRevenue: payment.amount
       }
     });
+    console.log('✅ Class stats updated');
 
-    // Update instructor earnings
-    await User.findByIdAndUpdate(payment.instructor._id, {
-      $inc: {
-        earnings: payment.instructorEarning,
-        totalRevenue: payment.instructorEarning,
-        totalSales: 1
-      }
-    });
+    // 4. ===== CREDIT INSTRUCTOR =====
+    const instructorId = payment.instructor._id || payment.instructor;
+    
+    const instructorUpdate = await User.findByIdAndUpdate(
+      instructorId,
+      {
+        $inc: {
+          earnings: payment.instructorEarning,
+          totalRevenue: payment.instructorEarning,
+          totalSales: 1
+        }
+      },
+      { new: true }
+    );
+    
+    console.log('✅ Instructor credited:');
+    console.log('   - Earnings added:', payment.instructorEarning);
+    console.log('   - New earnings balance:', instructorUpdate?.earnings);
+    console.log('   - New total revenue:', instructorUpdate?.totalRevenue);
 
-    console.log(`✅ Payment verified successfully: ${reference}`);
+    // 5. Send email receipt
+    try {
+      await emailService.sendPaymentReceipt(
+        payment.user.email,
+        `${payment.user.firstName} ${payment.user.lastName}`,
+        {
+          courseName: payment.class.title,
+          amount: payment.amount,
+          reference: payment.reference,
+          paidAt: payment.paidAt,
+          instructorName: `${payment.instructor.firstName} ${payment.instructor.lastName}`,
+          classId: payment.class._id
+        }
+      );
+    } catch (emailError) {
+      console.error('Failed to send receipt email:', emailError);
+    }
+
+    // 6. Notify instructor
+    try {
+      await emailService.sendInstructorSaleEmail(
+        payment.instructor.email,
+        `${payment.instructor.firstName} ${payment.instructor.lastName}`,
+        {
+          courseName: payment.class.title,
+          amount: payment.amount,
+          studentName: `${payment.user.firstName} ${payment.user.lastName}`,
+          studentEmail: payment.user.email,
+          paidAt: payment.paidAt,
+          instructorEarning: payment.instructorEarning,
+          totalEarnings: instructorUpdate?.totalRevenue || 0
+        }
+      );
+    } catch (emailError) {
+      console.error('Failed to send instructor email:', emailError);
+    }
 
     res.json({
       success: true,
       message: 'Payment verified successfully',
       payment: payment,
-      enrollment: enrollment
+      enrollment: enrollment,
+      instructorEarnings: instructorUpdate?.earnings
     });
 
   } catch (error) {
@@ -350,61 +400,39 @@ export const checkPaymentStatus = async (req, res) => {
   }
 };
 
-// ===== WEBHOOK HANDLER =====
 export const handleWebhook = async (req, res) => {
   try {
-    // Log the incoming webhook
-    console.log('📨 Webhook received');
-    console.log('Headers:', req.headers);
-    console.log('Body:', JSON.stringify(req.body, null, 2));
-
     const signature = req.headers['x-paystack-signature'];
     const payload = req.body;
 
-    if (!signature) {
-      console.error('❌ No webhook signature provided');
-      return res.status(401).json({ error: 'No signature provided' });
-    }
-
-    // Verify webhook signature using the webhook secret
     const isValid = paymentService.verifyWebhookSignature(signature, payload);
-
     if (!isValid) {
-      console.error('❌ Invalid webhook signature');
-      return res.status(401).json({ error: 'Invalid signature' });
+      return res.status(401).json({ success: false, message: 'Invalid signature' });
     }
-
-    console.log('✅ Webhook signature verified');
 
     const event = payload.event;
     const data = payload.data;
 
-    console.log(`📨 Webhook event: ${event} for reference: ${data?.reference}`);
+    console.log(`📨 Webhook received: ${event} for reference: ${data.reference}`);
 
-    // Handle charge.success event
     if (event === 'charge.success') {
       const reference = data.reference;
-      console.log(`💰 Processing successful payment: ${reference}`);
 
-      // Find payment record
       const payment = await Payment.findOne({ reference })
         .populate('user')
         .populate('class')
         .populate('instructor');
 
       if (!payment) {
-        console.log(`⚠️ Payment not found for reference: ${reference}`);
-        // Still return 200 to acknowledge the webhook
+        console.log(`⚠️ Payment not found: ${reference}`);
         return res.status(200).json({ success: true });
       }
 
-      // If already processed, skip
+      // Skip if already processed
       if (payment.status === 'success') {
-        console.log(`✅ Payment already processed: ${reference}`);
+        console.log(`✅ Already processed: ${reference}`);
         return res.status(200).json({ success: true });
       }
-
-      console.log(`✅ Payment found: ${payment._id}, updating...`);
 
       // Update payment
       payment.status = 'success';
@@ -412,31 +440,20 @@ export const handleWebhook = async (req, res) => {
       payment.paidAt = new Date();
       await payment.save();
 
-      console.log(`✅ Payment updated to success: ${reference}`);
-
       // Update enrollment
-      const enrollment = await Enrollment.findOneAndUpdate(
-        { paymentReference: reference },
-        {
-          paymentStatus: 'paid',
-          paidAt: new Date(),
-          accessType: 'paid'
-        },
-        { new: true, upsert: true }
+      await Enrollment.findOneAndUpdate(
+        { userId: payment.user._id, classId: payment.class._id },
+        { paymentStatus: 'paid', paidAt: new Date(), accessType: 'paid' }
       );
 
-      console.log(`✅ Enrollment updated: ${enrollment?._id || 'created'}`);
-
-      // Update class stats
+      // Update class
       await Class.findByIdAndUpdate(payment.class._id, {
-        $inc: { 
-          totalSales: 1,
-          totalRevenue: payment.amount
-        }
+        $inc: { totalSales: 1, totalRevenue: payment.amount }
       });
 
-      // Update instructor earnings
-      await User.findByIdAndUpdate(payment.instructor._id, {
+      // Credit instructor
+      const instructorId = payment.instructor._id || payment.instructor;
+      await User.findByIdAndUpdate(instructorId, {
         $inc: {
           earnings: payment.instructorEarning,
           totalRevenue: payment.instructorEarning,
@@ -444,60 +461,14 @@ export const handleWebhook = async (req, res) => {
         }
       });
 
-      console.log(`✅ Stats updated for class ${payment.class._id}`);
-
-      // Send email receipt
-      try {
-        await emailService.sendPaymentReceipt(
-          payment.user.email,
-          `${payment.user.firstName} ${payment.user.lastName}`,
-          {
-            courseName: payment.class.title,
-            amount: payment.amount,
-            reference: payment.reference,
-            paidAt: payment.paidAt,
-            instructorName: `${payment.instructor.firstName} ${payment.instructor.lastName}`
-          }
-        );
-        console.log(`✅ Receipt email sent to ${payment.user.email}`);
-      } catch (emailError) {
-        console.error('Failed to send receipt email:', emailError);
-      }
-
-      console.log(`✅ Webhook processed successfully: ${reference}`);
-    }
-
-    // Handle charge.failed event
-    if (event === 'charge.failed') {
-      const reference = data.reference;
-      console.log(`❌ Payment failed: ${reference}`);
-
-      await Payment.findOneAndUpdate(
-        { reference },
-        { 
-          status: 'failed',
-          paystackData: data
-        }
-      );
-
-      await Enrollment.findOneAndUpdate(
-        { paymentReference: reference },
-        { paymentStatus: 'failed' }
-      );
-
-      console.log(`❌ Payment marked as failed: ${reference}`);
+      console.log(`✅ Webhook processed: ${reference}`);
     }
 
     res.status(200).json({ success: true });
 
   } catch (error) {
-    console.error('Webhook handler error:', error);
-    // Always return 200 to Paystack to acknowledge receipt
-    res.status(200).json({ 
-      success: false, 
-      message: 'Webhook processing failed but acknowledged',
-      error: error.message 
-    });
+    console.error('Webhook error:', error);
+    res.status(500).json({ success: false });
   }
 };
 
