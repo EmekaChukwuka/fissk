@@ -12,7 +12,6 @@ function generateReference() {
   return `FISSK-${timestamp}-${random}`;
 }
 
-// ===== INITIALIZE PAYMENT =====
 export const initializePayment = async (req, res) => {
   try {
     const { classId } = req.body;
@@ -37,17 +36,56 @@ export const initializePayment = async (req, res) => {
       });
     }
 
-    // Check if user already enrolled
-    const existingEnrollment = await Enrollment.findOne({
+    // Check if user ALREADY has paid enrollment
+    const existingPaidEnrollment = await Enrollment.findOne({
       userId: userId,
       classId: classId,
       paymentStatus: 'paid'
     });
 
-    if (existingEnrollment) {
+    if (existingPaidEnrollment) {
       return res.status(400).json({
         success: false,
         message: 'You already have access to this class'
+      });
+    }
+
+    // Check for existing pending payment
+    const existingPayment = await Payment.findOne({
+      user: userId,
+      class: classId,
+      status: 'pending'
+    });
+
+    if (existingPayment) {
+      // Reuse existing pending payment - reinitialize with Paystack
+      const result = await paymentService.initializePayment(
+        user.email,
+        classData.price,
+        {
+          classId: classId,
+          userId: userId,
+          instructorId: classData.instructorId,
+          className: classData.title,
+          reference: existingPayment.reference
+        }
+      );
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to initialize payment',
+          error: result.error
+        });
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          authorizationUrl: result.authorizationUrl,
+          reference: existingPayment.reference,
+          payment: existingPayment
+        }
       });
     }
 
@@ -91,8 +129,8 @@ export const initializePayment = async (req, res) => {
       amount: classData.price,
       reference: reference,
       status: 'pending',
-      platformFee: classData.price * 0.3,  // 30%
-      instructorEarning: classData.price * 0.7, // 70%
+      platformFee: classData.price * 0.3,
+      instructorEarning: classData.price * 0.7,
       metadata: {
         className: classData.title,
         studentEmail: user.email,
@@ -102,17 +140,28 @@ export const initializePayment = async (req, res) => {
 
     await payment.save();
 
-    // Also create a pending enrollment
-    const enrollment = new Enrollment({
-      userId: userId,
-      classId: classId,
-      paymentReference: reference,
-      paymentStatus: 'pending',
-      amountPaid: classData.price,
-      accessType: 'paid'
-    });
-
-    await enrollment.save();
+    // ===== FIX: Use findOneAndUpdate with upsert instead of `new` =====
+    await Enrollment.findOneAndUpdate(
+      { userId: userId, classId: classId },
+      {
+        $set: {
+          paymentReference: reference,
+          paymentStatus: 'pending',
+          amountPaid: classData.price,
+          accessType: 'paid',
+          lastAccessed: new Date()
+        },
+        $setOnInsert: {
+          userId: userId,
+          classId: classId,
+          enrolledAt: new Date(),
+          progress: 0,
+          completed: false,
+          progressItems: []
+        }
+      },
+      { upsert: true, new: true }
+    );
 
     res.json({
       success: true,
