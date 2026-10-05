@@ -391,15 +391,27 @@ export const getWithdrawalHistory = async (req, res) => {
         });
     }
 };
-
 // ===== ADMIN: GET PENDING WITHDRAWALS =====
 export const getPendingWithdrawals = async (req, res) => {
     try {
+        console.log('🔍 Fetching pending withdrawals...');
+        
+        // First, let's see ALL withdrawals to debug
+        const allWithdrawals = await Withdrawal.find({})
+            .populate('instructor', 'firstName lastName email')
+            .sort({ createdAt: -1 });
+        
+        console.log('📋 Total withdrawals in DB:', allWithdrawals.length);
+        console.log('📋 Statuses:', allWithdrawals.map(w => w.status));
+
+        // Now fetch pending + processing
         const withdrawals = await Withdrawal.find({
             status: { $in: ['pending', 'processing'] }
         })
             .populate('instructor', 'firstName lastName email')
             .sort({ createdAt: 1 });
+
+        console.log('✅ Pending/Processing withdrawals found:', withdrawals.length);
 
         res.json({
             success: true,
