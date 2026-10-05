@@ -465,6 +465,86 @@ class EmailService {
 
         return this.sendEmail(studentEmail, subject, html);
     }
+
+    // ===== ADMIN WITHDRAWAL NOTIFICATION =====
+    async sendAdminWithdrawalNotification(adminEmail, adminName, withdrawalData, instructorData) {
+        const subject = `🔔 New Withdrawal Request - ₦${withdrawalData.amount.toLocaleString()}`;
+        
+        const html = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f8f9fa; }
+                    .header { background: linear-gradient(135deg, #6C3CE1, #8B5FBF); color: white; padding: 30px; text-align: center; border-radius: 12px 12px 0 0; }
+                    .content { background: white; padding: 30px; border-radius: 0 0 12px 12px; }
+                    .details { background: #f0f0ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+                    .details p { margin: 8px 0; }
+                    .details strong { color: #1A1A2E; }
+                    .button { display: inline-block; background: #6C3CE1; color: white; padding: 14px 30px; text-decoration: none; border-radius: 50px; font-weight: 600; margin: 10px 5px; }
+                    .footer { text-align: center; padding: 20px; color: #666; font-size: 0.9rem; }
+                    .alert { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h2>🔔 FISSK Admin Alert</h2>
+                        <p style="opacity:0.9;">New Withdrawal Request</p>
+                    </div>
+                    <div class="content">
+                        <h2>Hello ${adminName}!</h2>
+                        <p>An instructor has requested a withdrawal from their earnings.</p>
+                        
+                        <div class="alert">
+                            ⚡ <strong>Action Required:</strong> Please review and process this request in the admin dashboard.
+                        </div>
+                        
+                        <div class="details">
+                            <h3 style="margin-top: 0;">💵 Withdrawal Details</h3>
+                            <p><strong>Amount:</strong> ₦${withdrawalData.amount.toLocaleString()}</p>
+                            <p><strong>Reference:</strong> <code>${withdrawalData.reference}</code></p>
+                            <p><strong>Requested:</strong> ${new Date(withdrawalData.requestedAt).toLocaleString()}</p>
+                        </div>
+                        
+                        <div class="details">
+                            <h3 style="margin-top: 0;">👨‍🏫 Instructor</h3>
+                            <p><strong>Name:</strong> ${instructorData.firstName} ${instructorData.lastName}</p>
+                            <p><strong>Email:</strong> ${instructorData.email}</p>
+                            <p><strong>Phone:</strong> ${instructorData.phone || 'Not provided'}</p>
+                            <p><strong>Total Revenue:</strong> ₦${(instructorData.totalRevenue || 0).toLocaleString()}</p>
+                            <p><strong>Total Sales:</strong> ${instructorData.totalSales || 0}</p>
+                        </div>
+                        
+                        <div class="details">
+                            <h3 style="margin-top: 0;">🏦 Bank Details</h3>
+                            <p><strong>Bank:</strong> ${withdrawalData.bankDetails.bankName}</p>
+                            <p><strong>Account Number:</strong> ${withdrawalData.bankDetails.accountNumber}</p>
+                            <p><strong>Account Name:</strong> ${withdrawalData.bankDetails.accountName}</p>
+                        </div>
+
+                        <p style="text-align:center; margin: 25px 0;">
+                            <a href="${process.env.FRONTEND_URL}/admin/payouts.html" class="button">
+                                📊 Review Request
+                            </a>
+                        </p>
+
+                        <p style="font-size: 0.9rem; color: #666; border-top: 1px solid #eee; padding-top: 20px;">
+                            💡 <strong>Reminder:</strong> After approving, transfer the funds to the instructor's bank account and mark the withdrawal as completed in the admin dashboard.
+                        </p>
+                    </div>
+                    <div class="footer">
+                        <p>FISSK Online Academy - Admin Notifications</p>
+                        <p>📍 Lagos, Nigeria | 📧 hello@fissk.com</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        return this.sendEmail(adminEmail, subject, html);
+    }
 }
 
 export default new EmailService();

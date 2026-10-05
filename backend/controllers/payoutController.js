@@ -17,7 +17,6 @@ export const getEarnings = async (req, res) => {
     try {
         const instructorId = req.user.id;
 
-        // Get instructor data
         const instructor = await User.findById(instructorId);
         if (!instructor) {
             return res.status(404).json({
@@ -36,7 +35,7 @@ export const getEarnings = async (req, res) => {
             .sort({ paidAt: -1 })
             .limit(50);
 
-        // Get pending withdrawals
+        // ===== Include BOTH pending AND processing withdrawals =====
         const pendingWithdrawals = await Withdrawal.find({
             instructor: instructorId,
             status: { $in: ['pending', 'processing'] }
@@ -89,7 +88,7 @@ export const getEarnings = async (req, res) => {
 export const getBanks = async (req, res) => {
     try {
         const result = await payoutService.getBanks();
-        
+
         if (!result.success) {
             return res.status(500).json({
                 success: false,
@@ -148,13 +147,13 @@ export const validateBankAccount = async (req, res) => {
         });
     }
 };
-// backend/controllers/payoutController.js
+
+// ===== UPDATE BANK DETAILS =====
 export const updateBankDetails = async (req, res) => {
     try {
         const { bankName, accountNumber, bankCode } = req.body;
         const instructorId = req.user.id;
 
-        // Validate input (remove accountName requirement)
         if (!bankName || !accountNumber || !bankCode) {
             return res.status(400).json({
                 success: false,
@@ -162,7 +161,6 @@ export const updateBankDetails = async (req, res) => {
             });
         }
 
-        // Validate account number format (Nigerian = 10 digits)
         if (!/^\d{10}$/.test(accountNumber)) {
             return res.status(400).json({
                 success: false,
@@ -170,7 +168,7 @@ export const updateBankDetails = async (req, res) => {
             });
         }
 
-        // Verify with Paystack - THIS IS THE SOURCE OF TRUTH
+        // Verify with Paystack - this is the source of truth
         const validation = await payoutService.validateAccount(accountNumber, bankCode);
 
         if (!validation.success) {
@@ -181,17 +179,16 @@ export const updateBankDetails = async (req, res) => {
             });
         }
 
-        // Use Paystack's returned name - DON'T compare with user input
+        // Use Paystack's returned name (never trust user input)
         const verifiedAccountName = validation.accountName;
 
-        // Update user with bank details
         const instructor = await User.findByIdAndUpdate(
             instructorId,
             {
                 bankDetails: {
                     bankName,
                     accountNumber,
-                    accountName: verifiedAccountName, // Use Paystack's name
+                    accountName: verifiedAccountName,
                     bankCode
                 },
                 bankDetailsVerified: true
@@ -208,17 +205,18 @@ export const updateBankDetails = async (req, res) => {
 
         res.json({
             success: true,
-            message: 'Bank details saved and verified successfully',
+            message: 'Bank details saved successfully',
             bankDetails: instructor.bankDetails,
-            bankDetailsVerified: true,
-            verifiedName: verifiedAccountName // Show the verified name
+            bankDetailsVerified: instructor.bankDetailsVerified,
+            verifiedName: verifiedAccountName
         });
 
     } catch (error) {
         console.error('Update bank details error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update bank details'
+            message: 'Failed to update bank details',
+            error: error.message
         });
     }
 };
@@ -229,7 +227,6 @@ export const requestWithdrawal = async (req, res) => {
         const { amount } = req.body;
         const instructorId = req.user.id;
 
-        // Validate amount
         const numAmount = parseFloat(amount);
         if (!numAmount || numAmount <= 0) {
             return res.status(400).json({
@@ -238,7 +235,6 @@ export const requestWithdrawal = async (req, res) => {
             });
         }
 
-        // Get instructor
         const instructor = await User.findById(instructorId);
         if (!instructor) {
             return res.status(404).json({
@@ -247,7 +243,6 @@ export const requestWithdrawal = async (req, res) => {
             });
         }
 
-        // Check bank details exist
         if (!instructor.bankDetails || !instructor.bankDetails.accountNumber) {
             return res.status(400).json({
                 success: false,
@@ -256,7 +251,6 @@ export const requestWithdrawal = async (req, res) => {
             });
         }
 
-        // Check available balance
         const availableBalance = instructor.earnings || 0;
         if (numAmount > availableBalance) {
             return res.status(400).json({
@@ -265,7 +259,7 @@ export const requestWithdrawal = async (req, res) => {
             });
         }
 
-        // Check for existing pending withdrawal
+        // Check for existing pending/processing withdrawal
         const existingPending = await Withdrawal.findOne({
             instructor: instructorId,
             status: { $in: ['pending', 'processing'] }
@@ -278,10 +272,8 @@ export const requestWithdrawal = async (req, res) => {
             });
         }
 
-        // Generate reference
         const reference = generateWithdrawalReference();
 
-        // Create withdrawal request
         const withdrawal = new Withdrawal({
             instructor: instructorId,
             amount: numAmount,
@@ -297,12 +289,12 @@ export const requestWithdrawal = async (req, res) => {
 
         await withdrawal.save();
 
-        // Deduct from available earnings (hold it)
+        // Deduct from available earnings (hold in escrow)
         await User.findByIdAndUpdate(instructorId, {
             $inc: { earnings: -numAmount }
         });
 
-        // Send email notification
+        // ===== NOTIFY INSTRUCTOR =====
         try {
             await emailService.sendWithdrawalRequestEmail(
                 instructor.email,
@@ -314,7 +306,49 @@ export const requestWithdrawal = async (req, res) => {
                 }
             );
         } catch (emailError) {
-            console.error('Failed to send withdrawal email:', emailError);
+            console.error('Failed to send instructor withdrawal email:', emailError);
+        }
+
+        // ===== NOTIFY ALL ADMINS =====
+        try {
+            // Get all admin users
+            const admins = await User.find({ 
+                userType: 'admin',
+                isVerified: true // Only verified admins
+            }).select('firstName lastName email phone');
+
+            console.log(`📧 Sending withdrawal notification to ${admins.length} admin(s)`);
+
+            const adminNotifications = admins.map(admin => 
+                emailService.sendAdminWithdrawalNotification(
+                    admin.email,
+                    `${admin.firstName} ${admin.lastName}`,
+                    {
+                        amount: numAmount,
+                        reference,
+                        requestedAt: withdrawal.createdAt,
+                        bankDetails: instructor.bankDetails
+                    },
+                    {
+                        firstName: instructor.firstName,
+                        lastName: instructor.lastName,
+                        email: instructor.email,
+                        phone: instructor.phone,
+                        totalRevenue: instructor.totalRevenue,
+                        totalSales: instructor.totalSales
+                    }
+                ).catch(err => {
+                    console.error(`Failed to email admin ${admin.email}:`, err.message);
+                    return { success: false, adminEmail: admin.email, error: err.message };
+                })
+            );
+
+            const results = await Promise.all(adminNotifications);
+            const successCount = results.filter(r => r && r.success).length;
+            console.log(`✅ Sent to ${successCount}/${admins.length} admins`);
+        } catch (adminEmailError) {
+            console.error('Failed to send admin notifications:', adminEmailError);
+            // Don't fail the request if email fails
         }
 
         res.json({
@@ -339,35 +373,11 @@ export const requestWithdrawal = async (req, res) => {
     }
 };
 
-// ===== GET WITHDRAWAL HISTORY =====
-export const getWithdrawalHistory = async (req, res) => {
-    try {
-        const instructorId = req.user.id;
-
-        const withdrawals = await Withdrawal.find({
-            instructor: instructorId
-        }).sort({ createdAt: -1 });
-
-        res.json({
-            success: true,
-            withdrawals
-        });
-
-    } catch (error) {
-        console.error('Get withdrawal history error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to get withdrawal history',
-            error: error.message
-        });
-    }
-};
-
 // ===== ADMIN: GET PENDING WITHDRAWALS =====
 export const getPendingWithdrawals = async (req, res) => {
     try {
         const withdrawals = await Withdrawal.find({
-            status: 'pending'
+            status: { $in: ['pending', 'processing'] }
         })
             .populate('instructor', 'firstName lastName email')
             .sort({ createdAt: 1 });
@@ -387,7 +397,7 @@ export const getPendingWithdrawals = async (req, res) => {
     }
 };
 
-// ===== ADMIN: PROCESS WITHDRAWAL =====
+// ===== ADMIN: PROCESS WITHDRAWAL (Approve / Reject) =====
 export const processWithdrawal = async (req, res) => {
     try {
         const { id } = req.params;
@@ -430,13 +440,11 @@ export const processWithdrawal = async (req, res) => {
 
         // ===== APPROVE =====
         if (action === 'approve') {
-            // Check bank details
             if (!withdrawal.bankDetails || !withdrawal.bankDetails.accountNumber) {
                 withdrawal.status = 'failed';
                 withdrawal.failureReason = 'Instructor bank details not found';
                 await withdrawal.save();
 
-                // Refund
                 await User.findByIdAndUpdate(withdrawal.instructor._id, {
                     $inc: { earnings: withdrawal.amount }
                 });
@@ -447,14 +455,9 @@ export const processWithdrawal = async (req, res) => {
                 });
             }
 
-            // Mark as processing
             withdrawal.status = 'processing';
             withdrawal.processedBy = req.user.id;
             await withdrawal.save();
-
-            // ===== TODO: Integrate Paystack Transfer API =====
-            // For now, we'll mark it as processing. Admin will manually transfer
-            // and then mark as completed.
 
             res.json({
                 success: true,
@@ -477,7 +480,7 @@ export const processWithdrawal = async (req, res) => {
 export const completeWithdrawal = async (req, res) => {
     try {
         const { id } = req.params;
-        const { transferReference } = req.body;
+        const { transferReference, note } = req.body;
 
         const withdrawal = await Withdrawal.findById(id)
             .populate('instructor', 'firstName lastName email');
@@ -498,9 +501,8 @@ export const completeWithdrawal = async (req, res) => {
 
         withdrawal.status = 'completed';
         withdrawal.completedAt = new Date();
-        if (transferReference) {
-            withdrawal.paystackTransferId = transferReference;
-        }
+        if (transferReference) withdrawal.paystackTransferId = transferReference;
+        if (note) withdrawal.adminNote = note;
         await withdrawal.save();
 
         // Send success email

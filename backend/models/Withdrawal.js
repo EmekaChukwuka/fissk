@@ -1,23 +1,24 @@
-import mongoose from "mongoose";
+// backend/models/Withdrawal.js
+import mongoose from 'mongoose';
 
 const WithdrawalSchema = new mongoose.Schema({
-  instructor: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User', 
-    required: true 
+  instructor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
-  amount: { 
-    type: Number, 
-    required: true 
+  amount: {
+    type: Number,
+    required: true
   },
-  currency: { 
-    type: String, 
-    default: 'NGN' 
+  currency: {
+    type: String,
+    default: 'NGN'
   },
-  reference: { 
-    type: String, 
-    unique: true, 
-    required: true 
+  reference: {
+    type: String,
+    unique: true,
+    required: true
   },
   bankDetails: {
     bankName: { type: String, required: true },
@@ -25,27 +26,30 @@ const WithdrawalSchema = new mongoose.Schema({
     accountName: { type: String, required: true },
     bankCode: { type: String }
   },
-  status: { 
-    type: String, 
-    enum: ['pending', 'processing', 'completed', 'failed', 'cancelled'], 
-    default: 'pending' 
+  status: {
+    type: String,
+    enum: ['pending', 'processing', 'completed', 'failed', 'cancelled'],
+    default: 'pending'
   },
-  paystackTransferId: { 
-    type: String 
+  paystackTransferId: {
+    type: String
   },
-  paystackTransferData: { 
-    type: Object, 
-    default: {} 
+  paystackTransferData: {
+    type: Object,
+    default: {}
   },
-  completedAt: { 
-    type: Date 
+  adminNote: {
+    type: String
   },
-  failureReason: { 
-    type: String 
+  completedAt: {
+    type: Date
   },
-  processedBy: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User' 
+  failureReason: {
+    type: String
+  },
+  processedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, { timestamps: true });
 
@@ -55,4 +59,4 @@ WithdrawalSchema.index({ reference: 1 }, { unique: true });
 WithdrawalSchema.index({ status: 1 });
 WithdrawalSchema.index({ createdAt: -1 });
 
-export default mongoose.model("Withdrawal", WithdrawalSchema);
+export default mongoose.model('Withdrawal', WithdrawalSchema);

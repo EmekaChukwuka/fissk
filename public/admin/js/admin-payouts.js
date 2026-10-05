@@ -14,7 +14,6 @@ class AdminPayoutsClass {
         if (this.isInitialized) return;
         this.isInitialized = true;
         
-        // Wait for AdminApp to be ready
         if (!window.AdminApp) {
             await new Promise(resolve => {
                 const checkInterval = setInterval(() => {
@@ -94,6 +93,7 @@ class AdminPayoutsClass {
         container.innerHTML = this.pendingPayouts.map(payout => {
             const instructor = payout.instructor || {};
             const bankDetails = payout.bankDetails || {};
+            const isProcessing = payout.status === 'processing';
             
             return `
                 <tr>
@@ -107,15 +107,25 @@ class AdminPayoutsClass {
                     </td>
                     <td>${this.escapeHtml(bankDetails.bankName || '—')}</td>
                     <td>${this.escapeHtml(bankDetails.accountNumber || '—')}</td>
-                    <td>${payout.createdAt ? new Date(payout.createdAt).toLocaleDateString() : '—'}</td>
+                    <td>
+                        <span class="status-badge pending" style="padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; background: ${isProcessing ? '#DBEAFE' : '#FEF3C7'}; color: ${isProcessing ? '#1E40AF' : '#92400E'};">
+                            ${isProcessing ? '🔄 Processing' : '⏳ Pending'}
+                        </span>
+                    </td>
                     <td>
                         <div class="actions">
-                            <button class="btn-sm btn-success" onclick="window.AdminPayouts.processPayout('${payout._id}', 'approve')">
-                                ✅ Approve
-                            </button>
-                            <button class="btn-sm btn-danger" onclick="window.AdminPayouts.processPayout('${payout._id}', 'reject')">
-                                ❌ Reject
-                            </button>
+                            ${!isProcessing ? `
+                                <button class="btn-sm btn-success" onclick="window.AdminPayouts.processPayout('${payout._id}', 'approve')">
+                                    ✅ Approve
+                                </button>
+                                <button class="btn-sm btn-danger" onclick="window.AdminPayouts.processPayout('${payout._id}', 'reject')">
+                                    ❌ Reject
+                                </button>
+                            ` : `
+                                <button class="btn-sm btn-primary" onclick="window.AdminPayouts.markAsCompleted('${payout._id}', '${payout.amount}')" style="background: #6C3CE1; color: white; padding: 6px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer;">
+                                    ✅ Mark as Completed
+                                </button>
+                            `}
                         </div>
                     </td>
                 </tr>
@@ -272,7 +282,10 @@ class AdminPayoutsClass {
             const data = await response.json();
             
             if (data.success) {
-                window.AdminApp.showToast(`✅ Withdrawal ${action === 'approve' ? 'approved' : 'rejected'} successfully!`, 'success');
+                const message = action === 'approve' 
+                    ? '✅ Withdrawal approved! Now transfer the funds manually and mark as completed.'
+                    : '✅ Withdrawal rejected and funds returned to instructor.';
+                window.AdminApp.showToast(message, 'success');
                 await this.loadPayouts();
                 window.AdminApp.updateBadgeCounts();
             } else {
@@ -282,11 +295,44 @@ class AdminPayoutsClass {
             console.error('Process payout error:', error);
             window.AdminApp.showToast(`❌ ${error.message || `Failed to ${actionText} withdrawal`}`, 'error');
             
-            // Reset buttons
             buttons.forEach(btn => {
                 btn.disabled = false;
                 btn.textContent = btn.dataset.originalText || btn.textContent;
             });
+        }
+    }
+    
+    async markAsCompleted(payoutId, amount) {
+        const transferRef = prompt(
+            `Mark ₦${Number(amount).toLocaleString()} as COMPLETED?\n\n` +
+            `Have you already sent the money to the instructor's bank account?\n\n` +
+            `Enter the transfer reference (optional):`
+        );
+
+        if (transferRef === null) return; // User cancelled
+
+        try {
+            const response = await fetch(
+                `${window.AdminApp.baseUrl}/api/admin/payouts/${payoutId}/complete`,
+                {
+                    method: 'PUT',
+                    headers: window.AdminApp.getHeaders(),
+                    body: JSON.stringify({ transferReference: transferRef || undefined })
+                }
+            );
+
+            const data = await response.json();
+
+            if (data.success) {
+                window.AdminApp.showToast('✅ Withdrawal marked as completed! Instructor has been notified.', 'success');
+                await this.loadPayouts();
+                window.AdminApp.updateBadgeCounts();
+            } else {
+                throw new Error(data.message || 'Failed to complete');
+            }
+        } catch (error) {
+            console.error('Complete payout error:', error);
+            window.AdminApp.showToast(`❌ ${error.message}`, 'error');
         }
     }
     
@@ -319,7 +365,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 100);
         
-        // Fallback: if AdminApp doesn't load in 5 seconds, try anyway
         setTimeout(() => {
             if (!window.AdminPayouts) {
                 console.warn('⚠️ AdminApp not found, creating AdminPayouts anyway');
