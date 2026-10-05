@@ -12,47 +12,63 @@ class PaymentService {
       console.warn('⚠️ PAYSTACK_SECRET_KEY is not set in environment variables');
     }
   }
+// backend/services/paymentService.js
+async initializePayment(email, amount, metadata = {}) {
+  try {
+    // Build metadata custom fields
+    const customFields = Object.entries(metadata)
+      .filter(([key]) => key !== 'reference') // Don't duplicate reference in custom_fields
+      .map(([key, value]) => ({
+        display_name: key,
+        variable_name: key,
+        value: String(value)
+      }));
 
-  // ===== INITIALIZE PAYMENT =====
-  async initializePayment(email, amount, metadata = {}) {
-    try {
-      const response = await axios.post(
-        `${this.baseUrl}/transaction/initialize`,
-        {
-          email,
-          amount: amount * 100, // Convert to kobo
-          currency: 'NGN',
-          metadata: {
-            custom_fields: Object.entries(metadata).map(([key, value]) => ({
-              display_name: key,
-              variable_name: key,
-              value: value
-            }))
-          },
-          callback_url: `${process.env.FRONTEND_URL}/payment-verify.html`
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.secretKey}`,
-            'Content-Type': 'application/json'
-          }
+    const payload = {
+      email,
+      amount: Math.round(amount * 100), // Convert to kobo, ensure integer
+      currency: 'NGN',
+      reference: metadata.reference, // ← CRITICAL: Pass YOUR custom reference
+      metadata: {
+        custom_fields: customFields,
+        reference: metadata.reference // Also store in metadata as backup
+      },
+      callback_url: `${process.env.FRONTEND_URL}/payment-verify.html`
+    };
+
+    console.log('📤 Paystack initialize payload:', {
+      email: payload.email,
+      amount: payload.amount,
+      reference: payload.reference
+    });
+
+    const response = await axios.post(
+      `${this.baseUrl}/transaction/initialize`,
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${this.secretKey}`,
+          'Content-Type': 'application/json'
         }
-      );
+      }
+    );
 
-      return {
-        success: true,
-        data: response.data.data,
-        reference: response.data.data.reference,
-        authorizationUrl: response.data.data.authorization_url
-      };
-    } catch (error) {
-      console.error('Paystack initialize error:', error.response?.data || error.message);
-      return {
-        success: false,
-        error: error.response?.data?.message || error.message
-      };
-    }
+    console.log('📥 Paystack response reference:', response.data.data.reference);
+
+    return {
+      success: true,
+      data: response.data.data,
+      reference: response.data.data.reference,
+      authorizationUrl: response.data.data.authorization_url
+    };
+  } catch (error) {
+    console.error('Paystack initialize error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message
+    };
   }
+}
 
   // ===== VERIFY PAYMENT =====
   async verifyPayment(reference) {
