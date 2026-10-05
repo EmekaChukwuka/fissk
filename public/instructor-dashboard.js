@@ -1,16 +1,18 @@
-// instructor-dashboard.js - Complete with Payment Integration & Quiz Management
+// instructor-dashboard.js - Complete with Payment Integration & Earnings Management
 class InstructorDashboard {
   constructor() {
     this.currentUser = JSON.parse(localStorage.getItem('user'));
     this.token = localStorage.getItem('token');
+    this.earnings = null;
     this.init();
   }
-
+  
   async init() {
     this.bindUI();
     await this.loadUserData();
     await this.loadDashboardData();
     this.setupEventHandlers();
+    this.initEarnings();
   }
 
   bindUI() {
@@ -68,6 +70,17 @@ class InstructorDashboard {
       window.location.href = 'login.html';
     }
   }
+  
+  initEarnings() {
+    // Initialize the InstructorEarnings module
+    const earningsSection = document.getElementById('earnings');
+    if (earningsSection && window.InstructorEarnings) {
+      this.earnings = new window.InstructorEarnings(this);
+      console.log('✅ InstructorEarnings initialized');
+    } else {
+      console.warn('⚠️ InstructorEarnings module not found or earnings section missing');
+    }
+  }
 
   async loadDashboardData() {
     const results = await Promise.allSettled([
@@ -75,7 +88,6 @@ class InstructorDashboard {
       this.loadInstructorStats(),
       this.loadInstructorStreams(),
       this.loadEnrollments(),
-      this.loadEarnings(),
       this.loadPaymentHistory()
     ]);
     
@@ -86,35 +98,35 @@ class InstructorDashboard {
     });
   }
 
-async loadInstructorClasses() {
+  async loadInstructorClasses() {
     try {
-        const res = await fetch('https://fissk.onrender.com/register/instructor/classes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: this.currentUser.id })
-        });
-        const json = await res.json();
-        const classes = Array.isArray(json?.classes) ? json.classes : [];
-        
-        // Load quizzes for each class - with error handling
-        for (const cls of classes) {
-            try {
-                const quizzes = await this.loadClassQuizzes(cls._id);
-                cls.quizzes = quizzes || [];
-                cls.quizCount = quizzes ? quizzes.length : 0;
-            } catch (err) {
-                console.error(`Error loading quizzes for class ${cls._id}:`, err);
-                cls.quizzes = [];
-                cls.quizCount = 0;
-            }
+      const res = await fetch('https://fissk.onrender.com/register/instructor/classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: this.currentUser.id })
+      });
+      const json = await res.json();
+      const classes = Array.isArray(json?.classes) ? json.classes : [];
+      
+      // Load quizzes for each class
+      for (const cls of classes) {
+        try {
+          const quizzes = await this.loadClassQuizzes(cls._id);
+          cls.quizzes = quizzes || [];
+          cls.quizCount = quizzes ? quizzes.length : 0;
+        } catch (err) {
+          console.error(`Error loading quizzes for class ${cls._id}:`, err);
+          cls.quizzes = [];
+          cls.quizCount = 0;
         }
-        
-        this.renderClasses(classes);
-        this.populateClassSelects(classes);
+      }
+      
+      this.renderClasses(classes);
+      this.populateClassSelects(classes);
     } catch (err) {
-        console.error('loadInstructorClasses error', err);
+      console.error('loadInstructorClasses error', err);
     }
-}
+  }
 
   renderClasses(classes) {
     if (!this.el.classesList) return;
@@ -169,7 +181,7 @@ async loadInstructorClasses() {
     this.el.classesList.querySelectorAll('.view-students').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             const id = e.currentTarget.dataset.id;
-            await this.loadEnrollments(id); // Make sure this is awaited
+            await this.loadEnrollments(id);
             this.switchSection('students');
             if (this.el.classFilter) this.el.classFilter.value = id;
         });
@@ -205,7 +217,7 @@ async loadInstructorClasses() {
     }
   }
 
-renderRecentActivity(activities) {
+  renderRecentActivity(activities) {
     const container = this.el.recentActivities;
     if (!container) return;
     
@@ -229,9 +241,9 @@ renderRecentActivity(activities) {
             </div>
         </div>
     `).join('');
-}
+  }
 
- async loadInstructorStats() {
+  async loadInstructorStats() {
     try {
         const id = this.currentUser.id;
         const res = await fetch('https://fissk.onrender.com/register/instructor/stats', {
@@ -242,15 +254,12 @@ renderRecentActivity(activities) {
         const json = await res.json();
         console.log('Stats response:', json);
         
-        // Handle array response
         let s = {};
         if (Array.isArray(json) && json.length > 0) {
             s = json[0];
         } else if (json && typeof json === 'object' && !Array.isArray(json)) {
             s = json;
         }
-        
-        console.log('Processed stats:', s);
         
         if (s && Object.keys(s).length > 0) {
             if (this.el.totalClasses) this.el.totalClasses.textContent = s.totalClasses || 0;
@@ -262,7 +271,6 @@ renderRecentActivity(activities) {
             }
         }
         
-        // ===== RENDER RECENT ACTIVITY =====
         if (s.recent && this.el.recentActivities) {
             this.renderRecentActivity(s.recent);
         } else if (this.el.recentActivities) {
@@ -275,11 +283,9 @@ renderRecentActivity(activities) {
             this.renderRecentActivity([]);
         }
     }
-}
+  }
 
-// instructor-dashboard.js - FIXED
-
-async loadEnrollments(classId = '') {
+  async loadEnrollments(classId = '') {
     try {
         const res = await fetch(`https://fissk.onrender.com/register/instructor/enrollments`, {
             method: 'POST',
@@ -295,14 +301,13 @@ async loadEnrollments(classId = '') {
         const json = await res.json();
         console.log('Enrollments response:', json);
         
-         let enrollments = [];
+        let enrollments = [];
         
         if (Array.isArray(json)) {
             enrollments = json;
         } else if (Array.isArray(json?.enrollments)) {
             enrollments = json.enrollments;
         } else if (json && typeof json === 'object') {
-            // Try to find any array property
             for (const key in json) {
                 if (Array.isArray(json[key])) {
                     enrollments = json[key];
@@ -311,15 +316,14 @@ async loadEnrollments(classId = '') {
             }
         }
         
-        console.log('Processed enrollments:', enrollments);
         this.renderEnrollments(enrollments);
     } catch (err) {
         console.error('loadEnrollments error:', err);
         this.showMessage('Failed to load enrollments', 'error');
     }
-}
+  }
 
-renderEnrollments(items) {
+  renderEnrollments(items) {
     const container = this.el.enrollmentsList;
     if (!container) return;
     
@@ -374,7 +378,7 @@ renderEnrollments(items) {
             Total: ${items.length} student${items.length > 1 ? 's' : ''}
         </div>
     `;
-}
+  }
 
   // ===== CREATE CLASS API WITH PRICE =====
   async apiCreateClass(data) {
@@ -431,135 +435,6 @@ renderEnrollments(items) {
         submitBtn.disabled = false;
       }
     }
-  }
-
-  // ===== LOAD EARNINGS =====
-  async loadEarnings() {
-    try {
-      const token = this.token || localStorage.getItem('token');
-      
-      if (!token) {
-        console.log('No token found, skipping earnings');
-        this.showMessage('Please login again to view earnings', 'warning');
-        return;
-      }
-
-      const res = await fetch('https://fissk.onrender.com/api/payout/earnings', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (res.status === 401) {
-        localStorage.removeItem('token');
-        this.showMessage('Session expired. Please login again.', 'error');
-        setTimeout(() => {
-          window.location.href = 'login.html';
-        }, 2000);
-        return;
-      }
-      
-      if (!res.ok) {
-        throw new Error('Failed to load earnings');
-      }
-      
-      const data = await res.json();
-      
-      if (data.success) {
-        this.renderEarnings(data.earnings);
-        if (this.el.totalEarnings) {
-          this.el.totalEarnings.textContent = `₦${(data.earnings.totalRevenue || 0).toLocaleString()}`;
-        }
-      }
-    } catch (error) {
-      console.error('Load earnings error:', error);
-      this.renderEarningsFallback();
-    }
-  }
-
-  renderEarningsFallback() {
-    let earningsSection = document.getElementById('earningsSection');
-    if (!earningsSection) {
-      const overviewSection = document.getElementById('overview');
-      if (overviewSection) {
-        const activitiesDiv = overviewSection.querySelector('.recent-activities');
-        if (activitiesDiv) {
-          earningsSection = document.createElement('div');
-          earningsSection.id = 'earningsSection';
-          earningsSection.className = 'earnings-section';
-          activitiesDiv.parentNode.insertBefore(earningsSection, activitiesDiv.nextSibling);
-        }
-      }
-    }
-    
-    if (!earningsSection) return;
-    
-    earningsSection.innerHTML = `
-      <div class="earnings-card">
-        <h3>💰 Earnings Overview</h3>
-        <div style="text-align: center; padding: 20px;">
-          <p style="color: #6B7280;">Login required to view earnings</p>
-          <button class="btn btn-primary" onclick="window.location.href='login.html'">Login</button>
-        </div>
-      </div>
-    `;
-  }
-
-  renderEarnings(earnings) {
-    let earningsSection = document.getElementById('earningsSection');
-    if (!earningsSection) {
-      const overviewSection = document.getElementById('overview');
-      if (overviewSection) {
-        const activitiesDiv = overviewSection.querySelector('.recent-activities');
-        if (activitiesDiv) {
-          earningsSection = document.createElement('div');
-          earningsSection.id = 'earningsSection';
-          earningsSection.className = 'earnings-section';
-          activitiesDiv.parentNode.insertBefore(earningsSection, activitiesDiv.nextSibling);
-        }
-      }
-    }
-    
-    if (!earningsSection) return;
-    
-    earningsSection.innerHTML = `
-      <div class="earnings-card">
-        <h3>💰 Earnings Overview</h3>
-        <div class="earnings-grid">
-          <div class="earning-item">
-            <span class="label">Available Balance</span>
-            <span class="value">₦${(earnings.available || 0).toLocaleString()}</span>
-          </div>
-          <div class="earning-item">
-            <span class="label">Total Revenue</span>
-            <span class="value">₦${(earnings.totalRevenue || 0).toLocaleString()}</span>
-          </div>
-          <div class="earning-item">
-            <span class="label">Total Sales</span>
-            <span class="value">${earnings.totalSales || 0}</span>
-          </div>
-          <div class="earning-item">
-            <span class="label">Total Withdrawn</span>
-            <span class="value">₦${(earnings.totalWithdrawn || 0).toLocaleString()}</span>
-          </div>
-        </div>
-        <div class="earning-actions">
-          ${earnings.available > 0 ? `
-            <button class="btn btn-primary" onclick="window.instructorDashboard.requestWithdrawal()">
-              💰 Request Withdrawal
-            </button>
-          ` : ''}
-          <button class="btn btn-outline" onclick="window.instructorDashboard.showBankDetailsForm()">
-            🏦 Update Bank Details
-          </button>
-          <button class="btn btn-outline" onclick="window.instructorDashboard.loadPaymentHistory()">
-            📜 View Payment History
-          </button>
-        </div>
-      </div>
-    `;
   }
 
   // ===== LOAD PAYMENT HISTORY =====
@@ -674,18 +549,8 @@ renderEnrollments(items) {
   // QUIZ MANAGEMENT METHODS
   // ============================================================
 
-  /**
-   * Load quizzes for a class
-   */// ============================================================
-// QUIZ MANAGEMENT METHODS - FIXED
-// ============================================================
-
-/**
- * Load quizzes for a class
- */
-async loadClassQuizzes(classId) {
+  async loadClassQuizzes(classId) {
     try {
-        // Get fresh token
         const token = localStorage.getItem('token');
         
         if (!token) {
@@ -702,12 +567,8 @@ async loadClassQuizzes(classId) {
             }
         });
 
-        console.log(`Quiz load response status: ${res.status}`);
-
         if (res.status === 401) {
             console.log('Unauthorized - token expired');
-            localStorage.removeItem('token');
-            // Don't redirect immediately, just return empty
             return [];
         }
 
@@ -721,20 +582,16 @@ async loadClassQuizzes(classId) {
         }
 
         const data = await res.json();
-        console.log(`Loaded ${data.quizzes?.length || 0} quizzes for class ${classId}`);
         return data.quizzes || [];
     } catch (error) {
         console.error('Load class quizzes error:', error);
         return [];
     }
-}
-/**
- * Render quizzes for a class in the class card
- */
-renderClassQuizzes(container, quizzes, classId) {
+  }
+
+  renderClassQuizzes(container, quizzes, classId) {
     if (!container) return;
     
-    // Check if user is logged in
     const token = localStorage.getItem('token');
     if (!token) {
         container.innerHTML = `
@@ -792,7 +649,6 @@ renderClassQuizzes(container, quizzes, classId) {
         </button>
     `;
 
-    // Add event listeners for new buttons
     container.querySelectorAll('.submissions-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const quizId = btn.dataset.quizId;
@@ -807,7 +663,6 @@ renderClassQuizzes(container, quizzes, classId) {
         });
     });
 
-    // Add event listeners for quiz actions
     container.querySelectorAll('.edit-quiz-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const quizId = btn.dataset.quizId;
@@ -815,7 +670,6 @@ renderClassQuizzes(container, quizzes, classId) {
         });
     });
 
-    // Add event listeners for publish/unpublish buttons
     container.querySelectorAll('.publish-quiz-btn, .unpublish-quiz-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const quizId = btn.dataset.quizId;
@@ -837,12 +691,9 @@ renderClassQuizzes(container, quizzes, classId) {
             window.location.href = `instructor/quizzes/create.html?classId=${classId}`;
         });
     });
-}
+  }
 
-/**
- * Delete a quiz
- */
-async deleteQuiz(quizId) {
+  async deleteQuiz(quizId) {
     if (!confirm('Are you sure you want to delete this quiz? This action cannot be undone.')) {
         return;
     }
@@ -886,11 +737,9 @@ async deleteQuiz(quizId) {
         console.error('Delete quiz error:', error);
         this.showMessage('Failed to delete quiz', 'error');
     }
-}
-/**
- * Toggle quiz publish status
- */
-async toggleQuizPublish(quizId, currentStatus) {
+  }
+
+  async toggleQuizPublish(quizId, currentStatus) {
     try {
         const token = localStorage.getItem('token');
         
@@ -924,7 +773,6 @@ async toggleQuizPublish(quizId, currentStatus) {
 
         if (data.success) {
             this.showMessage(`✅ Quiz ${newStatus === 'published' ? 'published' : 'unpublished'}!`, 'success');
-            // Refresh the classes view
             await this.loadInstructorClasses();
         } else {
             this.showMessage('❌ ' + (data.message || 'Failed to update quiz'), 'error');
@@ -933,124 +781,6 @@ async toggleQuizPublish(quizId, currentStatus) {
         console.error('Toggle publish error:', error);
         this.showMessage('Failed to update quiz', 'error');
     }
-}
-
-  // ===== REQUEST WITHDRAWAL =====
-  async requestWithdrawal() {
-    const amount = prompt('Enter amount to withdraw (₦):');
-    if (!amount) return;
-    
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      alert('Please enter a valid amount');
-      return;
-    }
-    
-    try {
-      const token = this.token || localStorage.getItem('token');
-      
-      if (!token) {
-        alert('Please login to request withdrawal');
-        return;
-      }
-
-      const res = await fetch('https://fissk.onrender.com/api/payout/withdraw', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ amount: numAmount })
-      });
-      
-      const data = await res.json();
-      
-      if (data.success) {
-        alert('✅ Withdrawal request submitted successfully!');
-        await this.loadEarnings();
-        await this.loadPaymentHistory();
-      } else {
-        alert('❌ ' + (data.message || 'Withdrawal failed'));
-      }
-    } catch (error) {
-      console.error('Withdrawal error:', error);
-      alert('Failed to request withdrawal. Please try again.');
-    }
-  }
-
-  // ===== SHOW BANK DETAILS FORM =====
-  showBankDetailsForm() {
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-      <div class="modal-content" style="max-width: 500px;">
-        <span class="close-modal" onclick="this.closest('.modal').remove()">&times;</span>
-        <h2>🏦 Update Bank Details</h2>
-        <form id="bankDetailsForm">
-          <div class="form-group">
-            <label>Bank Name *</label>
-            <input type="text" id="bankName" placeholder="e.g., GTBank" required>
-          </div>
-          <div class="form-group">
-            <label>Account Number *</label>
-            <input type="text" id="accountNumber" placeholder="0123456789" required>
-          </div>
-          <div class="form-group">
-            <label>Account Name *</label>
-            <input type="text" id="accountName" placeholder="John Doe" required>
-          </div>
-          <div class="form-group">
-            <label>Bank Code *</label>
-            <input type="text" id="bankCode" placeholder="058 (for GTBank)" required>
-          </div>
-          <div class="form-actions" style="display: flex; gap: 12px; margin-top: 20px;">
-            <button type="submit" class="btn btn-primary">Save Bank Details</button>
-            <button type="button" class="btn btn-outline" onclick="this.closest('.modal').remove()">Cancel</button>
-          </div>
-        </form>
-      </div>
-    `;
-    document.body.appendChild(modal);
-    
-    document.getElementById('bankDetailsForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const bankName = document.getElementById('bankName').value;
-      const accountNumber = document.getElementById('accountNumber').value;
-      const accountName = document.getElementById('accountName').value;
-      const bankCode = document.getElementById('bankCode').value;
-      
-      try {
-        const token = this.token || localStorage.getItem('token');
-        
-        if (!token) {
-          alert('Please login to update bank details');
-          return;
-        }
-
-        const res = await fetch('https://fissk.onrender.com/api/payout/bank-details', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ bankName, accountNumber, accountName, bankCode })
-        });
-        
-        const data = await res.json();
-        
-        if (data.success) {
-          alert('✅ Bank details updated successfully!');
-          modal.remove();
-          await this.loadEarnings();
-        } else {
-          alert('❌ ' + (data.message || 'Failed to update bank details'));
-        }
-      } catch (error) {
-        console.error('Bank details error:', error);
-        alert('Failed to update bank details. Please try again.');
-      }
-    });
   }
 
   // ===== STREAMS WITH MEETING URL =====
@@ -1062,7 +792,6 @@ async toggleQuizPublish(quizId, currentStatus) {
         body: JSON.stringify({ id: this.currentUser.id })
       });
       const json = await res.json();
-      console.log('Streams data:', json);
       
       const scheduled = Array.isArray(json?.scheduled) ? json.scheduled : [];
       const past = Array.isArray(json?.past) ? json.past : [];
@@ -1215,145 +944,6 @@ async toggleQuizPublish(quizId, currentStatus) {
     }
   }
 
-    /**
-     * Load lessons for a class (for instructor view)
-     */
-    async loadClassLessons(classId) {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`https://fissk.onrender.com/api/lessons/class/${classId}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to load lessons');
-            }
-
-            const data = await response.json();
-            return data.lessons || [];
-        } catch (error) {
-            console.error('Load class lessons error:', error);
-            return [];
-        }
-    }
-
-    /**
-     * Render lessons in instructor class card
-     */
-    renderClassLessons(container, lessons, classId) {
-        if (!container) return;
-
-        if (!lessons || lessons.length === 0) {
-            container.innerHTML = `
-                <div class="no-lessons-small">
-                    <p>No lessons yet</p>
-                    <button class="btn btn-sm btn-primary create-lesson-btn" data-class-id="${classId}">
-                        + Create Lesson
-                    </button>
-                </div>
-            `;
-            const createBtn = container.querySelector('.create-lesson-btn');
-            if (createBtn) {
-                createBtn.addEventListener('click', () => {
-                    window.location.href = `instructor/lessons/create.html?classId=${classId}`;
-                });
-            }
-            return;
-        }
-
-        container.innerHTML = `
-            <div class="class-lessons-list">
-                ${lessons.map(lesson => `
-                    <div class="class-lesson-item">
-                        <span class="lesson-title">${this.escapeHtml(lesson.title)}</span>
-                        <span class="lesson-stats">
-                            ${lesson.contentItems?.length || 0} items • 
-                            ${lesson.estimatedTime || 0} min
-                        </span>
-                        <span class="lesson-status-badge ${lesson.isPublished ? 'published' : 'draft'}">
-                            ${lesson.isPublished ? 'Published' : 'Draft'}
-                        </span>
-                        <div class="lesson-actions">
-                            <button class="btn btn-sm btn-outline edit-lesson-btn" data-lesson-id="${lesson._id}" title="Edit Lesson">✏️</button>
-                            <button class="btn btn-sm btn-success view-lesson-btn" data-lesson-id="${lesson._id}" title="View Lesson">👁️</button>
-                            <button class="btn btn-sm btn-danger delete-lesson-btn" data-lesson-id="${lesson._id}" title="Delete Lesson">🗑️</button>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-            <button class="btn btn-sm btn-primary create-lesson-btn" data-class-id="${classId}" style="margin-top: 8px;">
-                + Add Lesson
-            </button>
-        `;
-
-        // Add event listeners
-        container.querySelectorAll('.edit-lesson-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const lessonId = btn.dataset.lessonId;
-                window.location.href = `instructor/lessons/edit.html?lessonId=${lessonId}`;
-            });
-        });
-
-        container.querySelectorAll('.view-lesson-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const lessonId = btn.dataset.lessonId;
-                window.location.href = `lesson.html?classId=${classId}&lessonId=${lessonId}`;
-            });
-        });
-
-        container.querySelectorAll('.delete-lesson-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const lessonId = btn.dataset.lessonId;
-                this.deleteLesson(lessonId);
-            });
-        });
-
-        container.querySelectorAll('.create-lesson-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const classId = btn.dataset.classId;
-                window.location.href = `instructor/lessons/create.html?classId=${classId}`;
-            });
-        });
-    }
-
-    /**
-    * Delete a lesson
-    */
-    async deleteLesson(lessonId) {
-        if (!confirm('Are you sure you want to delete this lesson? This action cannot be undone.')) {
-            return;
-        }
-
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`https://fissk.onrender.com/api/lessons/${lessonId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to delete lesson');
-            }
-
-            const data = await response.json();
-            if (data.success) {
-                this.showMessage('✅ Lesson deleted successfully!', 'success');
-                await this.loadInstructorClasses();
-            } else {
-                this.showMessage('❌ ' + (data.message || 'Failed to delete lesson'), 'error');
-            }
-        } catch (error) {
-            console.error('Delete lesson error:', error);
-            this.showMessage('Failed to delete lesson', 'error');
-        }
-    }
-
   // ===== COPY TO CLIPBOARD =====
   copyToClipboard(text) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1430,8 +1020,6 @@ async toggleQuizPublish(quizId, currentStatus) {
         description: description || '',
         scheduledTime: scheduledTime
       };
-      
-      console.log('Scheduling stream with payload:', payloadData);
       
       const id = this.currentUser.id;
       
@@ -1525,7 +1113,7 @@ async toggleQuizPublish(quizId, currentStatus) {
     }
     if (this.el.viewEarningsBtn) {
         this.el.viewEarningsBtn.addEventListener('click', () => {
-            this.switchSection('payments');
+            this.switchSection('earnings');
         });
     }
 
@@ -1651,6 +1239,11 @@ async toggleQuizPublish(quizId, currentStatus) {
     
     if (history.pushState) {
         history.pushState(null, null, `#${id}`);
+    }
+
+    // Load earnings when the earnings section is shown
+    if (id === 'earnings' && this.earnings) {
+        this.earnings.loadEarnings();
     }
   }
 }

@@ -1,3 +1,4 @@
+// backend/controllers/payoutController.js
 import User from '../models/User.js';
 import Payment from '../models/Payment.js';
 import Withdrawal from '../models/Withdrawal.js';
@@ -6,440 +7,541 @@ import emailService from '../services/emailService.js';
 
 // ===== GENERATE WITHDRAWAL REFERENCE =====
 function generateWithdrawalReference() {
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `WTH-${timestamp}-${random}`;
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `WTH-${timestamp}-${random}`;
 }
 
 // ===== GET EARNINGS SUMMARY =====
 export const getEarnings = async (req, res) => {
-  try {
-    const instructorId = req.user.id;
-
-    // Get user with earnings
-    const user = await User.findById(instructorId);
-
-    // Get recent transactions
-    const transactions = await Payment.find({
-      instructor: instructorId,
-      status: 'success'
-    })
-      .populate('user', 'firstName lastName email')
-      .populate('class', 'title')
-      .sort({ paidAt: -1 })
-      .limit(50);
-
-    // Get pending withdrawals
-    const pendingWithdrawals = await Withdrawal.find({
-      instructor: instructorId,
-      status: 'pending'
-    });
-
-    // Get completed withdrawals
-    const completedWithdrawals = await Withdrawal.find({
-      instructor: instructorId,
-      status: 'completed'
-    });
-
-    const totalWithdrawn = completedWithdrawals.reduce(
-      (sum, w) => sum + w.amount, 0
-    );
-
-    // Calculate available balance
-    const availableBalance = user.earnings || 0;
-
-    res.json({
-      success: true,
-      earnings: {
-        available: availableBalance,
-        totalRevenue: user.totalRevenue || 0,
-        totalSales: user.totalSales || 0,
-        totalWithdrawn: totalWithdrawn,
-        pendingWithdrawals: pendingWithdrawals.length,
-        transactions: transactions
-      }
-    });
-
-  } catch (error) {
-    console.error('Get earnings error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get earnings',
-      error: error.message
-    });
-  }
-};
-
-// ===== REQUEST WITHDRAWAL =====
-export const requestWithdrawal = async (req, res) => {
-  try {
-    const { amount } = req.body;
-    const instructorId = req.user.id;
-
-    // Get user
-    const user = await User.findById(instructorId);
-
-    // Validate amount
-    if (!amount || amount <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid amount'
-      });
-    }
-
-    // Check if user has bank details
-    if (!user.bankDetails || !user.bankDetails.accountNumber) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please set up your bank details first'
-      });
-    }
-
-    // Check available balance
-    if (amount > user.earnings) {
-      return res.status(400).json({
-        success: false,
-        message: `Insufficient balance. Available: ₦${user.earnings}`
-      });
-    }
-
-    // Generate reference
-    const reference = generateWithdrawalReference();
-
-    // Create withdrawal record
-    const withdrawal = new Withdrawal({
-      instructor: instructorId,
-      amount: amount,
-      reference: reference,
-      bankDetails: {
-        bankName: user.bankDetails.bankName,
-        accountNumber: user.bankDetails.accountNumber,
-        accountName: user.bankDetails.accountName,
-        bankCode: user.bankDetails.bankCode
-      },
-      status: 'pending'
-    });
-
-    await withdrawal.save();
-
-    // Send notification to instructor
     try {
-      await emailService.sendWithdrawalRequestEmail(
-        user.email,
-        `${user.firstName} ${user.lastName}`,
-        {
-          amount: amount,
-          reference: reference,
-          bankDetails: user.bankDetails
+        const instructorId = req.user.id;
+
+        // Get instructor data
+        const instructor = await User.findById(instructorId);
+        if (!instructor) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instructor not found'
+            });
         }
-      );
-    } catch (emailError) {
-      console.error('Failed to send withdrawal email:', emailError);
-    }
 
-    res.json({
-      success: true,
-      message: 'Withdrawal request submitted successfully',
-      withdrawal: withdrawal
-    });
+        // Get all successful payments for this instructor
+        const payments = await Payment.find({
+            instructor: instructorId,
+            status: 'success'
+        })
+            .populate('user', 'firstName lastName email')
+            .populate('class', 'title')
+            .sort({ paidAt: -1 })
+            .limit(50);
 
-  } catch (error) {
-    console.error('Request withdrawal error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to request withdrawal',
-      error: error.message
-    });
-  }
-};
+        // Get pending withdrawals
+        const pendingWithdrawals = await Withdrawal.find({
+            instructor: instructorId,
+            status: { $in: ['pending', 'processing'] }
+        }).sort({ createdAt: -1 });
 
-// ===== PROCESS WITHDRAWAL (Admin) =====
-export const processWithdrawal = async (req, res) => {
-  try {
-    const { withdrawalId, action } = req.body; // action: 'approve' or 'reject'
-    const adminId = req.user.id;
+        // Get completed withdrawals
+        const completedWithdrawals = await Withdrawal.find({
+            instructor: instructorId,
+            status: 'completed'
+        }).sort({ createdAt: -1 });
 
-    const withdrawal = await Withdrawal.findById(withdrawalId)
-      .populate('instructor');
-
-    if (!withdrawal) {
-      return res.status(404).json({
-        success: false,
-        message: 'Withdrawal not found'
-      });
-    }
-
-    if (withdrawal.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: `Withdrawal is already ${withdrawal.status}`
-      });
-    }
-
-    if (action === 'reject') {
-      withdrawal.status = 'cancelled';
-      withdrawal.failureReason = 'Rejected by admin';
-      await withdrawal.save();
-
-      return res.json({
-        success: true,
-        message: 'Withdrawal rejected',
-        withdrawal: withdrawal
-      });
-    }
-
-    // Approve and process
-    if (action === 'approve') {
-      // Check if instructor has bank details
-      const instructor = await User.findById(withdrawal.instructor._id);
-      
-      if (!instructor.bankDetails || !instructor.bankDetails.accountNumber) {
-        withdrawal.status = 'failed';
-        withdrawal.failureReason = 'Instructor bank details not found';
-        await withdrawal.save();
-
-        return res.status(400).json({
-          success: false,
-          message: 'Instructor bank details not found'
-        });
-      }
-
-      // Create recipient if not exists
-      let recipientCode = instructor.bankDetails.recipientCode;
-
-      if (!recipientCode) {
-        const recipientResult = await payoutService.createRecipient(
-          instructor.bankDetails.accountName || `${instructor.firstName} ${instructor.lastName}`,
-          instructor.bankDetails.accountNumber,
-          instructor.bankDetails.bankCode
+        const totalWithdrawn = completedWithdrawals.reduce(
+            (sum, w) => sum + (w.amount || 0), 0
         );
 
-        if (!recipientResult.success) {
-          withdrawal.status = 'failed';
-          withdrawal.failureReason = recipientResult.error;
-          await withdrawal.save();
+        const totalPending = pendingWithdrawals.reduce(
+            (sum, w) => sum + (w.amount || 0), 0
+        );
 
-          return res.status(500).json({
+        const totalEarnings = instructor.totalRevenue || 0;
+        const availableBalance = instructor.earnings || 0;
+
+        res.json({
+            success: true,
+            earnings: {
+                available: availableBalance,
+                pending: totalPending,
+                totalRevenue: totalEarnings,
+                totalSales: instructor.totalSales || 0,
+                totalWithdrawn: totalWithdrawn,
+                pendingWithdrawals: pendingWithdrawals.length,
+                transactions: payments,
+                withdrawals: pendingWithdrawals
+            },
+            bankDetails: instructor.bankDetails || null,
+            bankDetailsVerified: instructor.bankDetailsVerified || false
+        });
+
+    } catch (error) {
+        console.error('Get earnings error:', error);
+        res.status(500).json({
             success: false,
-            message: 'Failed to create recipient',
-            error: recipientResult.error
-          });
-        }
-
-        recipientCode = recipientResult.recipientCode;
-        
-        // Save recipient code to user
-        await User.findByIdAndUpdate(instructor._id, {
-          'bankDetails.recipientCode': recipientCode
+            message: 'Failed to get earnings',
+            error: error.message
         });
-      }
-
-      // Initiate transfer
-      const transferResult = await payoutService.initiateTransfer(
-        withdrawal.amount,
-        recipientCode,
-        `FISSK Course Earnings - ${withdrawal.reference}`
-      );
-
-      if (!transferResult.success) {
-        withdrawal.status = 'failed';
-        withdrawal.failureReason = transferResult.error;
-        withdrawal.paystackTransferData = { error: transferResult.error };
-        await withdrawal.save();
-
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to initiate transfer',
-          error: transferResult.error
-        });
-      }
-
-      // Update withdrawal
-      withdrawal.status = 'processing';
-      withdrawal.paystackTransferId = transferResult.transferId;
-      withdrawal.paystackTransferData = transferResult.data;
-      withdrawal.processedBy = adminId;
-      await withdrawal.save();
-
-      // Check if transfer is completed immediately (some transfers are instant)
-      if (transferResult.status === 'success') {
-        // Finalize withdrawal
-        await finalizeWithdrawal(withdrawal._id);
-      }
-
-      res.json({
-        success: true,
-        message: 'Withdrawal processing started',
-        withdrawal: withdrawal,
-        transferStatus: transferResult.status
-      });
     }
-
-  } catch (error) {
-    console.error('Process withdrawal error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to process withdrawal',
-      error: error.message
-    });
-  }
 };
 
-// ===== FINALIZE WITHDRAWAL =====
-export const finalizeWithdrawal = async (withdrawalId) => {
-  try {
-    const withdrawal = await Withdrawal.findById(withdrawalId)
-      .populate('instructor');
-
-    if (!withdrawal) {
-      throw new Error('Withdrawal not found');
-    }
-
-    // Update withdrawal
-    withdrawal.status = 'completed';
-    withdrawal.completedAt = new Date();
-    await withdrawal.save();
-
-    // Deduct from instructor earnings
-    await User.findByIdAndUpdate(withdrawal.instructor._id, {
-      $inc: { earnings: -withdrawal.amount }
-    });
-
-    // Send success email
+// ===== GET BANKS LIST =====
+export const getBanks = async (req, res) => {
     try {
-      await emailService.sendWithdrawalSuccessEmail(
-        withdrawal.instructor.email,
-        `${withdrawal.instructor.firstName} ${withdrawal.instructor.lastName}`,
-        {
-          amount: withdrawal.amount,
-          reference: withdrawal.reference,
-          bankDetails: withdrawal.bankDetails,
-          completedAt: withdrawal.completedAt
+        const result = await payoutService.getBanks();
+        
+        if (!result.success) {
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to fetch banks',
+                error: result.error
+            });
         }
-      );
-    } catch (emailError) {
-      console.error('Failed to send withdrawal success email:', emailError);
+
+        res.json({
+            success: true,
+            banks: result.banks
+        });
+    } catch (error) {
+        console.error('Get banks error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get banks',
+            error: error.message
+        });
     }
+};
 
-    return { success: true };
+// ===== VALIDATE BANK ACCOUNT =====
+export const validateBankAccount = async (req, res) => {
+    try {
+        const { accountNumber, bankCode } = req.body;
 
-  } catch (error) {
-    console.error('Finalize withdrawal error:', error);
-    return { success: false, error: error.message };
-  }
+        if (!accountNumber || !bankCode) {
+            return res.status(400).json({
+                success: false,
+                message: 'Account number and bank code are required'
+            });
+        }
+
+        const result = await payoutService.validateAccount(accountNumber, bankCode);
+
+        if (!result.success) {
+            return res.status(400).json({
+                success: false,
+                message: result.error || 'Failed to validate account'
+            });
+        }
+
+        res.json({
+            success: true,
+            accountName: result.accountName,
+            accountNumber,
+            bankCode
+        });
+    } catch (error) {
+        console.error('Validate account error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to validate account',
+            error: error.message
+        });
+    }
 };
 
 // ===== UPDATE BANK DETAILS =====
 export const updateBankDetails = async (req, res) => {
-  try {
-    const { bankName, accountNumber, accountName, bankCode } = req.body;
-    const instructorId = req.user.id;
+    try {
+        const { bankName, accountNumber, accountName, bankCode } = req.body;
+        const instructorId = req.user.id;
 
-    // Validate input
-    if (!bankName || !accountNumber || !accountName || !bankCode) {
-      return res.status(400).json({
-        success: false,
-        message: 'All bank details are required'
-      });
+        // Validate input
+        if (!bankName || !accountNumber || !accountName || !bankCode) {
+            return res.status(400).json({
+                success: false,
+                message: 'All bank details are required (bank name, account number, account name, bank code)'
+            });
+        }
+
+        // Validate account number format (Nigerian accounts are 10 digits)
+        if (!/^\d{10}$/.test(accountNumber)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Account number must be 10 digits'
+            });
+        }
+
+        // Verify account with Paystack
+        const validation = await payoutService.validateAccount(accountNumber, bankCode);
+
+        if (!validation.success) {
+            return res.status(400).json({
+                success: false,
+                message: 'Could not verify account. Please check your details and try again.',
+                error: validation.error
+            });
+        }
+
+        // Check if account name matches
+        const providedName = accountName.trim().toLowerCase();
+        const actualName = validation.accountName.trim().toLowerCase();
+        
+        if (providedName !== actualName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Account name does not match the bank records',
+                expected: validation.accountName,
+                provided: accountName
+            });
+        }
+
+        // Update user with bank details
+        const instructor = await User.findByIdAndUpdate(
+            instructorId,
+            {
+                bankDetails: {
+                    bankName,
+                    accountNumber,
+                    accountName: validation.accountName, // Use the verified name
+                    bankCode
+                },
+                bankDetailsVerified: true
+            },
+            { new: true }
+        );
+
+        if (!instructor) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instructor not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Bank details saved successfully',
+            bankDetails: instructor.bankDetails,
+            bankDetailsVerified: instructor.bankDetailsVerified
+        });
+
+    } catch (error) {
+        console.error('Update bank details error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to update bank details',
+            error: error.message
+        });
     }
+};
 
-    // Verify account with Paystack
-    const validation = await payoutService.validateAccount(accountNumber, bankCode);
+// ===== REQUEST WITHDRAWAL =====
+export const requestWithdrawal = async (req, res) => {
+    try {
+        const { amount } = req.body;
+        const instructorId = req.user.id;
 
-    if (!validation.success) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid account details',
-        error: validation.error
-      });
+        // Validate amount
+        const numAmount = parseFloat(amount);
+        if (!numAmount || numAmount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please enter a valid amount'
+            });
+        }
+
+        // Get instructor
+        const instructor = await User.findById(instructorId);
+        if (!instructor) {
+            return res.status(404).json({
+                success: false,
+                message: 'Instructor not found'
+            });
+        }
+
+        // Check bank details exist
+        if (!instructor.bankDetails || !instructor.bankDetails.accountNumber) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please add your bank details before requesting a withdrawal',
+                requiresBankDetails: true
+            });
+        }
+
+        // Check available balance
+        const availableBalance = instructor.earnings || 0;
+        if (numAmount > availableBalance) {
+            return res.status(400).json({
+                success: false,
+                message: `Insufficient balance. Available: ₦${availableBalance.toLocaleString()}`
+            });
+        }
+
+        // Check for existing pending withdrawal
+        const existingPending = await Withdrawal.findOne({
+            instructor: instructorId,
+            status: { $in: ['pending', 'processing'] }
+        });
+
+        if (existingPending) {
+            return res.status(400).json({
+                success: false,
+                message: 'You already have a pending withdrawal request. Please wait for it to be processed.'
+            });
+        }
+
+        // Generate reference
+        const reference = generateWithdrawalReference();
+
+        // Create withdrawal request
+        const withdrawal = new Withdrawal({
+            instructor: instructorId,
+            amount: numAmount,
+            reference,
+            bankDetails: {
+                bankName: instructor.bankDetails.bankName,
+                accountNumber: instructor.bankDetails.accountNumber,
+                accountName: instructor.bankDetails.accountName,
+                bankCode: instructor.bankDetails.bankCode
+            },
+            status: 'pending'
+        });
+
+        await withdrawal.save();
+
+        // Deduct from available earnings (hold it)
+        await User.findByIdAndUpdate(instructorId, {
+            $inc: { earnings: -numAmount }
+        });
+
+        // Send email notification
+        try {
+            await emailService.sendWithdrawalRequestEmail(
+                instructor.email,
+                `${instructor.firstName} ${instructor.lastName}`,
+                {
+                    amount: numAmount,
+                    reference,
+                    bankDetails: instructor.bankDetails
+                }
+            );
+        } catch (emailError) {
+            console.error('Failed to send withdrawal email:', emailError);
+        }
+
+        res.json({
+            success: true,
+            message: 'Withdrawal request submitted successfully',
+            withdrawal: {
+                id: withdrawal._id,
+                reference: withdrawal.reference,
+                amount: withdrawal.amount,
+                status: withdrawal.status,
+                bankDetails: withdrawal.bankDetails
+            }
+        });
+
+    } catch (error) {
+        console.error('Request withdrawal error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to request withdrawal',
+            error: error.message
+        });
     }
-
-    // Check if account name matches
-    if (validation.accountName.toLowerCase() !== accountName.toLowerCase()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Account name does not match the provided name',
-        expected: validation.accountName,
-        provided: accountName
-      });
-    }
-
-    // Update user
-    await User.findByIdAndUpdate(instructorId, {
-      bankDetails: {
-        bankName,
-        accountNumber,
-        accountName,
-        bankCode
-      },
-      bankDetailsVerified: true
-    });
-
-    res.json({
-      success: true,
-      message: 'Bank details updated successfully',
-      bankDetails: {
-        bankName,
-        accountNumber,
-        accountName,
-        bankCode
-      }
-    });
-
-  } catch (error) {
-    console.error('Update bank details error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update bank details',
-      error: error.message
-    });
-  }
 };
 
 // ===== GET WITHDRAWAL HISTORY =====
 export const getWithdrawalHistory = async (req, res) => {
-  try {
-    const instructorId = req.user.id;
+    try {
+        const instructorId = req.user.id;
 
-    const withdrawals = await Withdrawal.find({
-      instructor: instructorId
-    }).sort({ createdAt: -1 });
+        const withdrawals = await Withdrawal.find({
+            instructor: instructorId
+        }).sort({ createdAt: -1 });
 
-    res.json({
-      success: true,
-      withdrawals: withdrawals
-    });
+        res.json({
+            success: true,
+            withdrawals
+        });
 
-  } catch (error) {
-    console.error('Get withdrawal history error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get withdrawal history',
-      error: error.message
-    });
-  }
+    } catch (error) {
+        console.error('Get withdrawal history error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get withdrawal history',
+            error: error.message
+        });
+    }
 };
 
-// ===== GET PENDING WITHDRAWALS (Admin) =====
+// ===== ADMIN: GET PENDING WITHDRAWALS =====
 export const getPendingWithdrawals = async (req, res) => {
-  try {
-    const withdrawals = await Withdrawal.find({
-      status: 'pending'
-    })
-      .populate('instructor', 'firstName lastName email')
-      .sort({ createdAt: 1 });
+    try {
+        const withdrawals = await Withdrawal.find({
+            status: 'pending'
+        })
+            .populate('instructor', 'firstName lastName email')
+            .sort({ createdAt: 1 });
 
-    res.json({
-      success: true,
-      withdrawals: withdrawals
-    });
+        res.json({
+            success: true,
+            withdrawals
+        });
 
-  } catch (error) {
-    console.error('Get pending withdrawals error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get pending withdrawals',
-      error: error.message
-    });
-  }
+    } catch (error) {
+        console.error('Get pending withdrawals error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get pending withdrawals',
+            error: error.message
+        });
+    }
+};
+
+// ===== ADMIN: PROCESS WITHDRAWAL =====
+export const processWithdrawal = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { action } = req.body;
+
+        const withdrawal = await Withdrawal.findById(id)
+            .populate('instructor', 'firstName lastName email');
+
+        if (!withdrawal) {
+            return res.status(404).json({
+                success: false,
+                message: 'Withdrawal not found'
+            });
+        }
+
+        if (withdrawal.status !== 'pending') {
+            return res.status(400).json({
+                success: false,
+                message: `Withdrawal is already ${withdrawal.status}`
+            });
+        }
+
+        // ===== REJECT =====
+        if (action === 'reject') {
+            withdrawal.status = 'cancelled';
+            withdrawal.failureReason = 'Rejected by admin';
+            await withdrawal.save();
+
+            // Refund the amount back to instructor
+            await User.findByIdAndUpdate(withdrawal.instructor._id, {
+                $inc: { earnings: withdrawal.amount }
+            });
+
+            return res.json({
+                success: true,
+                message: 'Withdrawal rejected and funds returned to instructor',
+                withdrawal
+            });
+        }
+
+        // ===== APPROVE =====
+        if (action === 'approve') {
+            // Check bank details
+            if (!withdrawal.bankDetails || !withdrawal.bankDetails.accountNumber) {
+                withdrawal.status = 'failed';
+                withdrawal.failureReason = 'Instructor bank details not found';
+                await withdrawal.save();
+
+                // Refund
+                await User.findByIdAndUpdate(withdrawal.instructor._id, {
+                    $inc: { earnings: withdrawal.amount }
+                });
+
+                return res.status(400).json({
+                    success: false,
+                    message: 'Instructor bank details not found'
+                });
+            }
+
+            // Mark as processing
+            withdrawal.status = 'processing';
+            withdrawal.processedBy = req.user.id;
+            await withdrawal.save();
+
+            // ===== TODO: Integrate Paystack Transfer API =====
+            // For now, we'll mark it as processing. Admin will manually transfer
+            // and then mark as completed.
+
+            res.json({
+                success: true,
+                message: 'Withdrawal approved. Please transfer the funds manually and mark as completed.',
+                withdrawal
+            });
+        }
+
+    } catch (error) {
+        console.error('Process withdrawal error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to process withdrawal',
+            error: error.message
+        });
+    }
+};
+
+// ===== ADMIN: MARK WITHDRAWAL AS COMPLETED =====
+export const completeWithdrawal = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { transferReference } = req.body;
+
+        const withdrawal = await Withdrawal.findById(id)
+            .populate('instructor', 'firstName lastName email');
+
+        if (!withdrawal) {
+            return res.status(404).json({
+                success: false,
+                message: 'Withdrawal not found'
+            });
+        }
+
+        if (withdrawal.status !== 'processing') {
+            return res.status(400).json({
+                success: false,
+                message: `Withdrawal must be in 'processing' state. Current: ${withdrawal.status}`
+            });
+        }
+
+        withdrawal.status = 'completed';
+        withdrawal.completedAt = new Date();
+        if (transferReference) {
+            withdrawal.paystackTransferId = transferReference;
+        }
+        await withdrawal.save();
+
+        // Send success email
+        try {
+            await emailService.sendWithdrawalSuccessEmail(
+                withdrawal.instructor.email,
+                `${withdrawal.instructor.firstName} ${withdrawal.instructor.lastName}`,
+                {
+                    amount: withdrawal.amount,
+                    reference: withdrawal.reference,
+                    bankDetails: withdrawal.bankDetails,
+                    completedAt: withdrawal.completedAt
+                }
+            );
+        } catch (emailError) {
+            console.error('Failed to send withdrawal success email:', emailError);
+        }
+
+        res.json({
+            success: true,
+            message: 'Withdrawal marked as completed',
+            withdrawal
+        });
+
+    } catch (error) {
+        console.error('Complete withdrawal error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to complete withdrawal',
+            error: error.message
+        });
+    }
 };
