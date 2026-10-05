@@ -108,22 +108,40 @@ class AdminPayoutsClass {
                     <td>${this.escapeHtml(bankDetails.bankName || '—')}</td>
                     <td>${this.escapeHtml(bankDetails.accountNumber || '—')}</td>
                     <td>
-                        <span class="status-badge pending" style="padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; background: ${isProcessing ? '#DBEAFE' : '#FEF3C7'}; color: ${isProcessing ? '#1E40AF' : '#92400E'};">
+                        <span style="
+                            padding: 4px 12px;
+                            border-radius: 20px;
+                            font-size: 0.75rem;
+                            font-weight: 600;
+                            background: ${isProcessing ? '#DBEAFE' : '#FEF3C7'};
+                            color: ${isProcessing ? '#1E40AF' : '#92400E'};
+                        ">
                             ${isProcessing ? '🔄 Processing' : '⏳ Pending'}
                         </span>
                     </td>
                     <td>
-                        <div class="actions">
+                        <div class="actions" style="display: flex; gap: 8px; flex-wrap: wrap;">
                             ${!isProcessing ? `
-                                <button class="btn-sm btn-success" onclick="window.AdminPayouts.processPayout('${payout._id}', 'approve')">
+                                <button class="btn-sm btn-success" 
+                                        onclick="window.AdminPayouts.processPayout('${payout._id}', 'approve')"
+                                        style="background: #10B981; color: white; padding: 6px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer;">
                                     ✅ Approve
                                 </button>
-                                <button class="btn-sm btn-danger" onclick="window.AdminPayouts.processPayout('${payout._id}', 'reject')">
+                                <button class="btn-sm btn-danger" 
+                                        onclick="window.AdminPayouts.processPayout('${payout._id}', 'reject')"
+                                        style="background: #EF4444; color: white; padding: 6px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer;">
                                     ❌ Reject
                                 </button>
                             ` : `
-                                <button class="btn-sm btn-primary" onclick="window.AdminPayouts.markAsCompleted('${payout._id}', '${payout.amount}')" style="background: #6C3CE1; color: white; padding: 6px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer;">
+                                <button class="btn-sm btn-primary" 
+                                        onclick="window.AdminPayouts.markAsCompleted('${payout._id}', '${payout.amount}')"
+                                        style="background: #6C3CE1; color: white; padding: 6px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer;">
                                     ✅ Mark as Completed
+                                </button>
+                                <button class="btn-sm btn-danger" 
+                                        onclick="window.AdminPayouts.processPayout('${payout._id}', 'reject')"
+                                        style="background: #EF4444; color: white; padding: 6px 14px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; border: none; cursor: pointer;">
+                                    ❌ Cancel
                                 </button>
                             `}
                         </div>
@@ -258,7 +276,13 @@ class AdminPayoutsClass {
     async processPayout(payoutId, action) {
         const actionText = action === 'approve' ? 'approve' : 'reject';
         
-        // Find the button and show loading
+        const confirmMsg = action === 'approve' 
+            ? 'Approve this withdrawal? The instructor will be notified and you can then transfer the funds manually.'
+            : 'Reject this withdrawal? The funds will be returned to the instructor.';
+            
+        if (!confirm(confirmMsg)) return;
+        
+        // Find the buttons and show loading
         const buttons = document.querySelectorAll(`button[onclick*="${payoutId}"]`);
         buttons.forEach(btn => {
             btn.disabled = true;
