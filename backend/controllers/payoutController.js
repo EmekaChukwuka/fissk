@@ -35,7 +35,7 @@ export const getEarnings = async (req, res) => {
             .sort({ paidAt: -1 })
             .limit(50);
 
-        // ===== Include BOTH pending AND processing withdrawals =====
+        // Include BOTH pending AND processing withdrawals
         const pendingWithdrawals = await Withdrawal.find({
             instructor: instructorId,
             status: { $in: ['pending', 'processing'] }
@@ -168,7 +168,6 @@ export const updateBankDetails = async (req, res) => {
             });
         }
 
-        // Verify with Paystack - this is the source of truth
         const validation = await payoutService.validateAccount(accountNumber, bankCode);
 
         if (!validation.success) {
@@ -179,7 +178,7 @@ export const updateBankDetails = async (req, res) => {
             });
         }
 
-        // Use Paystack's returned name (never trust user input)
+        // Use Paystack's verified name
         const verifiedAccountName = validation.accountName;
 
         const instructor = await User.findByIdAndUpdate(
@@ -259,7 +258,6 @@ export const requestWithdrawal = async (req, res) => {
             });
         }
 
-        // Check for existing pending/processing withdrawal
         const existingPending = await Withdrawal.findOne({
             instructor: instructorId,
             status: { $in: ['pending', 'processing'] }
@@ -296,59 +294,56 @@ export const requestWithdrawal = async (req, res) => {
 
         // ===== NOTIFY INSTRUCTOR =====
         try {
-            await emailService.sendWithdrawalRequestEmail(
-                instructor.email,
-                `${instructor.firstName} ${instructor.lastName}`,
-                {
-                    amount: numAmount,
-                    reference,
-                    bankDetails: instructor.bankDetails
-                }
-            );
+            if (emailService.sendWithdrawalRequestEmail) {
+                await emailService.sendWithdrawalRequestEmail(
+                    instructor.email,
+                    `${instructor.firstName} ${instructor.lastName}`,
+                    {
+                        amount: numAmount,
+                        reference,
+                        bankDetails: instructor.bankDetails
+                    }
+                );
+            }
         } catch (emailError) {
-            console.error('Failed to send instructor withdrawal email:', emailError);
+            console.error('Failed to send instructor email:', emailError);
         }
 
         // ===== NOTIFY ALL ADMINS =====
         try {
-            // Get all admin users
             const admins = await User.find({ 
-                userType: 'admin',
-                isVerified: true // Only verified admins
+                userType: 'admin'
             }).select('firstName lastName email phone');
 
             console.log(`📧 Sending withdrawal notification to ${admins.length} admin(s)`);
 
-            const adminNotifications = admins.map(admin => 
-                emailService.sendAdminWithdrawalNotification(
-                    admin.email,
-                    `${admin.firstName} ${admin.lastName}`,
-                    {
-                        amount: numAmount,
-                        reference,
-                        requestedAt: withdrawal.createdAt,
-                        bankDetails: instructor.bankDetails
-                    },
-                    {
-                        firstName: instructor.firstName,
-                        lastName: instructor.lastName,
-                        email: instructor.email,
-                        phone: instructor.phone,
-                        totalRevenue: instructor.totalRevenue,
-                        totalSales: instructor.totalSales
-                    }
-                ).catch(err => {
-                    console.error(`Failed to email admin ${admin.email}:`, err.message);
-                    return { success: false, adminEmail: admin.email, error: err.message };
-                })
-            );
-
-            const results = await Promise.all(adminNotifications);
-            const successCount = results.filter(r => r && r.success).length;
-            console.log(`✅ Sent to ${successCount}/${admins.length} admins`);
+            if (emailService.sendAdminWithdrawalNotification) {
+                await Promise.all(admins.map(admin => 
+                    emailService.sendAdminWithdrawalNotification(
+                        admin.email,
+                        `${admin.firstName} ${admin.lastName}`,
+                        {
+                            amount: numAmount,
+                            reference,
+                            requestedAt: withdrawal.createdAt,
+                            bankDetails: instructor.bankDetails
+                        },
+                        {
+                            firstName: instructor.firstName,
+                            lastName: instructor.lastName,
+                            email: instructor.email,
+                            phone: instructor.phone,
+                            totalRevenue: instructor.totalRevenue,
+                            totalSales: instructor.totalSales
+                        }
+                    ).catch(err => {
+                        console.error(`Admin email failed: ${admin.email}`, err.message);
+                        return { success: false };
+                    })
+                ));
+            }
         } catch (adminEmailError) {
-            console.error('Failed to send admin notifications:', adminEmailError);
-            // Don't fail the request if email fails
+            console.error('Admin notification error:', adminEmailError);
         }
 
         res.json({
@@ -368,6 +363,30 @@ export const requestWithdrawal = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to request withdrawal',
+            error: error.message
+        });
+    }
+};
+
+// ===== GET WITHDRAWAL HISTORY =====
+export const getWithdrawalHistory = async (req, res) => {
+    try {
+        const instructorId = req.user.id;
+
+        const withdrawals = await Withdrawal.find({
+            instructor: instructorId
+        }).sort({ createdAt: -1 });
+
+        res.json({
+            success: true,
+            withdrawals
+        });
+
+    } catch (error) {
+        console.error('Get withdrawal history error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to get withdrawal history',
             error: error.message
         });
     }
@@ -397,7 +416,7 @@ export const getPendingWithdrawals = async (req, res) => {
     }
 };
 
-// ===== ADMIN: PROCESS WITHDRAWAL (Approve / Reject) =====
+// ===== ADMIN: PROCESS WITHDRAWAL =====
 export const processWithdrawal = async (req, res) => {
     try {
         const { id } = req.params;
@@ -426,7 +445,7 @@ export const processWithdrawal = async (req, res) => {
             withdrawal.failureReason = 'Rejected by admin';
             await withdrawal.save();
 
-            // Refund the amount back to instructor
+            // Refund back to instructor
             await User.findByIdAndUpdate(withdrawal.instructor._id, {
                 $inc: { earnings: withdrawal.amount }
             });
@@ -507,18 +526,20 @@ export const completeWithdrawal = async (req, res) => {
 
         // Send success email
         try {
-            await emailService.sendWithdrawalSuccessEmail(
-                withdrawal.instructor.email,
-                `${withdrawal.instructor.firstName} ${withdrawal.instructor.lastName}`,
-                {
-                    amount: withdrawal.amount,
-                    reference: withdrawal.reference,
-                    bankDetails: withdrawal.bankDetails,
-                    completedAt: withdrawal.completedAt
-                }
-            );
+            if (emailService.sendWithdrawalSuccessEmail) {
+                await emailService.sendWithdrawalSuccessEmail(
+                    withdrawal.instructor.email,
+                    `${withdrawal.instructor.firstName} ${withdrawal.instructor.lastName}`,
+                    {
+                        amount: withdrawal.amount,
+                        reference: withdrawal.reference,
+                        bankDetails: withdrawal.bankDetails,
+                        completedAt: withdrawal.completedAt
+                    }
+                );
+            }
         } catch (emailError) {
-            console.error('Failed to send withdrawal success email:', emailError);
+            console.error('Failed to send success email:', emailError);
         }
 
         res.json({
