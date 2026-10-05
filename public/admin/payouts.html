@@ -52,7 +52,7 @@
                     </div>
                 </div>
                 <div class="topbar-actions">
-                    <button class="btn btn-outline" onclick="if(window.AdminPayouts) AdminPayouts.loadPayouts()">
+                    <button class="btn btn-outline" onclick="if(window.AdminPayouts) window.AdminPayouts.loadPayouts()">
                         🔄 Refresh
                     </button>
                 </div>
@@ -119,9 +119,9 @@
                     <div class="admin-pagination">
                         <span class="page-info" id="paymentPageInfo">Showing 1-20 of 0</span>
                         <div class="page-buttons" id="paymentPaginationButtons">
-                            <button onclick="if(window.AdminPayouts) AdminPayouts.goToPaymentPage('prev')">←</button>
+                            <button onclick="if(window.AdminPayouts) window.AdminPayouts.goToPaymentPage('prev')">←</button>
                             <button class="active">1</button>
-                            <button onclick="if(window.AdminPayouts) AdminPayouts.goToPaymentPage('next')">→</button>
+                            <button onclick="if(window.AdminPayouts) window.AdminPayouts.goToPaymentPage('next')">→</button>
                         </div>
                     </div>
                 </div>
@@ -172,10 +172,6 @@
                     }
                 });
             });
-
-            if (typeof AdminPayouts !== 'undefined') {
-                window.AdminPayouts = AdminPayouts;
-            }
         });
     </script>
 </body>

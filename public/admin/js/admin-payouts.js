@@ -1,17 +1,34 @@
 // ===== ADMIN PAYOUTS MANAGEMENT =====
-class AdminPayouts {
+class AdminPayoutsClass {
     constructor() {
         this.currentPaymentPage = 1;
         this.totalPaymentPages = 1;
         this.totalPayments = 0;
         this.pendingPayouts = [];
         this.payments = [];
+        this.isInitialized = false;
         this.init();
     }
     
     async init() {
+        if (this.isInitialized) return;
+        this.isInitialized = true;
+        
+        // Wait for AdminApp to be ready
+        if (!window.AdminApp) {
+            await new Promise(resolve => {
+                const checkInterval = setInterval(() => {
+                    if (window.AdminApp) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 100);
+            });
+        }
+        
         await this.loadPayouts();
         this.setupEventListeners();
+        console.log('✅ AdminPayouts initialized');
     }
     
     async loadPayouts() {
@@ -23,6 +40,8 @@ class AdminPayouts {
     
     async loadPendingPayouts() {
         const container = document.getElementById('pendingPayoutsBody');
+        if (!container) return;
+        
         container.innerHTML = `
             <tr>
                 <td colspan="6" style="text-align: center; padding: 40px; color: var(--admin-gray);">
@@ -59,6 +78,7 @@ class AdminPayouts {
     
     renderPendingPayouts() {
         const container = document.getElementById('pendingPayoutsBody');
+        if (!container) return;
         
         if (!this.pendingPayouts || this.pendingPayouts.length === 0) {
             container.innerHTML = `
@@ -78,22 +98,22 @@ class AdminPayouts {
             return `
                 <tr>
                     <td>
-                        <strong>${instructor.firstName || ''} ${instructor.lastName || ''}</strong>
+                        <strong>${this.escapeHtml(instructor.firstName || '')} ${this.escapeHtml(instructor.lastName || '')}</strong>
                         <br>
-                        <small style="color: var(--admin-gray);">${instructor.email || '—'}</small>
+                        <small style="color: var(--admin-gray);">${this.escapeHtml(instructor.email || '—')}</small>
                     </td>
                     <td style="font-weight: 700; color: var(--admin-gray-dark);">
                         ₦${(payout.amount || 0).toLocaleString()}
                     </td>
-                    <td>${bankDetails.bankName || '—'}</td>
-                    <td>${bankDetails.accountNumber || '—'}</td>
+                    <td>${this.escapeHtml(bankDetails.bankName || '—')}</td>
+                    <td>${this.escapeHtml(bankDetails.accountNumber || '—')}</td>
                     <td>${payout.createdAt ? new Date(payout.createdAt).toLocaleDateString() : '—'}</td>
                     <td>
                         <div class="actions">
-                            <button class="btn-sm btn-success" onclick="AdminPayouts.processPayout('${payout._id}', 'approve')">
+                            <button class="btn-sm btn-success" onclick="window.AdminPayouts.processPayout('${payout._id}', 'approve')">
                                 ✅ Approve
                             </button>
-                            <button class="btn-sm btn-danger" onclick="AdminPayouts.processPayout('${payout._id}', 'reject')">
+                            <button class="btn-sm btn-danger" onclick="window.AdminPayouts.processPayout('${payout._id}', 'reject')">
                                 ❌ Reject
                             </button>
                         </div>
@@ -105,6 +125,8 @@ class AdminPayouts {
     
     async loadAllPayments() {
         const container = document.getElementById('allPaymentsBody');
+        if (!container) return;
+        
         container.innerHTML = `
             <tr>
                 <td colspan="7" style="text-align: center; padding: 40px; color: var(--admin-gray);">
@@ -148,6 +170,7 @@ class AdminPayouts {
     
     renderAllPayments() {
         const container = document.getElementById('allPaymentsBody');
+        if (!container) return;
         
         if (!this.payments || this.payments.length === 0) {
             container.innerHTML = `
@@ -163,7 +186,6 @@ class AdminPayouts {
         container.innerHTML = this.payments.map(payment => {
             const user = payment.user || {};
             const classData = payment.class || {};
-            const instructor = payment.instructor || {};
             
             const statusColors = {
                 success: 'active',
@@ -173,8 +195,8 @@ class AdminPayouts {
             
             return `
                 <tr>
-                    <td>${user.firstName || ''} ${user.lastName || ''}</td>
-                    <td>${classData.title || '—'}</td>
+                    <td>${this.escapeHtml(user.firstName || '')} ${this.escapeHtml(user.lastName || '')}</td>
+                    <td>${this.escapeHtml(classData.title || '—')}</td>
                     <td>₦${(payment.amount || 0).toLocaleString()}</td>
                     <td>₦${(payment.instructorEarning || 0).toLocaleString()}</td>
                     <td>₦${(payment.platformFee || 0).toLocaleString()}</td>
@@ -188,24 +210,25 @@ class AdminPayouts {
     renderPaymentPagination() {
         const container = document.getElementById('paymentPaginationButtons');
         const info = document.getElementById('paymentPageInfo');
+        if (!container || !info) return;
         
         const start = (this.currentPaymentPage - 1) * 20 + 1;
         const end = Math.min(this.currentPaymentPage * 20, this.totalPayments);
         info.textContent = `Showing ${start}-${end} of ${this.totalPayments}`;
         
-        let buttons = `<button onclick="AdminPayouts.goToPaymentPage('prev')" ${this.currentPaymentPage <= 1 ? 'disabled' : ''}>←</button>`;
+        let buttons = `<button onclick="window.AdminPayouts.goToPaymentPage('prev')" ${this.currentPaymentPage <= 1 ? 'disabled' : ''}>←</button>`;
         
         for (let i = 1; i <= this.totalPaymentPages; i++) {
             if (i === this.currentPaymentPage) {
                 buttons += `<button class="active">${i}</button>`;
             } else if (i <= 3 || i > this.totalPaymentPages - 3 || Math.abs(i - this.currentPaymentPage) <= 1) {
-                buttons += `<button onclick="AdminPayouts.goToPaymentPage(${i})">${i}</button>`;
+                buttons += `<button onclick="window.AdminPayouts.goToPaymentPage(${i})">${i}</button>`;
             } else if (i === 4 && this.currentPaymentPage > 5) {
                 buttons += `<span>...</span>`;
             }
         }
         
-        buttons += `<button onclick="AdminPayouts.goToPaymentPage('next')" ${this.currentPaymentPage >= this.totalPaymentPages ? 'disabled' : ''}>→</button>`;
+        buttons += `<button onclick="window.AdminPayouts.goToPaymentPage('next')" ${this.currentPaymentPage >= this.totalPaymentPages ? 'disabled' : ''}>→</button>`;
         container.innerHTML = buttons;
     }
     
@@ -224,7 +247,20 @@ class AdminPayouts {
     
     async processPayout(payoutId, action) {
         const actionText = action === 'approve' ? 'approve' : 'reject';
-        if (!confirm(`Are you sure you want to ${actionText} this withdrawal request?`)) return;
+        
+        // Find the button and show loading
+        const buttons = document.querySelectorAll(`button[onclick*="${payoutId}"]`);
+        buttons.forEach(btn => {
+            btn.disabled = true;
+            btn.dataset.originalText = btn.textContent;
+        });
+        
+        const clickedBtn = Array.from(buttons).find(b => 
+            b.getAttribute('onclick')?.includes(action)
+        );
+        if (clickedBtn) {
+            clickedBtn.textContent = action === 'approve' ? '⏳ Approving...' : '⏳ Rejecting...';
+        }
         
         try {
             const response = await fetch(`${window.AdminApp.baseUrl}/api/admin/payouts/${payoutId}/process`, {
@@ -244,7 +280,13 @@ class AdminPayouts {
             }
         } catch (error) {
             console.error('Process payout error:', error);
-            window.AdminApp.showToast(`❌ Failed to ${actionText} withdrawal`, 'error');
+            window.AdminApp.showToast(`❌ ${error.message || `Failed to ${actionText} withdrawal`}`, 'error');
+            
+            // Reset buttons
+            buttons.forEach(btn => {
+                btn.disabled = false;
+                btn.textContent = btn.dataset.originalText || btn.textContent;
+            });
         }
     }
     
@@ -254,11 +296,36 @@ class AdminPayouts {
             this.loadPendingPayouts();
         }, 60000);
     }
+    
+    escapeHtml(s) {
+        if (!s) return '';
+        return String(s).replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[ch]);
+    }
 }
 
-// ===== INITIALIZE =====
-document.addEventListener('DOMContentLoaded', () => {
+// ===== CREATE GLOBAL INSTANCE =====
+let AdminPayouts = null;
+
+document.addEventListener('DOMContentLoaded', function() {
     if (document.querySelector('.admin-wrapper') && document.querySelector('#pendingPayoutsBody')) {
-        window.AdminPayouts = new AdminPayouts();
+        const checkInterval = setInterval(() => {
+            if (window.AdminApp) {
+                clearInterval(checkInterval);
+                AdminPayouts = new AdminPayoutsClass();
+                window.AdminPayouts = AdminPayouts;
+                console.log('✅ AdminPayouts registered globally');
+            }
+        }, 100);
+        
+        // Fallback: if AdminApp doesn't load in 5 seconds, try anyway
+        setTimeout(() => {
+            if (!window.AdminPayouts) {
+                console.warn('⚠️ AdminApp not found, creating AdminPayouts anyway');
+                AdminPayouts = new AdminPayoutsClass();
+                window.AdminPayouts = AdminPayouts;
+            }
+        }, 5000);
     }
 });
