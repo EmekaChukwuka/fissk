@@ -1,3 +1,4 @@
+// backend/routes/adminRoutes.js
 import express from 'express';
 import { auth, isAdmin, hasPermission } from '../middleware/auth.js';
 import {
@@ -12,6 +13,7 @@ import {
   getPayments,
   getPendingPayouts,
   processPayout,
+  completePayout,      // ← ADDED
   getSettings,
   updateSettings,
   getActivityLogs,
@@ -21,7 +23,6 @@ import {
 const adminRouter = express.Router();
 
 // ===== AUTHENTICATION CHECK =====
-// Apply auth and isAdmin middleware to all routes
 adminRouter.use(auth, isAdmin);
 
 // ===== DASHBOARD =====
@@ -46,6 +47,7 @@ adminRouter.delete('/classes/:id', hasPermission('manageClasses'), deleteClass);
 adminRouter.get('/payments', hasPermission('managePayments'), getPayments);
 adminRouter.get('/payouts/pending', hasPermission('managePayouts'), getPendingPayouts);
 adminRouter.put('/payouts/:id/process', hasPermission('managePayouts'), processPayout);
+adminRouter.put('/payouts/:id/complete', hasPermission('managePayouts'), completePayout); // ← ADDED
 
 // ===== SETTINGS =====
 adminRouter.get('/settings', hasPermission('manageSettings'), getSettings);

@@ -1,3 +1,4 @@
+// backend/controllers/adminController.js
 import User from '../models/User.js';
 import Admin from '../models/Admin.js';
 import Class from '../models/Class.js';
@@ -8,6 +9,7 @@ import LiveSession from '../models/LiveSession.js';
 import ActivityLog from '../models/ActivityLog.js';
 import { logAdminActivity } from '../middleware/auth.js';
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs'; // ← ADDED (was missing)
 
 // ============================================================
 // DASHBOARD STATS
@@ -28,9 +30,9 @@ export const getDashboardStats = async (req, res) => {
       isApproved: false
     });
 
-    // Get pending withdrawals
+    // ===== FIXED: Count both pending AND processing withdrawals =====
     const pendingWithdrawals = await Withdrawal.countDocuments({
-      status: 'pending'
+      status: { $in: ['pending', 'processing'] }
     });
 
     // Get total revenue (platform fees from successful payments)
@@ -496,13 +498,19 @@ export const getPayments = async (req, res) => {
   }
 };
 
+// ===== FIXED: Returns both pending AND processing =====
 export const getPendingPayouts = async (req, res) => {
   try {
+    console.log('🎯 adminController.getPendingPayouts called');
+
     const withdrawals = await Withdrawal.find({
-      status: 'pending'
+      status: { $in: ['pending', 'processing'] }  // ← FIXED
     })
       .populate('instructor', 'firstName lastName email phone bankDetails')
       .sort({ createdAt: 1 });
+
+    console.log('📊 Found:', withdrawals.length, 'pending/processing withdrawals');
+    console.log('📊 Statuses:', withdrawals.map(w => w.status));
 
     res.json({
       success: true,
@@ -539,6 +547,11 @@ export const processPayout = async (req, res) => {
       withdrawal.failureReason = 'Rejected by admin';
       await withdrawal.save();
 
+      // Refund the amount back to instructor
+      await User.findByIdAndUpdate(withdrawal.instructor._id, {
+        $inc: { earnings: withdrawal.amount }
+      });
+
       await logAdminActivity(
         req,
         'payout_rejected',
@@ -550,7 +563,7 @@ export const processPayout = async (req, res) => {
 
       return res.json({
         success: true,
-        message: 'Withdrawal rejected',
+        message: 'Withdrawal rejected and funds returned to instructor',
         withdrawal
       });
     }
@@ -561,6 +574,11 @@ export const processPayout = async (req, res) => {
         withdrawal.status = 'failed';
         withdrawal.failureReason = 'Instructor bank details not found';
         await withdrawal.save();
+
+        // Refund
+        await User.findByIdAndUpdate(withdrawal.instructor._id, {
+          $inc: { earnings: withdrawal.amount }
+        });
 
         return res.status(400).json({
           success: false,
@@ -583,12 +601,9 @@ export const processPayout = async (req, res) => {
         `Withdrawal ${withdrawal.reference}`
       );
 
-      // TODO: Integrate Paystack Transfer API here
-      // const transferResult = await payoutService.initiateTransfer(...);
-
       res.json({
         success: true,
-        message: 'Withdrawal approved and processing',
+        message: 'Withdrawal approved. Please transfer the funds manually and mark as completed.',
         withdrawal
       });
     }
@@ -596,6 +611,76 @@ export const processPayout = async (req, res) => {
   } catch (error) {
     console.error('Process payout error:', error);
     res.status(500).json({ success: false, message: 'Failed to process payout' });
+  }
+};
+
+// ============================================================
+// COMPLETE PAYOUT (Mark as Completed)
+// ============================================================
+
+export const completePayout = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { transferReference, note } = req.body;
+
+    const withdrawal = await Withdrawal.findById(id)
+      .populate('instructor', 'firstName lastName email');
+
+    if (!withdrawal) {
+      return res.status(404).json({ success: false, message: 'Withdrawal not found' });
+    }
+
+    if (withdrawal.status !== 'processing') {
+      return res.status(400).json({
+        success: false,
+        message: `Withdrawal must be in 'processing' state. Current: ${withdrawal.status}`
+      });
+    }
+
+    withdrawal.status = 'completed';
+    withdrawal.completedAt = new Date();
+    if (transferReference) withdrawal.paystackTransferId = transferReference;
+    if (note) withdrawal.adminNote = note;
+    await withdrawal.save();
+
+    // Log activity
+    await logAdminActivity(
+      req,
+      'payout_processed',
+      'payout',
+      withdrawal._id,
+      { amount: withdrawal.amount, instructor: withdrawal.instructor.email },
+      `Withdrawal ${withdrawal.reference}`
+    );
+
+    // Send success email
+    try {
+      const emailService = (await import('../services/emailService.js')).default;
+      if (emailService.sendWithdrawalSuccessEmail) {
+        await emailService.sendWithdrawalSuccessEmail(
+          withdrawal.instructor.email,
+          `${withdrawal.instructor.firstName} ${withdrawal.instructor.lastName}`,
+          {
+            amount: withdrawal.amount,
+            reference: withdrawal.reference,
+            bankDetails: withdrawal.bankDetails,
+            completedAt: withdrawal.completedAt
+          }
+        );
+      }
+    } catch (emailError) {
+      console.error('Failed to send withdrawal success email:', emailError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Withdrawal marked as completed',
+      withdrawal
+    });
+
+  } catch (error) {
+    console.error('Complete payout error:', error);
+    res.status(500).json({ success: false, message: 'Failed to complete payout' });
   }
 };
 
@@ -617,7 +702,7 @@ export const getSettings = async (req, res) => {
       maintenanceMode: false,
       maxStudentsPerClass: 100,
       minPrice: 1000,
-      platformFee: 30 // percentage
+      platformFee: 30
     };
 
     res.json({
@@ -635,7 +720,6 @@ export const updateSettings = async (req, res) => {
   try {
     const updates = req.body;
     
-    // Validate commission rate
     if (updates.commissionRate !== undefined) {
       const rate = parseFloat(updates.commissionRate);
       if (isNaN(rate) || rate < 0 || rate > 100) {
@@ -646,7 +730,6 @@ export const updateSettings = async (req, res) => {
       }
     }
 
-    // Validate min price
     if (updates.minPrice !== undefined) {
       const price = parseFloat(updates.minPrice);
       if (isNaN(price) || price < 0) {
@@ -722,7 +805,6 @@ export const createAdmin = async (req, res) => {
   try {
     const { email, firstName, lastName, password, role } = req.body;
 
-    // Check if user already exists
     let user = await User.findOne({ email });
     if (user) {
       return res.status(400).json({
@@ -731,7 +813,6 @@ export const createAdmin = async (req, res) => {
       });
     }
 
-    // Create user
     const hashedPassword = await bcrypt.hash(password, 10);
     user = new User({
       firstName,
@@ -744,7 +825,6 @@ export const createAdmin = async (req, res) => {
     });
     await user.save();
 
-    // Create admin record
     const admin = new Admin({
       userId: user._id,
       role: role || 'moderator',
