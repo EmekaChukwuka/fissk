@@ -148,22 +148,21 @@ export const validateBankAccount = async (req, res) => {
         });
     }
 };
-
-// ===== UPDATE BANK DETAILS =====
+// backend/controllers/payoutController.js
 export const updateBankDetails = async (req, res) => {
     try {
-        const { bankName, accountNumber, accountName, bankCode } = req.body;
+        const { bankName, accountNumber, bankCode } = req.body;
         const instructorId = req.user.id;
 
-        // Validate input
-        if (!bankName || !accountNumber || !accountName || !bankCode) {
+        // Validate input (remove accountName requirement)
+        if (!bankName || !accountNumber || !bankCode) {
             return res.status(400).json({
                 success: false,
-                message: 'All bank details are required (bank name, account number, account name, bank code)'
+                message: 'Bank name, account number, and bank code are required'
             });
         }
 
-        // Validate account number format (Nigerian accounts are 10 digits)
+        // Validate account number format (Nigerian = 10 digits)
         if (!/^\d{10}$/.test(accountNumber)) {
             return res.status(400).json({
                 success: false,
@@ -171,29 +170,19 @@ export const updateBankDetails = async (req, res) => {
             });
         }
 
-        // Verify account with Paystack
+        // Verify with Paystack - THIS IS THE SOURCE OF TRUTH
         const validation = await payoutService.validateAccount(accountNumber, bankCode);
 
         if (!validation.success) {
             return res.status(400).json({
                 success: false,
-                message: 'Could not verify account. Please check your details and try again.',
+                message: 'Could not verify account. Please check your details.',
                 error: validation.error
             });
         }
 
-        // Check if account name matches
-        const providedName = accountName.trim().toLowerCase();
-        const actualName = validation.accountName.trim().toLowerCase();
-        
-        if (providedName !== actualName) {
-            return res.status(400).json({
-                success: false,
-                message: 'Account name does not match the bank records',
-                expected: validation.accountName,
-                provided: accountName
-            });
-        }
+        // Use Paystack's returned name - DON'T compare with user input
+        const verifiedAccountName = validation.accountName;
 
         // Update user with bank details
         const instructor = await User.findByIdAndUpdate(
@@ -202,7 +191,7 @@ export const updateBankDetails = async (req, res) => {
                 bankDetails: {
                     bankName,
                     accountNumber,
-                    accountName: validation.accountName, // Use the verified name
+                    accountName: verifiedAccountName, // Use Paystack's name
                     bankCode
                 },
                 bankDetailsVerified: true
@@ -219,17 +208,17 @@ export const updateBankDetails = async (req, res) => {
 
         res.json({
             success: true,
-            message: 'Bank details saved successfully',
+            message: 'Bank details saved and verified successfully',
             bankDetails: instructor.bankDetails,
-            bankDetailsVerified: instructor.bankDetailsVerified
+            bankDetailsVerified: true,
+            verifiedName: verifiedAccountName // Show the verified name
         });
 
     } catch (error) {
         console.error('Update bank details error:', error);
         res.status(500).json({
             success: false,
-            message: 'Failed to update bank details',
-            error: error.message
+            message: 'Failed to update bank details'
         });
     }
 };
