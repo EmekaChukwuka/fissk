@@ -9,7 +9,7 @@ class InstructorEarnings {
         this.bankDetails = null;
         this.bankDetailsVerified = false;
         // Use the same backend URL as the dashboard
-        this.baseUrl = 'https://fissk.onrender.com';
+        this.baseUrl = 'https://fissk-backend.onrender.com';
         this.init();
     }
 
