@@ -1,5 +1,5 @@
 // ============================================================
-// QUIZ TAKE - Main Quiz Taking Logic
+// QUIZ TAKE - Main Quiz Taking Logic (with Loading States)
 // ============================================================
 
 (function() {
@@ -23,7 +23,9 @@
     
     // ===== DOM REFERENCES =====
     const elements = {
-        loading: document.getElementById('loadingState'),
+        loading: document.getElementById('quizLoadingScreen'),
+        errorScreen: document.getElementById('quizErrorScreen'),
+        mainContent: document.getElementById('quizMainContent'),
         header: document.getElementById('quizHeader'),
         title: document.getElementById('quizTitle'),
         description: document.getElementById('quizDescription'),
@@ -48,13 +50,68 @@
         confirmSubmit: document.getElementById('confirmSubmitBtn')
     };
     
+    // ===== UI HELPERS =====
+    function showQuiz() {
+        if (window.QuizTakeUI && window.QuizTakeUI.showQuiz) {
+            window.QuizTakeUI.showQuiz();
+        } else {
+            // Fallback
+            const loading = document.getElementById('quizLoadingScreen');
+            const main = document.getElementById('quizMainContent');
+            if (loading) loading.style.display = 'none';
+            if (main) {
+                main.classList.remove('quiz-content-hidden');
+                main.classList.add('quiz-content-visible');
+            }
+        }
+    }
+    
+    function showError(title, message) {
+        if (window.QuizTakeUI && window.QuizTakeUI.showError) {
+            window.QuizTakeUI.showError(title, message);
+        } else {
+            // Fallback
+            const loading = document.getElementById('quizLoadingScreen');
+            const error = document.getElementById('quizErrorScreen');
+            const errorTitle = document.getElementById('errorTitle');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            if (loading) loading.style.display = 'none';
+            if (error) error.style.display = 'flex';
+            if (errorTitle && title) errorTitle.textContent = title;
+            if (errorMessage && message) errorMessage.textContent = message;
+        }
+    }
+    
+    function showSubmitting() {
+        if (window.QuizTakeUI && window.QuizTakeUI.showSubmitting) {
+            window.QuizTakeUI.showSubmitting();
+        } else {
+            // Fallback
+            const overlay = document.getElementById('submittingOverlay');
+            if (overlay) overlay.classList.add('active');
+        }
+    }
+    
+    function hideSubmitting() {
+        if (window.QuizTakeUI && window.QuizTakeUI.hideSubmitting) {
+            window.QuizTakeUI.hideSubmitting();
+        } else {
+            // Fallback
+            const overlay = document.getElementById('submittingOverlay');
+            if (overlay) overlay.classList.remove('active');
+        }
+    }
+    
     // ===== INITIALIZATION =====
     async function init() {
         state.quizId = QuizUtils.getQueryParam('quizId');
         
         if (!state.quizId) {
-            QuizUtils.showToast('No quiz specified', 'error');
-            window.location.href = '../classes.html';
+            showError(
+                'No Quiz Specified',
+                'Please select a quiz to take from your class page.'
+            );
             return;
         }
         
@@ -62,7 +119,9 @@
         const token = localStorage.getItem('token');
         if (!token) {
             QuizUtils.showToast('Please login to take this quiz', 'error');
-            window.location.href = '../login.html';
+            setTimeout(() => {
+                window.location.href = '../login.html';
+            }, 1500);
             return;
         }
         
@@ -72,15 +131,37 @@
             setupEventListeners();
             renderQuestion();
             state.isLoading = false;
-            if (elements.loading) elements.loading.style.display = 'none';
+            
+            // ===== SHOW THE QUIZ =====
+            showQuiz();
         } catch (error) {
             console.error('Init error:', error);
-            QuizUtils.showToast(error.message || 'Failed to load quiz', 'error');
-            if (elements.loading) {
-                elements.loading.innerHTML = `
-                    <p style="color: #EF4444;">❌ ${error.message}</p>
-                    <button class="btn btn-primary" onclick="location.reload()">Retry</button>
-                `;
+            
+            if (error.message.includes('enrolled') || error.message.includes('permission')) {
+                showError(
+                    'Enrollment Required',
+                    error.message || 'You need to be enrolled in this class to take the quiz.'
+                );
+            } else if (error.message.includes('login')) {
+                QuizUtils.showToast(error.message, 'error');
+                setTimeout(() => {
+                    window.location.href = '../login.html';
+                }, 1500);
+            } else if (error.message.includes('attempts') || error.message.includes('Maximum')) {
+                showError(
+                    'No Attempts Left',
+                    error.message || 'You have used all your attempts for this quiz.'
+                );
+            } else if (error.message.includes('not found') || error.message.includes('draft')) {
+                showError(
+                    'Quiz Unavailable',
+                    error.message || 'This quiz is not available at the moment.'
+                );
+            } else {
+                showError(
+                    'Failed to Load Quiz',
+                    error.message || 'Something went wrong. Please try again.'
+                );
             }
         }
     }
@@ -401,6 +482,10 @@
         state.isSubmitted = true;
         
         if (elements.confirmModal) elements.confirmModal.style.display = 'none';
+        
+        // ===== SHOW SUBMITTING OVERLAY =====
+        showSubmitting();
+        
         if (elements.submitBtn) {
             elements.submitBtn.disabled = true;
             elements.submitBtn.textContent = '⏳ Submitting...';
@@ -414,15 +499,22 @@
             
             if (data.success) {
                 QuizUtils.showToast('✅ Quiz submitted successfully!', 'success');
-                // Redirect to results
-                window.location.href = `results.html?attemptId=${data.attempt._id}`;
+                // Redirect to results after short delay
+                setTimeout(() => {
+                    window.location.href = `results.html?attemptId=${data.attempt._id}`;
+                }, 800);
             } else {
                 throw new Error(data.message || 'Submission failed');
             }
         } catch (error) {
             console.error('Submit error:', error);
+            
+            // Hide submitting overlay on error
+            hideSubmitting();
+            
             QuizUtils.showToast(error.message || 'Failed to submit quiz', 'error');
             state.isSubmitted = false;
+            
             if (elements.submitBtn) {
                 elements.submitBtn.disabled = false;
                 elements.submitBtn.textContent = '📤 Submit Quiz';

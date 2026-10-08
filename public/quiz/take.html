@@ -7,6 +7,176 @@
     <link rel="stylesheet" href="../styles.css">
     <link rel="stylesheet" href="../css/quiz/quiz-take.css">
     <link rel="icon" href="../fissklogo.jpg">
+    <style>
+        /* ===== LOADING SPINNER ===== */
+        .quiz-loading-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 70vh;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .spinner-container {
+            position: relative;
+            width: 90px;
+            height: 90px;
+            margin-bottom: 28px;
+        }
+
+        .spinner-ring {
+            position: absolute;
+            border: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+        }
+
+        .spinner-ring:nth-child(1) {
+            width: 100%;
+            height: 100%;
+            border-top-color: #8B5FBF;
+            animation-delay: -0.45s;
+        }
+
+        .spinner-ring:nth-child(2) {
+            width: 70%;
+            height: 70%;
+            top: 15%;
+            left: 15%;
+            border-right-color: #6C63FF;
+            animation-delay: -0.3s;
+        }
+
+        .spinner-ring:nth-child(3) {
+            width: 40%;
+            height: 40%;
+            top: 30%;
+            left: 30%;
+            border-bottom-color: #FF6B8B;
+            animation-delay: -0.15s;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .quiz-loading-screen h3 {
+            font-size: 1.4rem;
+            color: #1A1A2E;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .quiz-loading-screen p {
+            color: #6B7280;
+            font-size: 1rem;
+            max-width: 400px;
+        }
+
+        /* ===== ERROR STATE ===== */
+        .quiz-error-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 70vh;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .quiz-error-screen .error-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        .quiz-error-screen h3 {
+            font-size: 1.5rem;
+            color: #EF4444;
+            margin-bottom: 12px;
+        }
+
+        .quiz-error-screen p {
+            color: #6B7280;
+            font-size: 1rem;
+            margin-bottom: 24px;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+
+        .quiz-error-screen .btn {
+            margin: 0 6px;
+        }
+
+        /* ===== INITIAL LOADING (existing) ===== */
+        .quiz-loading {
+            display: none;
+        }
+
+        /* Hide main content until loaded */
+        .quiz-content-hidden {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease;
+        }
+
+        .quiz-content-visible {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.4s ease;
+        }
+
+        /* Small spinner for inline use */
+        .spinner-small {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        /* ===== SUBMITTING OVERLAY ===== */
+        .submitting-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(26, 26, 46, 0.9);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .submitting-overlay.active {
+            display: flex;
+        }
+
+        .submitting-overlay .spinner-container {
+            margin-bottom: 0;
+        }
+
+        .submitting-overlay h3 {
+            color: white;
+            font-size: 1.4rem;
+            margin: 0;
+        }
+
+        .submitting-overlay p {
+            color: rgba(255, 255, 255, 0.7);
+            margin: 0;
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
@@ -31,46 +201,74 @@
 
     <section class="quiz-section">
         <div class="container">
-            <!-- Quiz Header -->
-            <div class="quiz-header" id="quizHeader">
-                <div class="quiz-title-area">
-                    <h1 id="quizTitle">Loading Quiz...</h1>
-                    <p id="quizDescription"></p>
+            <!-- ===== LOADING SCREEN ===== -->
+            <div class="quiz-loading-screen" id="quizLoadingScreen">
+                <div class="spinner-container">
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
                 </div>
-                <div class="quiz-stats-area">
-                    <div class="quiz-timer" id="quizTimer">
-                        <span class="timer-icon">⏱️</span>
-                        <span class="timer-display" id="timerDisplay">--:--</span>
+                <h3>Loading Quiz...</h3>
+                <p>Please wait while we prepare your quiz questions.</p>
+            </div>
+
+            <!-- ===== ERROR SCREEN ===== -->
+            <div class="quiz-error-screen" id="quizErrorScreen" style="display: none;">
+                <span class="error-icon">❌</span>
+                <h3 id="errorTitle">Failed to Load Quiz</h3>
+                <p id="errorMessage">Something went wrong. Please try again.</p>
+                <div>
+                    <button class="btn btn-primary" onclick="location.reload()">🔄 Retry</button>
+                    <a href="../classes.html" class="btn btn-outline">← Back to Classes</a>
+                </div>
+            </div>
+
+            <!-- ===== MAIN QUIZ CONTENT (hidden until loaded) ===== -->
+            <div id="quizMainContent" class="quiz-content-hidden">
+
+                <!-- Quiz Header -->
+                <div class="quiz-header" id="quizHeader">
+                    <div class="quiz-title-area">
+                        <h1 id="quizTitle">Loading Quiz...</h1>
+                        <p id="quizDescription"></p>
                     </div>
-                    <div class="quiz-progress-text">
-                        <span id="questionCounter">0 / 0</span>
-                        <span id="answeredCounter">0 answered</span>
+                    <div class="quiz-stats-area">
+                        <div class="quiz-timer" id="quizTimer">
+                            <span class="timer-icon">⏱️</span>
+                            <span class="timer-display" id="timerDisplay">--:--</span>
+                        </div>
+                        <div class="quiz-progress-text">
+                            <span id="questionCounter">0 / 0</span>
+                            <span id="answeredCounter">0 answered</span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Progress Bar -->
-            <div class="quiz-progress-bar">
-                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-            </div>
-
-            <!-- Question Area -->
-            <div class="quiz-question-container" id="questionContainer">
-                <div class="question-number" id="questionNumber">Question 1</div>
-                <div class="question-text" id="questionText">Loading question...</div>
-                <div class="question-options" id="questionOptions">
-                    <!-- Options will be rendered here -->
+                <!-- Progress Bar -->
+                <div class="quiz-progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
                 </div>
-                <div class="question-actions">
-                    <button class="btn btn-outline" id="prevBtn" disabled>← Previous</button>
-                    <button class="btn btn-primary" id="nextBtn">Next →</button>
-                </div>
-            </div>
 
-            <!-- Submit Area -->
-            <div class="quiz-submit-area">
-                <button class="btn btn-success" id="submitQuizBtn">📤 Submit Quiz</button>
-                <span class="submit-info" id="submitInfo">You have answered <span id="answeredCount">0</span> of <span id="totalCount">0</span> questions</span>
+                <!-- Question Area -->
+                <div class="quiz-question-container" id="questionContainer">
+                    <div class="question-number" id="questionNumber">Question 1</div>
+                    <div class="question-text" id="questionText">Loading question...</div>
+                    <div class="question-options" id="questionOptions">
+                        <!-- Options will be rendered here -->
+                    </div>
+                    <div class="question-actions">
+                        <button class="btn btn-outline" id="prevBtn" disabled>← Previous</button>
+                        <button class="btn btn-primary" id="nextBtn">Next →</button>
+                    </div>
+                </div>
+
+                <!-- Submit Area -->
+                <div class="quiz-submit-area">
+                    <button class="btn btn-success" id="submitQuizBtn">📤 Submit Quiz</button>
+                    <span class="submit-info" id="submitInfo">
+                        You have answered <span id="answeredCount">0</span> of <span id="totalCount">0</span> questions
+                    </span>
+                </div>
             </div>
         </div>
     </section>
@@ -91,13 +289,108 @@
         </div>
     </div>
 
-    <!-- Loading State -->
-    <div id="loadingState" class="quiz-loading">
-        <div class="spinner"></div>
-        <p>Loading quiz...</p>
+    <!-- ===== SUBMITTING OVERLAY ===== -->
+    <div class="submitting-overlay" id="submittingOverlay">
+        <div class="spinner-container">
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+        </div>
+        <h3>Submitting Your Quiz...</h3>
+        <p>Calculating your score, please wait.</p>
     </div>
 
     <script src="../js/quiz/quiz-core.js"></script>
     <script src="../js/quiz/quiz-take.js"></script>
+
+    <!-- ===== UI HELPERS FOR LOADING / ERROR / SUBMIT STATES ===== -->
+    <script>
+        // Global helper functions for state management
+        window.QuizTakeUI = {
+            /**
+             * Show the loading screen
+             */
+            showLoading() {
+                const loading = document.getElementById('quizLoadingScreen');
+                const error = document.getElementById('quizErrorScreen');
+                const main = document.getElementById('quizMainContent');
+
+                if (loading) loading.style.display = 'flex';
+                if (error) error.style.display = 'none';
+                if (main) {
+                    main.classList.add('quiz-content-hidden');
+                    main.classList.remove('quiz-content-visible');
+                }
+            },
+
+            /**
+             * Show the main quiz content (hide loading)
+             */
+            showQuiz() {
+                const loading = document.getElementById('quizLoadingScreen');
+                const error = document.getElementById('quizErrorScreen');
+                const main = document.getElementById('quizMainContent');
+
+                if (loading) loading.style.display = 'none';
+                if (error) error.style.display = 'none';
+                if (main) {
+                    main.classList.remove('quiz-content-hidden');
+                    main.classList.add('quiz-content-visible');
+                }
+            },
+
+            /**
+             * Show error screen
+             */
+            showError(title, message) {
+                const loading = document.getElementById('quizLoadingScreen');
+                const error = document.getElementById('quizErrorScreen');
+                const main = document.getElementById('quizMainContent');
+                const errorTitle = document.getElementById('errorTitle');
+                const errorMessage = document.getElementById('errorMessage');
+
+                if (loading) loading.style.display = 'none';
+                if (main) {
+                    main.classList.add('quiz-content-hidden');
+                    main.classList.remove('quiz-content-visible');
+                }
+                if (error) error.style.display = 'flex';
+                if (errorTitle && title) errorTitle.textContent = title;
+                if (errorMessage && message) errorMessage.textContent = message;
+            },
+
+            /**
+             * Show submitting overlay
+             */
+            showSubmitting() {
+                const overlay = document.getElementById('submittingOverlay');
+                if (overlay) overlay.classList.add('active');
+            },
+
+            /**
+             * Hide submitting overlay
+             */
+            hideSubmitting() {
+                const overlay = document.getElementById('submittingOverlay');
+                if (overlay) overlay.classList.remove('active');
+            }
+        };
+
+        // Show loading immediately on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            window.QuizTakeUI.showLoading();
+        });
+
+        // Safety timeout: if quiz doesn't load in 15 seconds, show error
+        setTimeout(() => {
+            const loading = document.getElementById('quizLoadingScreen');
+            if (loading && loading.style.display === 'flex') {
+                window.QuizTakeUI.showError(
+                    'Taking Too Long...',
+                    'The quiz is taking longer than expected to load. Please check your connection and try again.'
+                );
+            }
+        }, 15000);
+    </script>
 </body>
 </html>
