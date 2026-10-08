@@ -1,7 +1,12 @@
+// backend/controllers/quizAttemptController.js
 import Quiz from '../models/Quiz.js';
 import QuizAttempt from '../models/QuizAttempt.js';
 import QuizService from '../services/quizService.js';
 import Enrollment from '../models/Enrollment.js';
+import Class from '../models/Class.js';
+import Stream from '../models/Stream.js';
+import Assignment from '../models/Assignment.js';
+import User from '../models/User.js';
 
 /**
  * Start a quiz attempt
@@ -23,7 +28,6 @@ export const startAttempt = async (req, res) => {
     const quiz = await QuizService.validateAttempt(quizId, userId);
 
     // Check enrollment
-    const Enrollment = (await import('../models/Enrollment.js')).default;
     const enrollment = await Enrollment.findOne({ userId, classId: quiz.classId });
     
     if (!enrollment) {
@@ -34,7 +38,6 @@ export const startAttempt = async (req, res) => {
     }
 
     // Check for existing in-progress attempt
-    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
     const existingAttempt = await QuizAttempt.findOne({
       quizId,
       userId,
@@ -120,7 +123,7 @@ export const saveAnswer = async (req, res) => {
     }
 
     attempt.answers[answerIndex].answer = answer;
-    attempt.answers[answerIndex].isCorrect = null; // Reset grading
+    attempt.answers[answerIndex].isCorrect = null;
     attempt.answers[answerIndex].pointsEarned = null;
 
     await attempt.save();
@@ -200,9 +203,14 @@ export const submitAttempt = async (req, res) => {
     });
 
     if (enrollment) {
+      // Ensure quizProgress array exists
+      if (!enrollment.quizProgress) {
+        enrollment.quizProgress = [];
+      }
+
       // Check if quiz already exists in progress
       const existingIndex = enrollment.quizProgress.findIndex(
-        q => q.quizId.toString() === quizId.toString()
+        q => q.quizId && q.quizId.toString() === quizId.toString()
       );
       
       const quizData = {
@@ -211,7 +219,9 @@ export const submitAttempt = async (req, res) => {
         score: gradedAttempt.score,
         passed: gradedAttempt.passed,
         completedAt: new Date(),
-        attemptNumber: enrollment.quizProgress.filter(q => q.quizId.toString() === quizId.toString()).length + 1,
+        attemptNumber: enrollment.quizProgress.filter(
+          q => q.quizId && q.quizId.toString() === quizId.toString()
+        ).length + 1,
         timeSpent: gradedAttempt.timeSpent || 0
       };
       
@@ -229,13 +239,15 @@ export const submitAttempt = async (req, res) => {
       enrollment.totalQuizzesTaken = completedQuizzes.length;
       
       if (completedQuizzes.length > 0) {
-        const scores = completedQuizzes.map(q => q.score);
-        enrollment.averageQuizScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-        enrollment.bestQuizScore = Math.max(...scores);
+        const quizScores = completedQuizzes.map(q => q.score);
+        enrollment.averageQuizScore = Math.round(
+          quizScores.reduce((a, b) => a + b, 0) / quizScores.length
+        );
+        enrollment.bestQuizScore = Math.max(...quizScores);
         enrollment.quizzesPassed = completedQuizzes.filter(q => q.passed).length;
       }
       
-      // ===== NEW: UPDATE OVERALL COURSE PROGRESS =====
+      // Update overall course progress
       await updateCourseProgress(enrollment._id);
       
       await enrollment.save();
@@ -311,7 +323,9 @@ async function updateCourseProgress(enrollmentId) {
   totalItems += quizzes.length;
   
   // Count completed quizzes
-  const completedQuizzes = enrollment.quizProgress.filter(q => q.completedAt).length;
+  const completedQuizzes = enrollment.quizProgress 
+    ? enrollment.quizProgress.filter(q => q.completedAt).length 
+    : 0;
   completedItems += completedQuizzes;
 
   // 3. Assignments (if any)
@@ -351,9 +365,6 @@ export const getAttemptResults = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
-    const Quiz = (await import('../models/Quiz.js')).default;
-
     const attempt = await QuizAttempt.findById(attemptId)
       .populate('quizId')
       .lean();
@@ -365,7 +376,7 @@ export const getAttemptResults = async (req, res) => {
     console.log('Attempt userId:', attempt.userId?.toString());
     console.log('Current userId:', userId?.toString());
 
-    // ===== FIX: Compare as strings =====
+    // Compare as strings
     const isOwner = attempt.userId?.toString() === userId?.toString();
     console.log('Is owner?', isOwner);
 
@@ -457,9 +468,6 @@ export const gradeEssay = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
-    const Quiz = (await import('../models/Quiz.js')).default;
-
     const attempt = await QuizAttempt.findById(attemptId);
     if (!attempt) {
       return res.status(404).json({ success: false, message: 'Attempt not found' });
@@ -470,7 +478,7 @@ export const gradeEssay = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    // ===== FIX: Compare as strings =====
+    // Compare as strings
     const isInstructor = quiz.instructorId?.toString() === userId?.toString();
     console.log('Is instructor?', isInstructor);
 
@@ -553,14 +561,13 @@ export const getQuizSubmissions = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    const Quiz = (await import('../models/Quiz.js')).default;
     const quiz = await Quiz.findById(quizId);
     
     if (!quiz) {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    // ===== FIX: Compare as strings =====
+    // Compare as strings
     const isInstructor = quiz.instructorId?.toString() === userId?.toString();
     console.log('Is instructor?', isInstructor);
     console.log('Quiz instructor ID:', quiz.instructorId?.toString());
@@ -573,10 +580,6 @@ export const getQuizSubmissions = async (req, res) => {
         message: 'Only the quiz instructor can view submissions' 
       });
     }
-
-
-    const QuizAttempt = (await import('../models/QuizAttempt.js')).default;
-    const User = (await import('../models/User.js')).default;
 
     const submissions = await QuizAttempt.find({ quizId })
       .populate('userId', 'firstName lastName email')

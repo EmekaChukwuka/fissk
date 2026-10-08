@@ -53,4 +53,4 @@ adminRouter.put('/payouts/:id/complete', hasPermission('managePayouts'), complet
 adminRouter.get('/settings', hasPermission('manageSettings'), getSettings);
 adminRouter.put('/settings', hasPermission('manageSettings'), updateSettings);
 
-export default adminRouter;
+export default adminRouter;  
