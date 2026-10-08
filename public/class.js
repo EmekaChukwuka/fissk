@@ -524,25 +524,44 @@ class ClassManager {
     }
 
     async viewQuizResults(quizId) {
-        try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/${quizId}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            const data = await response.json();
-            if (data.success && data.quiz && data.quiz.attemptId) {
-                window.location.href = `quiz/results.html?attemptId=${data.quiz.attemptId}`;
-            } else {
-                window.showToast('No results available for this quiz.', 'info');
+    try {
+         const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/attempts/user?classId=${this.classId}`, {
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Content-Type': 'application/json'
             }
-        } catch (error) {
-            console.error('View results error:', error);
-            window.showToast('Failed to load results.', 'error');
+        });
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.attempts || data.attempts.length === 0) {
+            window.showToast('No results available for this quiz.', 'info');
+            return;
         }
+
+        // Find the most recent completed attempt for this specific quiz
+        const completedAttempts = data.attempts
+            .filter(a => {
+                const attemptQuizId = a.quizId?._id || a.quizId;
+                return attemptQuizId?.toString() === quizId.toString() &&
+                       (a.status === 'completed' || a.status === 'graded');
+            })
+            .sort((a, b) => new Date(b.submittedAt || b.createdAt) - new Date(a.submittedAt || a.createdAt));
+
+        if (completedAttempts.length === 0) {
+            window.showToast('No completed attempts found for this quiz.', 'info');
+            return;
+        }
+
+        // Redirect to the results page with the latest attempt
+        const latestAttempt = completedAttempts[0];
+        window.location.href = `quiz/results.html?attemptId=${latestAttempt._id}`;
+        
+    } catch (error) {
+        console.error('View results error:', error);
+        window.showToast('Failed to load results.', 'error');
     }
+}
     
 
 /**
