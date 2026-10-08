@@ -1,4 +1,5 @@
 // backend/controllers/quizAttemptController.js
+import mongoose from 'mongoose';
 import Quiz from '../models/Quiz.js';
 import QuizAttempt from '../models/QuizAttempt.js';
 import QuizService from '../services/quizService.js';
@@ -7,6 +8,9 @@ import Class from '../models/Class.js';
 import Stream from '../models/Stream.js';
 import Assignment from '../models/Assignment.js';
 import User from '../models/User.js';
+
+// Get raw Mongoose models where needed
+const StreamModel = mongoose.model('Stream');
 
 /**
  * Start a quiz attempt
@@ -24,10 +28,8 @@ export const startAttempt = async (req, res) => {
     console.log('Quiz ID:', quizId);
     console.log('User ID:', userId);
 
-    // Validate attempt - this will throw if not valid
     const quiz = await QuizService.validateAttempt(quizId, userId);
 
-    // Check enrollment
     const enrollment = await Enrollment.findOne({ userId, classId: quiz.classId });
     
     if (!enrollment) {
@@ -37,7 +39,6 @@ export const startAttempt = async (req, res) => {
       });
     }
 
-    // Check for existing in-progress attempt
     const existingAttempt = await QuizAttempt.findOne({
       quizId,
       userId,
@@ -53,11 +54,9 @@ export const startAttempt = async (req, res) => {
       });
     }
 
-    // Get attempt number
     const attemptsCount = await QuizAttempt.countDocuments({ quizId, userId });
     const attemptNumber = attemptsCount + 1;
 
-    // Create new attempt
     const attempt = new QuizAttempt({
       quizId,
       userId,
@@ -102,7 +101,6 @@ export const saveAnswer = async (req, res) => {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
 
-    // Find active attempt
     const attempt = await QuizAttempt.findOne({
       quizId,
       userId,
@@ -116,7 +114,6 @@ export const saveAnswer = async (req, res) => {
       });
     }
 
-    // Update answer
     const answerIndex = attempt.answers.findIndex(a => a.questionIndex === questionIndex);
     if (answerIndex === -1) {
       return res.status(400).json({ success: false, message: 'Invalid question index' });
@@ -164,14 +161,12 @@ export const submitAttempt = async (req, res) => {
       });
     }
 
-    // Calculate time spent
     const timeSpent = Math.floor((Date.now() - new Date(attempt.startedAt).getTime()) / 1000);
     attempt.timeSpent = timeSpent;
     attempt.submittedAt = new Date();
 
     await attempt.save();
 
-    // Auto-grade the attempt
     const gradedAttempt = await QuizService.autoGradeAttempt(attempt._id);
 
     // ===== UPDATE CLASS STATS =====
@@ -203,12 +198,10 @@ export const submitAttempt = async (req, res) => {
     });
 
     if (enrollment) {
-      // Ensure quizProgress array exists
       if (!enrollment.quizProgress) {
         enrollment.quizProgress = [];
       }
 
-      // Check if quiz already exists in progress
       const existingIndex = enrollment.quizProgress.findIndex(
         q => q.quizId && q.quizId.toString() === quizId.toString()
       );
@@ -234,7 +227,6 @@ export const submitAttempt = async (req, res) => {
         enrollment.quizProgress.push(quizData);
       }
       
-      // Update enrollment quiz stats
       const completedQuizzes = enrollment.quizProgress.filter(q => q.completedAt);
       enrollment.totalQuizzesTaken = completedQuizzes.length;
       
@@ -247,7 +239,6 @@ export const submitAttempt = async (req, res) => {
         enrollment.quizzesPassed = completedQuizzes.filter(q => q.passed).length;
       }
       
-      // Update overall course progress
       await updateCourseProgress(enrollment._id);
       
       await enrollment.save();
@@ -297,19 +288,16 @@ async function updateCourseProgress(enrollmentId) {
   const enrollment = await Enrollment.findById(enrollmentId);
   if (!enrollment) return;
 
-  // Get class data to know total items
   const classData = await Class.findById(enrollment.classId);
   if (!classData) return;
 
-  // Count total items in the class
   let totalItems = 0;
   let completedItems = 0;
 
   // 1. Videos/Streams
-  const streams = await Stream.find({ streamClass: enrollment.classId });
+  const streams = await StreamModel.find({ streamClass: enrollment.classId });
   totalItems += streams.length;
   
-  // Count completed videos from progressItems
   const completedVideos = enrollment.progressItems.filter(
     item => item.itemType === 'video' && item.completed
   ).length;
@@ -322,13 +310,12 @@ async function updateCourseProgress(enrollmentId) {
   });
   totalItems += quizzes.length;
   
-  // Count completed quizzes
   const completedQuizzes = enrollment.quizProgress 
     ? enrollment.quizProgress.filter(q => q.completedAt).length 
     : 0;
   completedItems += completedQuizzes;
 
-  // 3. Assignments (if any)
+  // 3. Assignments
   const assignments = await Assignment.find({ classId: enrollment.classId });
   totalItems += assignments.length;
   
@@ -340,10 +327,8 @@ async function updateCourseProgress(enrollmentId) {
   // Calculate progress percentage
   const progress = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
-  // Update enrollment progress
   enrollment.progress = Math.min(progress, 100);
   
-  // Mark as completed if 100%
   if (progress >= 100) {
     enrollment.completed = true;
     enrollment.completedAt = new Date();
@@ -373,36 +358,25 @@ export const getAttemptResults = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Attempt not found' });
     }
 
-    console.log('Attempt userId:', attempt.userId?.toString());
-    console.log('Current userId:', userId?.toString());
-
-    // Compare as strings
     const isOwner = attempt.userId?.toString() === userId?.toString();
-    console.log('Is owner?', isOwner);
 
-    // Check if user is instructor of the class
     let isInstructor = false;
     try {
       const quiz = await Quiz.findById(attempt.quizId);
       if (quiz) {
         isInstructor = quiz.instructorId?.toString() === userId?.toString();
-        console.log('Is instructor?', isInstructor);
       }
     } catch (err) {
       console.error('Error checking instructor:', err);
     }
 
     if (!isOwner && !isInstructor) {
-      console.log('❌ User does not have permission to view these results');
       return res.status(403).json({ 
         success: false, 
         message: 'You do not have permission to view these results' 
       });
     }
 
-    console.log('✅ User has permission to view results');
-
-    // Get detailed results
     const results = await QuizService.getDetailedResults(attemptId);
 
     res.json({
@@ -478,9 +452,7 @@ export const gradeEssay = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    // Compare as strings
     const isInstructor = quiz.instructorId?.toString() === userId?.toString();
-    console.log('Is instructor?', isInstructor);
 
     if (!isInstructor) {
       return res.status(403).json({ 
@@ -489,7 +461,6 @@ export const gradeEssay = async (req, res) => {
       });
     }
 
-    // Update answer with instructor grading
     const answer = attempt.answers.find(a => a.questionIndex === questionIndex);
     if (!answer) {
       return res.status(400).json({ success: false, message: 'Invalid question index' });
@@ -508,7 +479,6 @@ export const gradeEssay = async (req, res) => {
     answer.isCorrect = earnedPoints >= maxPoints / 2;
     answer.pointsEarned = earnedPoints;
 
-    // Recalculate total score
     let totalPoints = 0;
     let earnedTotal = 0;
 
@@ -532,7 +502,6 @@ export const gradeEssay = async (req, res) => {
 
     await attempt.save();
 
-    // Update quiz stats
     await QuizService.updateQuizStats(quiz._id);
 
     console.log('✅ Essay graded successfully');
@@ -567,14 +536,10 @@ export const getQuizSubmissions = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    // Compare as strings
     const isInstructor = quiz.instructorId?.toString() === userId?.toString();
     console.log('Is instructor?', isInstructor);
-    console.log('Quiz instructor ID:', quiz.instructorId?.toString());
-    console.log('Current user ID:', userId?.toString());
 
     if (!isInstructor) {
-      console.log('❌ User is not the instructor of this quiz');
       return res.status(403).json({ 
         success: false, 
         message: 'Only the quiz instructor can view submissions' 
@@ -588,7 +553,6 @@ export const getQuizSubmissions = async (req, res) => {
 
     console.log(`Found ${submissions.length} submissions`);
 
-    // Format submissions for frontend
     const formattedSubmissions = submissions.map(sub => ({
       ...sub,
       studentName: sub.userId ? `${sub.userId.firstName} ${sub.userId.lastName}`.trim() : 'Anonymous',
