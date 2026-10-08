@@ -7,6 +7,122 @@
     <link rel="stylesheet" href="../styles.css">
     <link rel="stylesheet" href="../css/quiz/quiz-results.css">
     <link rel="icon" href="../fissklogo.jpg">
+    <style>
+        /* ===== LOADING SPINNER ===== */
+        .results-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .spinner-container {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
+        }
+
+        .spinner-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 4px solid transparent;
+            border-radius: 50%;
+            animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+        }
+
+        .spinner-ring:nth-child(1) {
+            border-top-color: #8B5FBF;
+            animation-delay: -0.45s;
+        }
+
+        .spinner-ring:nth-child(2) {
+            border-right-color: #6C63FF;
+            animation-delay: -0.3s;
+            width: 70%;
+            height: 70%;
+            top: 15%;
+            left: 15%;
+        }
+
+        .spinner-ring:nth-child(3) {
+            border-bottom-color: #FF6B8B;
+            animation-delay: -0.15s;
+            width: 40%;
+            height: 40%;
+            top: 30%;
+            left: 30%;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-loading h3 {
+            font-size: 1.3rem;
+            color: #1A1A2E;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .results-loading p {
+            color: #6B7280;
+            font-size: 1rem;
+        }
+
+        /* ===== ERROR STATE ===== */
+        .results-error {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .results-error .error-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        .results-error h3 {
+            font-size: 1.5rem;
+            color: #EF4444;
+            margin-bottom: 12px;
+        }
+
+        .results-error p {
+            color: #6B7280;
+            font-size: 1rem;
+            margin-bottom: 24px;
+            max-width: 400px;
+        }
+
+        .results-error .btn {
+            margin: 0 6px;
+        }
+
+        /* Hide the results section until loaded */
+        .results-section .container > *:not(.results-loading):not(.results-error) {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .results-section.loaded .container > *:not(.results-loading):not(.results-error) {
+            opacity: 1;
+        }
+
+        .results-section.loaded .results-loading,
+        .results-section.loaded .results-error {
+            display: none;
+        }
+    </style>
 </head>
 <body>
     <!-- Navigation -->
@@ -29,10 +145,32 @@
         </div>
     </nav>
 
-    <section class="results-section">
+    <section class="results-section" id="resultsSection">
         <div class="container">
+            <!-- Loading Spinner -->
+            <div class="results-loading" id="resultsLoading">
+                <div class="spinner-container">
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
+                    <div class="spinner-ring"></div>
+                </div>
+                <h3>Loading Your Results...</h3>
+                <p>Please wait while we fetch your quiz results.</p>
+            </div>
+
+            <!-- Error State (hidden by default) -->
+            <div class="results-error" id="resultsError" style="display: none;">
+                <span class="error-icon">❌</span>
+                <h3>Failed to Load Results</h3>
+                <p id="errorMessage">Something went wrong. Please try again.</p>
+                <div>
+                    <button class="btn btn-primary" onclick="location.reload()">🔄 Retry</button>
+                    <a href="../classes.html" class="btn btn-outline">← Back to Classes</a>
+                </div>
+            </div>
+
             <!-- Results Summary -->
-            <div class="results-summary" id="resultsSummary">
+            <div class="results-summary" id="resultsSummary" style="display: none;">
                 <div class="results-header">
                     <h1 id="quizTitle">Quiz Results</h1>
                     <p id="quizDescription"></p>
@@ -64,7 +202,7 @@
             </div>
 
             <!-- Review Questions -->
-            <div class="results-questions">
+            <div class="results-questions" id="resultsQuestions" style="display: none;">
                 <h2>Review Answers</h2>
                 <div id="questionsReview">
                     <!-- Questions will be rendered here -->
@@ -72,7 +210,7 @@
             </div>
 
             <!-- Actions -->
-            <div class="results-actions">
+            <div class="results-actions" id="resultsActions" style="display: none;">
                 <a href="../classes.html" class="btn btn-outline">← Back to Classes</a>
                 <a href="../dashboard.html" class="btn btn-primary">📊 Dashboard</a>
                 <button class="btn btn-secondary" id="retakeBtn" style="display:none;">🔄 Retake Quiz</button>
@@ -82,5 +220,86 @@
 
     <script src="../js/quiz/quiz-core.js"></script>
     <script src="../js/quiz/quiz-results.js"></script>
+    <script>
+        // ===== HELPER FUNCTIONS FOR LOADING STATE =====
+        window.QuizResultsUI = {
+            /**
+             * Show loading state
+             */
+            showLoading() {
+                const section = document.getElementById('resultsSection');
+                const loading = document.getElementById('resultsLoading');
+                const error = document.getElementById('resultsError');
+                const summary = document.getElementById('resultsSummary');
+                const questions = document.getElementById('resultsQuestions');
+                const actions = document.getElementById('resultsActions');
+
+                if (section) section.classList.remove('loaded');
+                if (loading) loading.style.display = 'flex';
+                if (error) error.style.display = 'none';
+                if (summary) summary.style.display = 'none';
+                if (questions) questions.style.display = 'none';
+                if (actions) actions.style.display = 'none';
+            },
+
+            /**
+             * Show results (hide loading)
+             */
+            showResults() {
+                const section = document.getElementById('resultsSection');
+                const loading = document.getElementById('resultsLoading');
+                const error = document.getElementById('resultsError');
+                const summary = document.getElementById('resultsSummary');
+                const questions = document.getElementById('resultsQuestions');
+                const actions = document.getElementById('resultsActions');
+
+                if (loading) loading.style.display = 'none';
+                if (error) error.style.display = 'none';
+                if (summary) summary.style.display = 'block';
+                if (questions) questions.style.display = 'block';
+                if (actions) actions.style.display = 'flex';
+                if (section) section.classList.add('loaded');
+            },
+
+            /**
+             * Show error state
+             */
+            showError(message) {
+                const section = document.getElementById('resultsSection');
+                const loading = document.getElementById('resultsLoading');
+                const error = document.getElementById('resultsError');
+                const summary = document.getElementById('resultsSummary');
+                const questions = document.getElementById('resultsQuestions');
+                const actions = document.getElementById('resultsActions');
+                const errorMsg = document.getElementById('errorMessage');
+
+                if (loading) loading.style.display = 'none';
+                if (summary) summary.style.display = 'none';
+                if (questions) questions.style.display = 'none';
+                if (actions) actions.style.display = 'none';
+                if (error) error.style.display = 'flex';
+                if (errorMsg && message) errorMsg.textContent = message;
+                if (section) section.classList.remove('loaded');
+            }
+        };
+
+        // ===== SHOW LOADING IMMEDIATELY =====
+        document.addEventListener('DOMContentLoaded', () => {
+            window.QuizResultsUI.showLoading();
+        });
+
+        // ===== SAFETY TIMEOUT =====
+        // If results don't load within 15 seconds, show error
+        setTimeout(() => {
+            const section = document.getElementById('resultsSection');
+            if (section && !section.classList.contains('loaded')) {
+                // Only show timeout error if we're still loading
+                const loading = document.getElementById('resultsLoading');
+                if (loading && loading.style.display !== 'none') {
+                    window.QuizResultsUI.showError('Taking too long to load. Please check your connection and try again.');
+                }
+            }
+        }, 15000);
+    </script>
 </body>
 </html>

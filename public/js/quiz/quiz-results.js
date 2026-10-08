@@ -1,5 +1,5 @@
 // ============================================================
-// QUIZ RESULTS - Display Quiz Results (FIXED)
+// QUIZ RESULTS - Display Quiz Results (FIXED with Loading States)
 // ============================================================
 
 (function() {
@@ -27,6 +27,57 @@
         errorContainer: document.getElementById('resultsError')
     };
     
+    // ===== LOADING STATE HELPERS =====
+    function showLoading() {
+        const section = document.getElementById('resultsSection');
+        const loading = document.getElementById('resultsLoading');
+        const error = document.getElementById('resultsError');
+        const summary = document.getElementById('resultsSummary');
+        const questions = document.getElementById('resultsQuestions');
+        const actions = document.getElementById('resultsActions');
+
+        if (section) section.classList.remove('loaded');
+        if (loading) loading.style.display = 'flex';
+        if (error) error.style.display = 'none';
+        if (summary) summary.style.display = 'none';
+        if (questions) questions.style.display = 'none';
+        if (actions) actions.style.display = 'none';
+    }
+    
+    function showResults() {
+        const section = document.getElementById('resultsSection');
+        const loading = document.getElementById('resultsLoading');
+        const error = document.getElementById('resultsError');
+        const summary = document.getElementById('resultsSummary');
+        const questions = document.getElementById('resultsQuestions');
+        const actions = document.getElementById('resultsActions');
+
+        if (loading) loading.style.display = 'none';
+        if (error) error.style.display = 'none';
+        if (summary) summary.style.display = 'block';
+        if (questions) questions.style.display = 'block';
+        if (actions) actions.style.display = 'flex';
+        if (section) section.classList.add('loaded');
+    }
+    
+    function showError(message) {
+        const section = document.getElementById('resultsSection');
+        const loading = document.getElementById('resultsLoading');
+        const error = document.getElementById('resultsError');
+        const summary = document.getElementById('resultsSummary');
+        const questions = document.getElementById('resultsQuestions');
+        const actions = document.getElementById('resultsActions');
+        const errorMsg = document.getElementById('errorMessage');
+
+        if (loading) loading.style.display = 'none';
+        if (summary) summary.style.display = 'none';
+        if (questions) questions.style.display = 'none';
+        if (actions) actions.style.display = 'none';
+        if (error) error.style.display = 'flex';
+        if (errorMsg && message) errorMsg.textContent = message;
+        if (section) section.classList.remove('loaded');
+    }
+    
     // ===== INITIALIZATION =====
     async function init() {
         state.attemptId = QuizUtils.getQueryParam('attemptId');
@@ -45,34 +96,43 @@
             return;
         }
         
+        // ===== SHOW LOADING IMMEDIATELY =====
+        showLoading();
+        
+        // Safety timeout: if results don't load in 15 seconds, show error
+        const safetyTimeout = setTimeout(() => {
+            const section = document.getElementById('resultsSection');
+            if (section && !section.classList.contains('loaded')) {
+                showError('Taking too long to load. Please check your connection and try again.');
+            }
+        }, 15000);
+        
         try {
             await loadResults();
+            
+            // Clear the safety timeout since we loaded successfully
+            clearTimeout(safetyTimeout);
+            
             renderResults();
             setupEventListeners();
+            
+            // ===== HIDE LOADING, SHOW RESULTS =====
+            showResults();
         } catch (error) {
+            clearTimeout(safetyTimeout);
             console.error('Init error:', error);
             
-            if (error.message === 'You do not have permission to view these results') {
-                // Show a friendly message
-                const container = document.querySelector('.results-section .container');
-                if (container) {
-                    container.innerHTML = `
-                        <div class="error-container" style="text-align: center; padding: 60px 20px;">
-                            <div style="font-size: 4rem; margin-bottom: 20px;">🔒</div>
-                            <h2 style="color: #1A1A2E; margin-bottom: 12px;">Access Denied</h2>
-                            <p style="color: #6B7280; font-size: 1.1rem; max-width: 500px; margin: 0 auto 24px;">
-                                You don't have permission to view these results. 
-                                ${error.message.includes('instructor') ? 'Only the quiz creator can view these results.' : 'Please make sure you are logged in as the correct user.'}
-                            </p>
-                            <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-                                <a href="../dashboard.html" class="btn btn-primary">Go to Dashboard</a>
-                                <a href="../classes.html" class="btn btn-outline">Browse Classes</a>
-                            </div>
-                        </div>
-                    `;
-                }
+            if (error.message === 'You do not have permission to view these results' ||
+                error.message.includes('permission')) {
+                // Show a friendly message in the error container
+                showError(error.message || 'You do not have permission to view these results.');
+            } else if (error.message.includes('login')) {
+                QuizUtils.showToast(error.message, 'error');
+                setTimeout(() => {
+                    window.location.href = '../login.html';
+                }, 1500);
             } else {
-                QuizUtils.showToast(error.message || 'Failed to load results', 'error');
+                showError(error.message || 'Failed to load quiz results');
             }
         }
     }
@@ -104,8 +164,12 @@
                 throw new Error('Please login to view results');
             }
             
+            if (response.status === 404) {
+                throw new Error('Quiz attempt not found. It may have been deleted.');
+            }
+            
             if (!response.ok) {
-                throw new Error('Failed to load results');
+                throw new Error(`Failed to load results (${response.status})`);
             }
             
             const data = await response.json();
