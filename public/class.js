@@ -131,7 +131,7 @@ class ClassManager {
         try {
             console.log('Loading class data for ID:', this.classId);
             
-            const response = await fetch(`https://fissk-backend.onrender.com/register/class/${this.classId}`);
+            const response = await fetch(`https://fissk-iui2.onrender.com/register/class/${this.classId}`);
             
             console.log('Class data response status:', response.status);
             
@@ -192,7 +192,7 @@ class ClassManager {
         }
         
         try {
-            const response = await fetch('https://fissk-backend.onrender.com/register/get-user-classes', {
+            const response = await fetch('https://fissk-iui2.onrender.com/register/get-user-classes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: this.user.email })
@@ -220,7 +220,7 @@ class ClassManager {
     async loadClassVideos() {
         try {
             const userId = this.userId || '';
-            const response = await fetch(`https://fissk-backend.onrender.com/api/by-class/${this.classId}?userId=${userId}`);
+            const response = await fetch(`https://fissk-iui2.onrender.com/api/by-class/${this.classId}?userId=${userId}`);
             
             if (!response.ok) {
                 throw new Error('Failed to load videos');
@@ -257,7 +257,7 @@ class ClassManager {
         try {
             console.log('Loading recordings for class:', this.classId);
             const userId = this.userId || '';
-            const response = await fetch(`https://fissk-backend.onrender.com/api/by-class/${this.classId}?userId=${userId}`);
+            const response = await fetch(`https://fissk-iui2.onrender.com/api/by-class/${this.classId}?userId=${userId}`);
             
             if (!response.ok) {
                 throw new Error('Failed to load recordings');
@@ -308,7 +308,7 @@ class ClassManager {
             
             // Check enrollment status with payment details
             if (this.isEnrolled) {
-                const response = await fetch('https://fissk-backend.onrender.com/register/get-user-classes', {
+                const response = await fetch('https://fissk-iui2.onrender.com/register/get-user-classes', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: this.user.email })
@@ -375,7 +375,7 @@ class ClassManager {
 
         console.log('Loading quizzes with token:', token.substring(0, 20) + '...');
 
-        const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/class/${this.classId}`, {
+        const response = await fetch(`https://fissk-iui2.onrender.com/api/quizzes/class/${this.classId}`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -525,7 +525,7 @@ class ClassManager {
 
     async viewQuizResults(quizId) {
     try {
-         const response = await fetch(`https://fissk-backend.onrender.com/api/quizzes/attempts/user?classId=${this.classId}`, {
+         const response = await fetch(`https://fissk-iui2.onrender.com/api/quizzes/attempts/user?classId=${this.classId}`, {
             headers: {
                 'Authorization': `Bearer ${this.token}`,
                 'Content-Type': 'application/json'
@@ -828,7 +828,7 @@ showLessonDetail(lesson) {
 
             console.log('Loading lessons with token:', token.substring(0, 20) + '...');
 
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${this.classId}`, {
+            const response = await fetch(`https://fissk-iui2.onrender.com/api/lessons/class/${this.classId}`, {
                 headers: { 
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -937,7 +937,7 @@ showLessonDetail(lesson) {
 
     async loadUserProgress() {
         try {
-            const response = await fetch('https://fissk-backend.onrender.com/register/user-progress', {
+            const response = await fetch('https://fissk-iui2.onrender.com/register/user-progress', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: this.userId, classId: this.classId }),
@@ -964,7 +964,7 @@ showLessonDetail(lesson) {
 
     async loadUpcomingSessions() {
         try {
-            const res = await fetch('https://fissk-backend.onrender.com/register/class/upcoming', {
+            const res = await fetch('https://fissk-iui2.onrender.com/register/class/upcoming', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: this.classId }),
@@ -1117,7 +1117,7 @@ showLessonDetail(lesson) {
                             const name = `${this.classData.instructorId.firstName || ''} ${this.classData.instructorId.lastName || ''}`.trim();
                             if (instructorNameEl) instructorNameEl.textContent = name || 'Staff';
                         } else {
-                            const response = await fetch('https://fissk-backend.onrender.com/register/classes/instructor', {
+                            const response = await fetch('https://fissk-iui2.onrender.com/register/classes/instructor', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ instructor_id: this.classData.instructorId })
@@ -1282,7 +1282,7 @@ showLessonDetail(lesson) {
         try {
             console.log('Initiating payment for class:', this.classId, 'User:', this.user.id);
             
-            const response = await fetch('https://fissk-backend.onrender.com/api/payment/initialize', {
+            const response = await fetch('https://fissk-iui2.onrender.com/api/payment/initialize', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -1372,7 +1372,7 @@ showLessonDetail(lesson) {
         container.innerHTML = '<div class="forum-loading">Loading discussions...</div>';
         
         try {
-            const url = `https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`;
+            const url = `https://fissk-iui2.onrender.com/forum-api/class/${this.classId}/topics`;
             console.log('Fetching forum topics from:', url);
             
             const response = await fetch(url);
@@ -1542,7 +1542,7 @@ showLessonDetail(lesson) {
 
     async loadClassForumCategories() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/categories`);
+            const response = await fetch(`https://fissk-iui2.onrender.com/forum-api/class/${this.classId}/categories`);
             const categories = await response.json();
             
             const select = document.getElementById('classTopicCategory');
@@ -1576,7 +1576,7 @@ showLessonDetail(lesson) {
         try {
             console.log('Submitting topic:', { title, content, categoryId, userId: this.userId, classId: this.classId });
             
-            const response = await fetch(`https://fissk-backend.onrender.com/forum-api/class/${this.classId}/topics`, {
+            const response = await fetch(`https://fissk-iui2.onrender.com/forum-api/class/${this.classId}/topics`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1630,7 +1630,7 @@ showLessonDetail(lesson) {
             let userReview = null;
             if (this.userId) {
                 const userReviewRes = await fetch(
-                    `https://fissk-backend.onrender.com/api/reviews/user/${this.userId}/class/${this.classId}`
+                    `https://fissk-iui2.onrender.com/api/reviews/user/${this.userId}/class/${this.classId}`
                 );
                 if (userReviewRes.ok) {
                     const userReviewData = await userReviewRes.json();
@@ -1639,7 +1639,7 @@ showLessonDetail(lesson) {
             }
             
             const response = await fetch(
-                `https://fissk-backend.onrender.com/api/reviews/class/${this.classId}`
+                `https://fissk-iui2.onrender.com/api/reviews/class/${this.classId}`
             );
             
             if (!response.ok) {
@@ -1966,7 +1966,7 @@ showLessonDetail(lesson) {
         submitBtn.textContent = 'Saving...';
         
         try {
-            const response = await fetch('https://fissk-backend.onrender.com/api/reviews', {
+            const response = await fetch('https://fissk-iui2.onrender.com/api/reviews', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -2002,7 +2002,7 @@ showLessonDetail(lesson) {
         
         try {
             const response = await fetch(
-                `https://fissk-backend.onrender.com/api/reviews/${this.userId}/class/${this.classId}`,
+                `https://fissk-iui2.onrender.com/api/reviews/${this.userId}/class/${this.classId}`,
                 {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
@@ -2037,7 +2037,7 @@ showLessonDetail(lesson) {
         if (!reason) return;
         
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/reviews/${reviewId}/report`, {
+            const response = await fetch(`https://fissk-iui2.onrender.com/api/reviews/${reviewId}/report`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: this.userId, reason })
@@ -2564,7 +2564,7 @@ showLessonDetail(lesson) {
                 return;
             }
             
-            const statusResponse = await fetch(`https://fissk-backend.onrender.com/api/mux/asset-status/${playbackId}`);
+            const statusResponse = await fetch(`https://fissk-iui2.onrender.com/api/mux/asset-status/${playbackId}`);
             if (statusResponse.ok) {
                 const data = await statusResponse.json();
                 callback(data.ready || false);
@@ -2588,7 +2588,7 @@ showLessonDetail(lesson) {
                 if (this.userId && this.isEnrolled) {
                     const progressPercent = Math.floor((videoPlayer.currentTime / videoPlayer.duration) * 100);
                     if (progressPercent > 0) {
-                        fetch('https://fissk-backend.onrender.com/register/progress/update', {
+                        fetch('https://fissk-iui2.onrender.com/register/progress/update', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -2745,7 +2745,7 @@ async viewLesson(lessonId) {
             }
         }
 
-        const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}`, {
+        const response = await fetch(`https://fissk-iui2.onrender.com/api/lessons/${lessonId}`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -3092,7 +3092,7 @@ async markLessonComplete(lessonId, button = null, originalText = null) {
             return;
         }
 
-        const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/${lessonId}/complete`, {
+        const response = await fetch(`https://fissk-iui2.onrender.com/api/lessons/${lessonId}/complete`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -3167,7 +3167,7 @@ async markLessonComplete(lessonId, button = null, originalText = null) {
      */
     async loadLessons() {
         try {
-            const response = await fetch(`https://fissk-backend.onrender.com/api/lessons/class/${this.classId}`, {
+            const response = await fetch(`https://fissk-iui2.onrender.com/api/lessons/class/${this.classId}`, {
                 headers: { 
                     'Authorization': `Bearer ${this.token}`,
                     'Content-Type': 'application/json'
@@ -3237,7 +3237,7 @@ async markLessonComplete(lessonId, button = null, originalText = null) {
         }
 
         try {
-            const response = await fetch('https://fissk-backend.onrender.com/register/join-class', {
+            const response = await fetch('https://fissk-iui2.onrender.com/register/join-class', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ classId: this.classId, email: this.user.email })

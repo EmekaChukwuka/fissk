@@ -758,7 +758,7 @@ app.get('/live/chat-history', (req, res) => {
 const PORT = process.env.PORT || 3000;
 connectDB();
 //createAdmin();
-const url = `https://fissk-backend.onrender.com/`;
+const url = `https://fissk-iui2.onrender.com/`;
 const interval = 600000; // Interval in milliseconds (10 minutes)
 
 //Reloader Function
