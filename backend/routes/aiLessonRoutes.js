@@ -1,4 +1,3 @@
-// backend/routes/aiLessonRoutes.js
 import express from 'express';
 import axios from 'axios';
 import Class from '../models/Class.js';
@@ -10,8 +9,18 @@ const aiLessonRouter = express.Router();
 // CONFIG (env-overridable)
 // ============================================================
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL   = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+// ============================================================
+// MODEL FALLBACK CHAIN
+// Primary: Gemini 3.8 Flash (most intelligent Flash model)
+// Fallback 1: Gemini 3.6 Flash (high-throughput workhorse)
+// Fallback 2: Gemini 3.5 Flash-Lite (fastest, most budget-friendly)
+// ============================================================
+const MODEL_CHAIN = [
+  process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash-lite'
+];
 
 const MAX_PROMPT_CHARS   = 2000;
 const MIN_PROMPT_CHARS   = 10;
@@ -184,7 +193,7 @@ aiLessonRouter.post('/generate', auth, async (req, res) => {
     // ---- 5. Build prompt ----
     const promptText = buildPrompt(classData, trimmedPrompt, options || {});
 
-    // ---- 6. Call Gemini (structured JSON) ----
+    // ---- 6. Build Gemini request body ----
     const requestBody = {
       contents: [
         {
@@ -218,23 +227,46 @@ aiLessonRouter.post('/generate', auth, async (req, res) => {
       }
     };
 
-    let geminiResponse;
-    try {
-      geminiResponse = await axios.post(
-        `${GEMINI_URL}?key=${GEMINI_API_KEY}`,
-        requestBody,
-        {
-          timeout: REQUEST_TIMEOUT_MS,
-          headers: { 'Content-Type': 'application/json' }
+    // ---- 7. Call Gemini with fallback chain ----
+    let geminiResponse = null;
+    let lastError = null;
+
+    for (const model of MODEL_CHAIN) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      try {
+        console.log(`[AI] Trying model: ${model}`);
+        geminiResponse = await axios.post(
+          `${geminiUrl}?key=${GEMINI_API_KEY}`,
+          requestBody,
+          {
+            timeout: REQUEST_TIMEOUT_MS,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+        console.log(`[AI] Success with model: ${model}`);
+        break; // Success — exit loop
+      } catch (err) {
+        lastError = err;
+        const status = err.response?.status;
+        const detail = err.response?.data?.error?.message || err.message;
+        console.warn(`[AI] Model ${model} failed (status: ${status || 'N/A'}):`, detail);
+
+        // Non-retryable errors (4xx except 429) should stop immediately.
+        // Retrying with a different model won't fix an invalid request or bad API key.
+        if (status && status !== 429 && status < 500) {
+          console.error(`[AI] Non-retryable error (${status}). Stopping fallback.`);
+          break;
         }
-      );
-    } catch (err) {
-      const status = err.response?.status;
-      const detail = err.response?.data?.error?.message || err.message;
+        // Otherwise, continue to next model (429, 5xx, timeout, network error)
+      }
+    }
 
-      console.error('Gemini API error:', status, detail);
+    // ---- 8. Handle all-models-failed ----
+    if (!geminiResponse) {
+      const status = lastError?.response?.status;
+      const isTimeout = lastError?.code === 'ECONNABORTED' || lastError?.code === 'ETIMEDOUT';
 
-      if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
+      if (isTimeout) {
         return res.status(504).json({
           success: false,
           message: 'AI request timed out. Please try again.'
@@ -258,7 +290,7 @@ aiLessonRouter.post('/generate', auth, async (req, res) => {
       });
     }
 
-    // ---- 7. Extract JSON text from Gemini response ----
+    // ---- 9. Extract JSON text from Gemini response ----
     const candidate = geminiResponse.data?.candidates?.[0];
     const parts     = candidate?.content?.parts || [];
     const rawText   = parts.map(p => p.text || '').join('');
@@ -271,7 +303,7 @@ aiLessonRouter.post('/generate', auth, async (req, res) => {
       });
     }
 
-    // ---- 8. Parse and validate ----
+    // ---- 10. Parse and validate ----
     let parsed;
     try {
       parsed = JSON.parse(rawText);
@@ -316,14 +348,14 @@ aiLessonRouter.post('/generate', auth, async (req, res) => {
       });
     }
 
-    // ---- 9. Estimated time (matches frontend/backend math) ----
+    // ---- 11. Estimated time (matches frontend/backend math) ----
     const totalWords = cleanItems.reduce(
       (sum, it) => sum + it.content.split(/\s+/).filter(Boolean).length,
       0
     );
     const estimatedTime = Math.max(1, Math.ceil(totalWords / 100));
 
-    // ---- 10. Return draft (no DB write) ----
+    // ---- 12. Return draft (no DB write) ----
     return res.json({
       success: true,
       draft: {
