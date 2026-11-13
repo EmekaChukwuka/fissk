@@ -254,6 +254,22 @@
         .q-type-badge.fill-in { background: #d1fae5; color: #065f46; }
         .q-type-badge.essay { background: #fce4ec; color: #b71c1c; }
 
+        /* ===== AI QUIZ GENERATOR: spinner ===== */
+        .spinner-small {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: qspin 0.6s linear infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        @keyframes qspin {
+            to { transform: rotate(360deg); }
+        }
+
         /* Responsive */
         @media (max-width: 600px) {
             .question-modal-content {
@@ -368,7 +384,11 @@
             <div class="builder-section questions-section">
                 <div class="questions-header">
                     <h3>📋 Questions</h3>
-                    <button class="btn btn-primary" id="addQuestionBtn">+ Add Question</button>
+                    <div>
+                        <button class="btn btn-primary" id="addQuestionBtn">+ Add Question</button>
+                        <!-- ===== AI QUIZ GENERATOR: trigger button ===== -->
+                        <button class="btn btn-primary" id="aiGenerateQuizBtn" style="background:#6C3CE1; margin-left:8px;">✨ Generate with AI</button>
+                    </div>
                 </div>
                 <div id="questionsList" class="questions-list">
                     <!-- Questions will be added here -->
@@ -503,6 +523,38 @@
             <div id="previewContent">
                 <p>Loading preview...</p>
             </div>
+        </div>
+    </div>
+
+    <!-- ===== AI QUIZ GENERATOR MODAL ===== -->
+    <div id="aiQuizModal" class="modal">
+        <div class="modal-content" style="max-width:640px;">
+            <span class="close-modal" id="closeAiQuizModal">&times;</span>
+            <h2>✨ Generate Questions with AI</h2>
+            <p style="color:#6B7280; margin-bottom:16px;">
+                Describe the questions you want. The AI will draft multiple-choice and true/false questions you can review and edit.
+            </p>
+
+            <form id="aiQuizForm">
+                <div class="form-group-modern">
+                    <label for="aiQuizPrompt">Describe the questions you need <span class="required">*</span></label>
+                    <textarea id="aiQuizPrompt" rows="4" required
+                        placeholder="e.g. Create 5 multiple-choice questions on the causes of World War I, and 2 true/false questions on key dates."></textarea>
+                    <span class="hint">10–2000 characters.</span>
+                </div>
+
+                <div class="form-group-modern">
+                    <label for="aiQuizCount">Number of questions (max 20)</label>
+                    <input type="number" id="aiQuizCount" value="5" min="1" max="20" style="max-width:140px;">
+                </div>
+
+                <div id="aiQuizStatus" style="display:none; padding:12px; border-radius:8px; margin-top:8px;"></div>
+
+                <div class="form-actions" style="border-top:1px solid var(--border); padding-top:16px; margin-top:8px; display:flex; justify-content:flex-end; gap:12px;">
+                    <button type="button" class="btn btn-outline" id="aiQuizCancelBtn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="aiQuizSubmitBtn">✨ Generate Questions</button>
+                </div>
+            </form>
         </div>
     </div>
 

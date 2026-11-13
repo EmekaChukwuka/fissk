@@ -1,5 +1,5 @@
 // ============================================================
-// QUIZ BUILDER - Create and Edit Quizzes (UPDATED)
+// QUIZ BUILDER - Create and Edit Quizzes (UPDATED + AI Generator)
 // ============================================================
 
 (function() {
@@ -44,7 +44,7 @@
         saveQuestionBtn: document.getElementById('saveQuestionBtn'),
         previewModal: document.getElementById('previewModal'),
         previewContent: document.getElementById('previewContent'),
-        // NEW: Redesigned modal elements
+        // Redesigned modal elements
         questionCountBadge: document.getElementById('questionCountBadge'),
         typeSelector: document.getElementById('questionTypeSelector'),
         optionsContainer: document.getElementById('optionsContainer'),
@@ -75,27 +75,24 @@
 
     function setOptionsInUI(options, correctIndex) {
         const container = elements.optionsContainer;
-        // Clear existing options (keep the add button)
         const addBtn = container.querySelector('.add-option-btn');
         container.querySelectorAll('.option-row').forEach(el => el.remove());
-        
+
         options.forEach((opt, index) => {
             addOptionRow(opt, index, correctIndex === index);
         });
-        
-        // Re-append add button
+
         container.appendChild(addBtn);
     }
 
     function addOptionRow(value = '', index = null, isCorrect = false) {
         const container = elements.optionsContainer;
         const addBtn = container.querySelector('.add-option-btn');
-        
-        // Calculate index
+
         const rows = container.querySelectorAll('.option-row');
         const idx = index !== null ? index : rows.length;
-        const letter = String.fromCharCode(65 + idx); // A, B, C, D, ...
-        
+        const letter = String.fromCharCode(65 + idx);
+
         const row = document.createElement('div');
         row.className = 'option-row';
         row.dataset.optionIndex = idx;
@@ -107,11 +104,9 @@
             </label>
             <button type="button" class="remove-option" title="Remove option">✕</button>
         `;
-        
-        // Insert before the add button
+
         container.insertBefore(row, addBtn);
-        
-        // Add remove event
+
         row.querySelector('.remove-option').addEventListener('click', function() {
             const rows = container.querySelectorAll('.option-row');
             if (rows.length <= 2) {
@@ -121,10 +116,9 @@
             row.remove();
             updateOptionLetters();
         });
-        
-        // Update radio button values when options change
+
         row.querySelector('.option-input').addEventListener('input', updateOptionLetters);
-        
+
         updateOptionLetters();
         return row;
     }
@@ -144,8 +138,7 @@
         const container = elements.optionsContainer;
         const addBtn = container.querySelector('.add-option-btn');
         container.querySelectorAll('.option-row').forEach(el => el.remove());
-        
-        // Add 4 default options
+
         for (let i = 0; i < 4; i++) {
             addOptionRow('', i, i === 0);
         }
@@ -156,24 +149,21 @@
     function setupQuestionTypeSelector() {
         const buttons = elements.typeSelector.querySelectorAll('.question-type-btn');
         const optionsGroup = document.getElementById('optionsGroup');
-        
+
         buttons.forEach(btn => {
             btn.addEventListener('click', function() {
-                // Update active state
                 buttons.forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
-                
+
                 const type = this.dataset.type;
                 elements.questionType.value = type;
-                
-                // Show/hide options based on type
+
                 if (type === 'essay' || type === 'fill-in') {
                     optionsGroup.style.display = 'none';
                 } else {
                     optionsGroup.style.display = 'block';
                 }
-                
-                // For true/false, set specific options
+
                 if (type === 'true-false') {
                     setOptionsInUI(['True', 'False'], 0);
                 }
@@ -265,7 +255,7 @@
     // ===== RENDER QUESTIONS =====
     function renderQuestions() {
         if (!elements.questionsList) return;
-        
+
         if (state.questions.length === 0) {
             elements.questionsList.innerHTML = `
                 <div class="empty-questions">
@@ -297,7 +287,6 @@
             `;
         }).join('');
 
-        // Add event listeners
         elements.questionsList.querySelectorAll('.edit-question-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 const index = parseInt(this.dataset.index);
@@ -320,30 +309,24 @@
     function openQuestionModal(index = null) {
         state.editingIndex = index;
 
-        // Reset UI
         resetOptionsUI();
-        
-        // Set active type button
+
         const buttons = elements.typeSelector.querySelectorAll('.question-type-btn');
         buttons.forEach(b => b.classList.remove('active'));
 
         if (index !== null && state.questions[index]) {
             const q = state.questions[index];
-            
-            // Set title
+
             if (elements.questionModalTitle) elements.questionModalTitle.textContent = '✏️ Edit Question';
             if (elements.saveQuestionBtn) elements.saveQuestionBtn.textContent = '✅ Update Question';
             if (elements.questionCountBadge) elements.questionCountBadge.textContent = `Question ${index + 1}`;
-            
-            // Set type
+
             const typeBtn = elements.typeSelector.querySelector(`[data-type="${q.type}"]`);
             if (typeBtn) typeBtn.classList.add('active');
             if (elements.questionType) elements.questionType.value = q.type || 'multiple-choice';
-            
-            // Set question text
+
             if (elements.questionText) elements.questionText.value = q.question || '';
-            
-            // Set options
+
             if (q.options && q.options.length > 0) {
                 let correctIndex = 0;
                 if (typeof q.correctAnswer === 'number') {
@@ -353,14 +336,10 @@
                 }
                 setOptionsInUI(q.options, correctIndex);
             }
-            
-            // Set points
+
             if (elements.questionPoints) elements.questionPoints.value = q.points || 1;
-            
-            // Set explanation
             if (elements.questionExplanation) elements.questionExplanation.value = q.explanation || '';
-            
-            // Show/hide options based on type
+
             const optionsGroup = document.getElementById('optionsGroup');
             if (q.type === 'essay' || q.type === 'fill-in') {
                 if (optionsGroup) optionsGroup.style.display = 'none';
@@ -368,25 +347,21 @@
                 if (optionsGroup) optionsGroup.style.display = 'block';
             }
         } else {
-            // New question
             if (elements.questionModalTitle) elements.questionModalTitle.textContent = '✏️ Add Question';
             if (elements.saveQuestionBtn) elements.saveQuestionBtn.textContent = '✅ Add Question';
             if (elements.questionCountBadge) elements.questionCountBadge.textContent = `Question ${state.questions.length + 1}`;
-            
-            // Reset form
+
             if (elements.questionForm) elements.questionForm.reset();
             if (elements.questionText) elements.questionText.value = '';
             if (elements.questionPoints) elements.questionPoints.value = 1;
             if (elements.questionExplanation) elements.questionExplanation.value = '';
-            
-            // Set default type
+
             const defaultBtn = elements.typeSelector.querySelector('[data-type="multiple-choice"]');
             if (defaultBtn) defaultBtn.classList.add('active');
             if (elements.questionType) elements.questionType.value = 'multiple-choice';
-            
+
             resetOptionsUI();
-            
-            // Show options
+
             const optionsGroup = document.getElementById('optionsGroup');
             if (optionsGroup) optionsGroup.style.display = 'block';
         }
@@ -411,7 +386,6 @@
         let options = [];
         let correctAnswer = null;
 
-        // Handle different question types
         if (type === 'essay') {
             options = [];
             correctAnswer = null;
@@ -420,7 +394,6 @@
             const correctIndex = getCorrectOptionIndex();
             correctAnswer = correctIndex === 0 ? 0 : 1;
         } else if (type === 'fill-in') {
-            // For fill-in, we use the first option as the correct answer
             const optionInputs = elements.optionsContainer.querySelectorAll('.option-input');
             if (optionInputs.length > 0 && optionInputs[0].value.trim()) {
                 options = [optionInputs[0].value.trim()];
@@ -430,18 +403,16 @@
                 return;
             }
         } else {
-            // Multiple choice or multiple answer
             options = getOptionsFromUI();
             if (options.length < 2) {
                 alert('Please enter at least 2 options');
                 return;
             }
-            
+
             const correctIndex = getCorrectOptionIndex();
             if (type === 'multiple-choice') {
                 correctAnswer = correctIndex;
             } else if (type === 'multiple-answer') {
-                // For multiple answer, we need to collect all checked options
                 const checkedOptions = elements.optionsContainer.querySelectorAll('input[name="correctOption"]:checked');
                 correctAnswer = Array.from(checkedOptions).map(el => parseInt(el.value));
                 if (correctAnswer.length === 0) {
@@ -510,7 +481,7 @@
         };
 
         const isEditing = state.isEditing && state.quizId;
-        const url = isEditing 
+        const url = isEditing
             ? `https://fissk-iui2.onrender.com/api/quizzes/${state.quizId}`
             : 'https://fissk-iui2.onrender.com/api/quizzes';
         const method = isEditing ? 'PUT' : 'POST';
@@ -546,11 +517,11 @@
 
             if (data.success) {
                 QuizUtils.showToast(`✅ Quiz ${isEditing ? 'updated' : 'created'} successfully!`, 'success');
-                
+
                 if (confirm('Quiz saved! Would you like to publish it now?')) {
                     await publishQuiz(data.quiz?._id || state.quizId);
                 }
-                
+
                 window.location.href = '../../instructor-dashboard.html#classes';
             } else {
                 QuizUtils.showToast('❌ ' + (data.message || 'Failed to save quiz'), 'error');
@@ -644,10 +615,134 @@
         `;
 
         elements.previewContent.innerHTML = previewHTML;
-        
+
         if (elements.previewModal) {
             elements.previewModal.style.display = 'flex';
         }
+    }
+
+    // ============================================================
+    // ===== AI QUIZ GENERATOR =====
+    // ============================================================
+
+    function openAiQuizModal() {
+        const modal = document.getElementById('aiQuizModal');
+        if (!modal) return;
+        const form = document.getElementById('aiQuizForm');
+        if (form) form.reset();
+        const countEl = document.getElementById('aiQuizCount');
+        if (countEl) countEl.value = 5;
+        const status = document.getElementById('aiQuizStatus');
+        if (status) {
+            status.style.display = 'none';
+            status.textContent = '';
+        }
+        modal.style.display = 'flex';
+    }
+
+    function showAiQuizStatus(message, type = 'error') {
+        const status = document.getElementById('aiQuizStatus');
+        if (!status) return;
+        const colors = {
+            error:   { bg: '#fee2e2', color: '#991b1b' },
+            success: { bg: '#d1fae5', color: '#065f46' },
+            info:    { bg: '#dbeafe', color: '#1e40af' }
+        };
+        const c = colors[type] || colors.error;
+        status.style.display = 'block';
+        status.style.background = c.bg;
+        status.style.color = c.color;
+        status.textContent = message;
+    }
+
+    async function generateQuizWithAI() {
+        const promptEl = document.getElementById('aiQuizPrompt');
+        const prompt = (promptEl?.value || '').trim();
+        const countEl = document.getElementById('aiQuizCount');
+        const count = Math.min(Math.max(parseInt(countEl?.value) || 5, 1), 20);
+
+        if (prompt.length < 10) {
+            showAiQuizStatus('Please describe your questions in at least 10 characters.', 'error');
+            return;
+        }
+
+        if (!state.classId) {
+            showAiQuizStatus('No class selected. Please return to your dashboard.', 'error');
+            return;
+        }
+
+        const submitBtn = document.getElementById('aiQuizSubmitBtn');
+        const original = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-small"></span> Generating…';
+        showAiQuizStatus('Generating your questions…', 'info');
+
+        try {
+            const response = await fetch('https://fissk-iui2.onrender.com/api/quizzes/generate', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${state.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    classId: state.classId,
+                    prompt,
+                    options: { count }
+                })
+            });
+
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '../../login.html';
+                return;
+            }
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok || !data.success) {
+                showAiQuizStatus(data.message || 'Failed to generate questions. Please try again.', 'error');
+                return;
+            }
+
+            applyAiQuestions(data.draft);
+
+            const note = data.draft.rejectedCount > 0
+                ? ` (${data.draft.rejectedCount} question(s) were dropped because the AI returned them in an invalid format.)`
+                : '';
+            showAiQuizStatus(
+                `✨ Added ${data.draft.questions.length} question(s). Review and edit below, then save.${note}`,
+                'success'
+            );
+
+            setTimeout(() => {
+                const modal = document.getElementById('aiQuizModal');
+                if (modal) modal.style.display = 'none';
+            }, 900);
+
+        } catch (error) {
+            console.error('AI quiz generate error:', error);
+            showAiQuizStatus('Network error. Please check your connection and try again.', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = original;
+        }
+    }
+
+    function applyAiQuestions(draft) {
+        if (!draft || !Array.isArray(draft.questions)) return;
+
+        const newQuestions = draft.questions.map(q => ({
+            type: q.type,
+            question: q.question,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            points: q.points,
+            explanation: q.explanation
+        }));
+
+        state.questions = state.questions.concat(newQuestions);
+        renderQuestions();
     }
 
     // ===== DISCARD =====
@@ -696,6 +791,34 @@
         // Discard
         if (elements.discardBtn) {
             elements.discardBtn.addEventListener('click', discard);
+        }
+
+        // ===== AI QUIZ GENERATOR: listeners =====
+        const aiGenerateQuizBtn = document.getElementById('aiGenerateQuizBtn');
+        if (aiGenerateQuizBtn) {
+            aiGenerateQuizBtn.addEventListener('click', openAiQuizModal);
+        }
+
+        const aiQuizForm = document.getElementById('aiQuizForm');
+        if (aiQuizForm) {
+            aiQuizForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                generateQuizWithAI();
+            });
+        }
+
+        const aiQuizCancel = document.getElementById('aiQuizCancelBtn');
+        if (aiQuizCancel) {
+            aiQuizCancel.addEventListener('click', () => {
+                document.getElementById('aiQuizModal').style.display = 'none';
+            });
+        }
+
+        const closeAiQuiz = document.getElementById('closeAiQuizModal');
+        if (closeAiQuiz) {
+            closeAiQuiz.addEventListener('click', () => {
+                document.getElementById('aiQuizModal').style.display = 'none';
+            });
         }
 
         // Modal close on overlay click

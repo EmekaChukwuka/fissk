@@ -21,6 +21,7 @@ import quizRouter from './routes/quizRoutes.js';
 import certificateRouter from './routes/certificateRoutes.js';
 import lessonRouter from './routes/lessonRoutes.js';
 import aiLessonRouter from './routes/aiLessonRoutes.js';
+import aiQuizRouter from './routes/aiQuizRoutes.js';
 import axios from "axios";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,6 +48,7 @@ app.use('/register', Regisrouter);
 app.use('/api/payment', paymentRouter);
 app.use('/api/payout', payoutRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/quizzes', aiQuizRouter);
 app.use('/api/quizzes', quizRouter);
 app.use('/api/certificates', certificateRouter);
 app.use('/api/lessons', aiLessonRouter);
