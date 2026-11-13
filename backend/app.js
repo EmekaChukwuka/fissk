@@ -20,6 +20,7 @@ import createAdmin from './scripts/createAdmin.js';
 import quizRouter from './routes/quizRoutes.js';
 import certificateRouter from './routes/certificateRoutes.js';
 import lessonRouter from './routes/lessonRoutes.js';
+import aiLessonRouter from './routes/aiLessonRoutes.js';
 import axios from "axios";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -48,7 +49,9 @@ app.use('/api/payout', payoutRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/quizzes', quizRouter);
 app.use('/api/certificates', certificateRouter);
+app.use('/api/lessons', aiLessonRouter);
 app.use('/api/lessons', lessonRouter);
+
 
 // ===== LIVEKIT CONFIGURATION =====
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
@@ -759,7 +762,7 @@ const PORT = process.env.PORT || 3000;
 connectDB();
 //createAdmin();
 const url = `https://fissk-iui2.onrender.com/`;
-const interval = 600000; // Interval in milliseconds (10 minutes)
+const interval = 300000; // Interval in milliseconds (5 minutes)
 
 //Reloader Function
 function reloadWebsite() {

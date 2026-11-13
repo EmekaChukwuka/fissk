@@ -326,6 +326,34 @@ class LessonBuilder {
                 this.saveContentItem();
             });
         }
+
+        // ===== AI LESSON GENERATOR: event listeners =====
+        const aiBtn = document.getElementById('aiGenerateBtn');
+        if (aiBtn) {
+            aiBtn.addEventListener('click', () => this.openAiModal());
+        }
+
+        const aiForm = document.getElementById('aiForm');
+        if (aiForm) {
+            aiForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.generateWithAI();
+            });
+        }
+
+        const aiCancel = document.getElementById('aiCancelBtn');
+        if (aiCancel) {
+            aiCancel.addEventListener('click', () => {
+                document.getElementById('aiModal').style.display = 'none';
+            });
+        }
+
+        const aiClose = document.getElementById('closeAiModal');
+        if (aiClose) {
+            aiClose.addEventListener('click', () => {
+                document.getElementById('aiModal').style.display = 'none';
+            });
+        }
     }
 
     toggleContentFields() {
@@ -757,6 +785,134 @@ class LessonBuilder {
                 saveBtn.textContent = '💾 Save Lesson';
             }
         }
+    }
+
+    // ============================================================
+    // AI LESSON GENERATOR METHODS
+    // ============================================================
+
+    openAiModal() {
+        const modal = document.getElementById('aiModal');
+        if (!modal) return;
+        const aiForm = document.getElementById('aiForm');
+        if (aiForm) aiForm.reset();
+        const assess = document.getElementById('aiIncludeAssessment');
+        if (assess) assess.checked = true;
+        const status = document.getElementById('aiStatus');
+        if (status) {
+            status.style.display = 'none';
+            status.textContent = '';
+        }
+        modal.style.display = 'flex';
+    }
+
+    showAiStatus(message, type = 'error') {
+        const status = document.getElementById('aiStatus');
+        if (!status) return;
+        const colors = {
+            error:   { bg: '#fee2e2', color: '#991b1b' },
+            success: { bg: '#d1fae5', color: '#065f46' },
+            info:    { bg: '#dbeafe', color: '#1e40af' }
+        };
+        const c = colors[type] || colors.error;
+        status.style.display = 'block';
+        status.style.background = c.bg;
+        status.style.color = c.color;
+        status.textContent = message;
+    }
+
+    async generateWithAI() {
+        const promptEl = document.getElementById('aiPrompt');
+        const prompt = (promptEl?.value || '').trim();
+
+        if (prompt.length < 10) {
+            this.showAiStatus('Please describe your lesson in at least 10 characters.', 'error');
+            return;
+        }
+
+        const gradeLevel        = (document.getElementById('aiGradeLevel')?.value || '').trim();
+        const depth             = document.getElementById('aiDepth')?.value || 'standard';
+        const includeAssessment = document.getElementById('aiIncludeAssessment')?.checked !== false;
+
+        const submitBtn = document.getElementById('aiGenerateSubmit');
+        const original  = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="loading-spinner"></span> Generating…';
+        this.showAiStatus('Generating your lesson draft…', 'info');
+
+        try {
+            const response = await fetch('https://fissk-iui2.onrender.com/api/lessons/generate', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    classId: this.classId,
+                    prompt,
+                    options: { gradeLevel, depth, includeAssessment }
+                })
+            });
+
+            if (response.status === 401) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '../../login.html';
+                return;
+            }
+
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok || !data.success) {
+                const msg = data.message || 'Failed to generate lesson. Please try again.';
+                this.showAiStatus(msg, 'error');
+                return;
+            }
+
+            this.applyAiDraft(data.draft);
+            this.showAiStatus('✨ Draft generated. Review and edit below, then save.', 'success');
+
+            setTimeout(() => {
+                const modal = document.getElementById('aiModal');
+                if (modal) modal.style.display = 'none';
+            }, 800);
+
+        } catch (error) {
+            console.error('AI generate error:', error);
+            this.showAiStatus('Network error. Please check your connection and try again.', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = original;
+        }
+    }
+
+    applyAiDraft(draft) {
+        if (!draft) return;
+
+        // Only fill lesson title/description if currently empty
+        const titleEl = document.getElementById('lessonTitle');
+        const descEl  = document.getElementById('lessonDescription');
+        if (titleEl && !titleEl.value.trim()) titleEl.value = draft.title || '';
+        if (descEl  && !descEl.value.trim())  descEl.value  = draft.description || '';
+
+        // Append content items
+        const newItems = (draft.contentItems || []).map((item, index) => ({
+            type: 'text',
+            title: item.title || `Section ${index + 1}`,
+            content: item.content || '',
+            contentId: null,
+            isRequired: true,
+            order: this.contentItems.length + index,
+            duration: 0
+        }));
+
+        this.contentItems = this.contentItems.concat(newItems);
+
+        // Default to unpublished draft per AI-generation policy
+        const pubEl = document.getElementById('isPublished');
+        if (pubEl) pubEl.checked = false;
+
+        this.renderContentItems();
     }
 
     escapeHtml(str) {
