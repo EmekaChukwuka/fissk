@@ -793,6 +793,9 @@ class InstructorDashboard {
       });
       const json = await res.json();
       
+        console.log('📹 Full streams response:', json);   // ← ADD
+        console.log('📹 Scheduled:', json?.scheduled?.length || 0, 'Past:', json?.past?.length || 0);  // ← ADD
+       
       const scheduled = Array.isArray(json?.scheduled) ? json.scheduled : [];
       const past = Array.isArray(json?.past) ? json.past : [];
       

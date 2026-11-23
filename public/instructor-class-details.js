@@ -1,7 +1,6 @@
 // instructor-class-details.js
 class InstructorClassDetails {
     constructor() {
-        // Get classId from URL
         const urlParams = new URLSearchParams(window.location.search);
         this.classId = urlParams.get('id');
         this.currentUser = JSON.parse(localStorage.getItem('user'));
@@ -10,15 +9,13 @@ class InstructorClassDetails {
         this.videos = [];
         this.streams = [];
         this.lessons = [];
-        this.baseUrl = 'https://fissk-iui2.onrender.com'; // Your backend URL
-        
-        // Redirect if no user
+        this.baseUrl = 'https://fissk-iui2.onrender.com';
+
         if (!this.currentUser) {
             window.location.href = 'login.html';
             return;
         }
-        
-        // Redirect if no class ID
+
         if (!this.classId || this.classId === 'undefined' || this.classId === 'null') {
             this.showMessage('❌ No class selected. Redirecting...', 'error');
             setTimeout(() => {
@@ -26,20 +23,20 @@ class InstructorClassDetails {
             }, 2000);
             return;
         }
-        
+
         this.init();
     }
 
     async init() {
         try {
-            // Show loading states for all containers
             this.showAllLoadingStates();
-            
-            await this.loadClass();
-            await this.loadVideos();
-            await this.loadStudents();
-            await this.loadStreams();
-            await this.loadLessons();
+            await Promise.allSettled([
+                this.loadClass(),
+                this.loadVideos(),
+                this.loadStudents(),
+                this.loadStreams(),
+                this.loadLessons()
+            ]);
             this.bindTabs();
             this.setupEventHandlers();
         } catch (error) {
@@ -48,19 +45,18 @@ class InstructorClassDetails {
         }
     }
 
-    // ===== LOADING INDICATORS =====
+    // ===== LOADING STATES =====
     showAllLoadingStates() {
         this.showVideosLoading();
         this.showStudentsLoading();
         this.showStreamsLoading();
         this.showLessonsLoading();
-        this.showMaterialsLoading();
     }
 
     showVideosLoading() {
-        const container = document.getElementById('videosContainer');
-        if (!container) return;
-        container.innerHTML = `
+        const c = document.getElementById('videosContainer');
+        if (!c) return;
+        c.innerHTML = `
             <div class="loading-container" style="grid-column: 1 / -1;">
                 <div class="loading-spinner-large"></div>
                 <p class="loading-text">Loading videos...</p>
@@ -69,9 +65,9 @@ class InstructorClassDetails {
     }
 
     showStudentsLoading() {
-        const container = document.getElementById('studentsContainer');
-        if (!container) return;
-        container.innerHTML = `
+        const c = document.getElementById('studentsContainer');
+        if (!c) return;
+        c.innerHTML = `
             <div class="loading-container">
                 <div class="loading-spinner-large"></div>
                 <p class="loading-text">Loading students...</p>
@@ -80,9 +76,9 @@ class InstructorClassDetails {
     }
 
     showStreamsLoading() {
-        const container = document.getElementById('streamsContainer');
-        if (!container) return;
-        container.innerHTML = `
+        const c = document.getElementById('streamsContainer');
+        if (!c) return;
+        c.innerHTML = `
             <div class="loading-container">
                 <div class="loading-spinner-large"></div>
                 <p class="loading-text">Loading streams...</p>
@@ -91,9 +87,9 @@ class InstructorClassDetails {
     }
 
     showLessonsLoading() {
-        const container = document.getElementById('lessonsContainer');
-        if (!container) return;
-        container.innerHTML = `
+        const c = document.getElementById('lessonsContainer');
+        if (!c) return;
+        c.innerHTML = `
             <div class="loading-container" style="grid-column: 1 / -1;">
                 <div class="loading-spinner-large"></div>
                 <p class="loading-text">Loading lessons...</p>
@@ -101,18 +97,7 @@ class InstructorClassDetails {
         `;
     }
 
-    showMaterialsLoading() {
-        const container = document.getElementById('materialsContainer');
-        if (!container) return;
-        container.innerHTML = `
-            <div class="loading-container">
-                <div class="loading-spinner-large"></div>
-                <p class="loading-text">Loading materials...</p>
-            </div>
-        `;
-    }
-
-    // ===== SKELETON LOADERS FOR SPECIFIC SECTIONS =====
+    // ===== SKELETONS =====
     getVideosSkeleton() {
         return `
             <div class="skeleton-grid" style="grid-column: 1 / -1;">
@@ -122,10 +107,6 @@ class InstructorClassDetails {
                         <div class="skeleton-line medium"></div>
                         <div class="skeleton-line short"></div>
                         <div class="skeleton-line long"></div>
-                        <div style="display: flex; gap: 8px; margin-top: 12px;">
-                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
-                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
-                        </div>
                     </div>
                 `).join('')}
             </div>
@@ -156,10 +137,6 @@ class InstructorClassDetails {
                         <div class="skeleton-line medium"></div>
                         <div class="skeleton-line short"></div>
                         <div class="skeleton-line long"></div>
-                        <div style="display: flex; gap: 8px; margin-top: 12px;">
-                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
-                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
-                        </div>
                     </div>
                 `).join('')}
             </div>
@@ -177,57 +154,25 @@ class InstructorClassDetails {
                         </div>
                         <div class="skeleton-line medium"></div>
                         <div class="skeleton-line long"></div>
-                        <div style="display: flex; gap: 12px; margin-top: 8px;">
-                            <div class="skeleton-line short"></div>
-                            <div class="skeleton-line short"></div>
-                            <div class="skeleton-line short"></div>
-                        </div>
-                        <div style="display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #f0f0f0;">
-                            <div class="skeleton-line" style="flex: 1; height: 28px;"></div>
-                            <div class="skeleton-line" style="flex: 1; height: 28px;"></div>
-                            <div class="skeleton-line" style="flex: 1; height: 28px;"></div>
-                            <div class="skeleton-line" style="flex: 1; height: 28px;"></div>
-                        </div>
                     </div>
                 `).join('')}
             </div>
         `;
     }
 
-    getMaterialsSkeleton() {
-        return `
-            <div class="skeleton-grid" style="grid-column: 1 / -1; margin-top: 16px;">
-                ${Array(3).fill(0).map(() => `
-                    <div class="skeleton-card">
-                        <div class="skeleton-line medium"></div>
-                        <div class="skeleton-line short"></div>
-                        <div class="skeleton-line long"></div>
-                        <div style="display: flex; gap: 8px; margin-top: 12px;">
-                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
-                            <div class="skeleton-line" style="flex: 1; height: 32px;"></div>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    }
-
+    // ===== HEADERS =====
     headers() {
-        return {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.token}`
-        };
+        const h = { 'Content-Type': 'application/json' };
+        if (this.token) h['Authorization'] = `Bearer ${this.token}`;
+        return h;
     }
 
-    // ===== SPINNER HELPERS =====
+    // ===== SPINNER =====
     showButtonSpinner(button, loadingText = 'Loading...') {
         if (!button) return;
         button.disabled = true;
         button.dataset.originalText = button.textContent;
-        button.innerHTML = `
-            <span class="spinner"></span>
-            ${loadingText}
-        `;
+        button.innerHTML = `<span class="spinner"></span>${loadingText}`;
     }
 
     hideButtonSpinner(button, originalText = null) {
@@ -240,31 +185,23 @@ class InstructorClassDetails {
         const existing = document.querySelector('.custom-toast');
         if (existing) existing.remove();
 
-        const messageEl = document.createElement('div');
-        messageEl.className = `custom-toast toast-${type}`;
-        messageEl.textContent = message;
-        messageEl.style.cssText = `
-            position: fixed;
-            top: 80px;
-            right: 20px;
-            padding: 16px 24px;
-            border-radius: 12px;
-            color: white;
+        const el = document.createElement('div');
+        el.className = `custom-toast toast-${type}`;
+        el.textContent = message;
+        el.style.cssText = `
+            position: fixed; top: 80px; right: 20px; padding: 16px 24px;
+            border-radius: 12px; color: white;
             background: ${type === 'success' ? '#10B981' : type === 'error' ? '#EF4444' : '#6C3CE1'};
-            z-index: 10000;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            font-weight: 500;
-            font-size: 0.95rem;
-            max-width: 400px;
+            z-index: 10000; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            font-weight: 500; font-size: 0.95rem; max-width: 400px;
             animation: slideInRight 0.3s ease;
         `;
-        document.body.appendChild(messageEl);
-        
+        document.body.appendChild(el);
         setTimeout(() => {
-            messageEl.style.opacity = '0';
-            messageEl.style.transform = 'translateX(100px)';
-            messageEl.style.transition = 'all 0.3s ease';
-            setTimeout(() => messageEl.remove(), 300);
+            el.style.opacity = '0';
+            el.style.transform = 'translateX(100px)';
+            el.style.transition = 'all 0.3s ease';
+            setTimeout(() => el.remove(), 300);
         }, 4000);
     }
 
@@ -274,57 +211,38 @@ class InstructorClassDetails {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 btn.classList.add('active');
-                const tabId = btn.dataset.tab + 'Tab';
-                const tabContent = document.getElementById(tabId);
+                const tabContent = document.getElementById(btn.dataset.tab + 'Tab');
                 if (tabContent) tabContent.classList.add('active');
             };
         });
     }
 
     setupEventHandlers() {
-        // Upload Video Button
         const uploadBtn = document.getElementById('uploadVideoBtn');
-        if (uploadBtn) {
-            uploadBtn.addEventListener('click', () => {
-                this.showMessage('📹 Please use the live stream recording feature to upload videos', 'info');
-            });
-        }
+        if (uploadBtn) uploadBtn.addEventListener('click', () => {
+            this.showMessage('📹 Please use the live stream recording feature to upload videos', 'info');
+        });
 
-        // Schedule Stream Button
         const scheduleBtn = document.getElementById('scheduleStreamBtn');
-        if (scheduleBtn) {
-            scheduleBtn.addEventListener('click', () => {
-                document.getElementById('scheduleStreamModal').style.display = 'flex';
-            });
-        }
+        if (scheduleBtn) scheduleBtn.addEventListener('click', () => {
+            document.getElementById('scheduleStreamModal').style.display = 'flex';
+        });
 
-        // Upload Material Button
         const materialBtn = document.getElementById('uploadMaterialBtn');
-        if (materialBtn) {
-            materialBtn.addEventListener('click', () => {
-                this.showMessage('📚 Upload material feature coming soon!', 'info');
-            });
-        }
+        if (materialBtn) materialBtn.addEventListener('click', () => {
+            this.showMessage('📚 Upload material feature coming soon!', 'info');
+        });
 
-        // Edit Class Button
         const editBtn = document.getElementById('editClassBtn');
-        if (editBtn) {
-            editBtn.addEventListener('click', () => {
-                this.openEditModal();
-            });
-        }
+        if (editBtn) editBtn.addEventListener('click', () => this.openEditModal());
 
-        // Delete Class Button
         const deleteBtn = document.getElementById('deleteClassBtn');
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', async () => {
-                if (confirm('Are you sure you want to delete this class? This action cannot be undone and will delete all associated data.')) {
-                    await this.deleteClass();
-                }
-            });
-        }
+        if (deleteBtn) deleteBtn.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to delete this class? This action cannot be undone and will delete all associated data.')) {
+                await this.deleteClass();
+            }
+        });
 
-        // Modal close
         document.querySelectorAll('.close-modal').forEach(el => {
             el.addEventListener('click', () => {
                 const modal = el.closest('.modal');
@@ -332,92 +250,76 @@ class InstructorClassDetails {
             });
         });
 
-        // Close modal on outside click
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.style.display = 'none';
-                }
+                if (e.target === modal) modal.style.display = 'none';
             });
         });
 
-        // ESC key to close modal
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 document.querySelectorAll('.modal').forEach(modal => {
                     if (modal.style.display === 'flex') {
                         modal.style.display = 'none';
-                        const videoPlayer = document.getElementById('videoPlayer');
-                        if (videoPlayer) {
-                            videoPlayer.pause();
-                            videoPlayer.currentTime = 0;
+                        const vp = document.getElementById('videoPlayer');
+                        if (vp) {
+                            if (vp.hls) { try { vp.hls.destroy(); } catch {} vp.hls = null; }
+                            vp.pause();
+                            vp.currentTime = 0;
                         }
                     }
                 });
             }
         });
 
-        // Schedule Stream Form
         const scheduleForm = document.getElementById('scheduleStreamForm');
-        if (scheduleForm) {
-            scheduleForm.addEventListener('submit', async (ev) => {
-                ev.preventDefault();
-                await this.scheduleStream();
-            });
-        }
+        if (scheduleForm) scheduleForm.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            await this.scheduleStream();
+        });
 
-        // Edit Class Form
         const editForm = document.getElementById('editClassForm');
-        if (editForm) {
-            editForm.addEventListener('submit', async (ev) => {
-                ev.preventDefault();
-                await this.updateClass();
-            });
-        }
+        if (editForm) editForm.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            await this.updateClass();
+        });
 
-        // Create Lesson button
         const createLessonBtn = document.getElementById('createLessonBtn');
-        if (createLessonBtn) {
-            createLessonBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                window.location.href = `instructor/lessons/create.html?classId=${this.classId}`;
-            });
-        }
+        if (createLessonBtn) createLessonBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.location.href = `instructor/lessons/create.html?classId=${this.classId}`;
+        });
 
-        // Manage Lessons button
         const manageLessonsBtn = document.getElementById('manageLessonsBtn');
-        if (manageLessonsBtn) {
-            manageLessonsBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                window.location.href = `instructor/lessons/manage.html?classId=${this.classId}`;
-            });
-        }
+        if (manageLessonsBtn) manageLessonsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.location.href = `instructor/lessons/manage.html?classId=${this.classId}`;
+        });
     }
 
-    // ===== LOAD CLASS DETAILS =====
+    // ===== LOAD CLASS =====
     async loadClass() {
         try {
-            const url = `${this.baseUrl}/register/instructor/classes/${this.classId}`;
-            const res = await fetch(url, {
+            const res = await fetch(`${this.baseUrl}/register/instructor/classes/${this.classId}`, {
                 method: 'POST',
                 headers: this.headers(),
                 body: JSON.stringify({ id: this.currentUser.id })
             });
-            
-            if (!res.ok) {
-                throw new Error('Failed to load class details');
-            }
-            
+            if (!res.ok) throw new Error('Failed to load class details');
+
             const c = await res.json();
 
-            document.getElementById('className').textContent = c.title || 'Untitled Class';
-            document.getElementById('classDescription').textContent = c.description || 'No description available';
-            document.getElementById('classCategory').textContent = c.category || 'General';
-            document.getElementById('classLevel').textContent = c.level || 'Beginner';
-            document.getElementById('classDuration').textContent = c.duration || 'Self-paced';
-            document.getElementById('classStudents').textContent = `👥 ${c.student_count || 0} Students`;
-            
-            // Store for edit modal
+            const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+            set('className', c.title || 'Untitled Class');
+            set('classDescription', c.description || 'No description available');
+            set('classCategory', c.category || 'General');
+            set('classLevel', c.level || 'Beginner');
+            set('classDuration', c.duration || 'Self-paced');
+
+            const enrolled = c.student_count ?? c.enrolledStudents ?? 0;
+            set('classStudents', `👥 ${enrolled} Students`);
+
             this.classData = c;
         } catch (error) {
             console.error('Load class error:', error);
@@ -425,27 +327,27 @@ class InstructorClassDetails {
         }
     }
 
-    // ===== LOAD VIDEOS =====
+    // ===== LOAD VIDEOS (FIXED) =====
     async loadVideos() {
         const container = document.getElementById('videosContainer');
         if (!container) return;
 
         try {
-            // Show skeleton loader
             container.innerHTML = this.getVideosSkeleton();
 
-            // Use the /api/by-class/:classId endpoint
-            const url = `${this.baseUrl}/api/by-class/${this.classId}`;
-            const res = await fetch(url, {
-                headers: this.headers()
-            });
-            
-            if (!res.ok) {
-                throw new Error('Failed to load videos');
-            }
-            
-            const videos = await res.json();
-            this.videos = Array.isArray(videos) ? videos : [];
+            // userId as query param — backend reads req.query.userId
+            const url = `${this.baseUrl}/api/by-class/${this.classId}?userId=${this.currentUser?.id || ''}`;
+            const res = await fetch(url, { headers: this.headers() });
+
+            if (!res.ok) throw new Error(`Failed to load videos (${res.status})`);
+
+            const data = await res.json();
+
+            // FIX: Handle both shapes — { success, videos: [] } and bare []
+            let videos = [];
+            if (data && Array.isArray(data.videos)) videos = data.videos;
+            else if (Array.isArray(data)) videos = data;
+            this.videos = videos;
 
             if (this.videos.length === 0) {
                 container.innerHTML = `
@@ -458,32 +360,29 @@ class InstructorClassDetails {
             }
 
             container.innerHTML = this.videos.map((video, index) => {
-                const videoTitle = video.classTitle || video.videoDetails?.title || video.title || 'Untitled Video';
-                const videoDesc = video.classDescription || video.videoDetails?.description || video.description || 'No description';
+                const title = video.classTitle || video.videoDetails?.title || video.title || 'Untitled Video';
+                const desc = video.classDescription || video.videoDetails?.description || video.description || 'No description';
                 const playbackId = video.muxPlaybackId || video.playbackId || video.videoDetails?.playbackId;
-                const thumbnailUrl = playbackId ? `https://image.mux.com/${playbackId}/thumbnail.jpg?time=5` : null;
+                const thumb = playbackId ? `https://image.mux.com/${playbackId}/thumbnail.jpg?time=5` : null;
                 const videoId = video._id || video.id || index;
-                
+                const status = video.muxStatus || 'ready';
+                const isReady = status === 'ready';
+
                 return `
                     <div class="video-card" data-video-index="${index}" data-video-id="${videoId}">
                         <div class="video-thumbnail" style="background: linear-gradient(135deg, #8B5FBF, #6C63FF); position: relative;">
-                            ${thumbnailUrl ? 
-                                `<img src="${thumbnailUrl}" alt="${videoTitle}" style="width:100%;height:100%;object-fit:cover;">` : 
-                                `<span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3rem; color: rgba(255,255,255,0.5);">🎬</span>`
-                            }
-                            <span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2rem; color: white; opacity: 0.8;">▶</span>
-                            ${video.muxStatus === 'preparing' ? 
-                                `<span style="position: absolute; bottom: 10px; right: 10px; background: #F59E0B; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem;">⏳ Processing</span>` : 
-                                `<span style="position: absolute; bottom: 10px; right: 10px; background: #10B981; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem;">✅ Ready</span>`
-                            }
+                            ${thumb ? `<img src="${thumb}" alt="${this.escapeHtml(title)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">` : ''}
+                            <span style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 2rem; color: white; opacity: 0.85;">▶</span>
+                            <span style="position: absolute; bottom: 10px; right: 10px; background: ${isReady ? '#10B981' : '#F59E0B'}; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem;">
+                                ${isReady ? '✅ Ready' : '⏳ Processing'}
+                            </span>
                         </div>
                         <div class="video-info">
-                            <h4>${this.escapeHtml(videoTitle)}</h4>
-                            <p>${this.escapeHtml(videoDesc)}</p>
+                            <h4>${this.escapeHtml(title)}</h4>
+                            <p>${this.escapeHtml(desc)}</p>
                             <div class="video-meta" style="display: flex; gap: 12px; font-size: 0.8rem; color: #999; margin-top: 8px;">
-                                <span>⏱️ ${video.duration || video.videoDetails?.duration || 'Unknown'}</span>
-                                <span>📅 ${video.createdAt ? new Date(video.createdAt).toLocaleDateString() : video.videoDetails?.date ? new Date(video.videoDetails.date).toLocaleDateString() : 'Unknown date'}</span>
-                                ${playbackId ? `<span>🔗 <a href="https://stream.mux.com/${playbackId}.m3u8" target="_blank" style="color: #8B5FBF;">HLS</a></span>` : ''}
+                                <span>⏱️ ${video.duration || 'Unknown'}</span>
+                                <span>📅 ${video.createdAt ? new Date(video.createdAt).toLocaleDateString() : '—'}</span>
                             </div>
                         </div>
                         <div style="padding: 0 15px 15px; display: flex; gap: 8px;">
@@ -500,41 +399,34 @@ class InstructorClassDetails {
                 `;
             }).join('');
 
-            // Add click handlers for video playback
             container.querySelectorAll('.play-video-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    const index = parseInt(btn.dataset.videoIndex);
-                    this.playVideo(index);
+                    this.playVideo(parseInt(btn.dataset.videoIndex));
                 });
             });
 
-            // Click on card to play
             container.querySelectorAll('.video-card').forEach(card => {
                 card.addEventListener('click', (e) => {
                     if (e.target.closest('.delete-video-btn') || e.target.closest('.play-video-btn')) return;
-                    const index = parseInt(card.dataset.videoIndex);
-                    this.playVideo(index);
+                    this.playVideo(parseInt(card.dataset.videoIndex));
                 });
             });
 
-            // Add delete handlers
             container.querySelectorAll('.delete-video-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    const videoId = btn.dataset.videoId;
                     if (confirm('Are you sure you want to delete this video?')) {
-                        await this.deleteVideo(videoId);
+                        await this.deleteVideo(btn.dataset.videoId);
                     }
                 });
             });
-
         } catch (error) {
             console.error('Load videos error:', error);
             container.innerHTML = `
                 <div class="no-content" style="grid-column: 1 / -1; text-align: center; padding: 40px;">
                     <p style="color: #EF4444;">❌ Failed to load videos</p>
-                    <p style="color: #999; font-size: 0.9rem;">${error.message}</p>
+                    <p style="color: #999; font-size: 0.9rem;">${this.escapeHtml(error.message)}</p>
                 </div>
             `;
         }
@@ -543,108 +435,100 @@ class InstructorClassDetails {
     // ===== PLAY VIDEO =====
     playVideo(videoIndex) {
         const video = this.videos[videoIndex];
-        if (!video) {
-            this.showMessage('❌ Video not found', 'error');
-            return;
-        }
+        if (!video) { this.showMessage('❌ Video not found', 'error'); return; }
 
         const playbackId = video.muxPlaybackId || video.playbackId || video.videoDetails?.playbackId;
-        if (!playbackId) {
-            this.showMessage('❌ Video playback URL not available', 'error');
-            return;
-        }
+        if (!playbackId) { this.showMessage('❌ Video playback URL not available', 'error'); return; }
 
         const modal = document.getElementById('videoModal');
         const videoPlayer = document.getElementById('videoPlayer');
         const videoTitle = document.getElementById('videoTitle');
         const videoDescription = document.getElementById('videoDescription');
-        
-        if (!modal || !videoPlayer) {
-            console.error('Video modal elements not found');
-            return;
-        }
-        
-        // Use HLS.js for Mux videos
+        if (!modal || !videoPlayer) return;
+
         const hlsUrl = `https://stream.mux.com/${playbackId}.m3u8`;
-        
-        if (Hls && Hls.isSupported()) {
+
+        // Clean up previous instance
+        if (videoPlayer.hls) {
+            try { videoPlayer.hls.destroy(); } catch {}
+            videoPlayer.hls = null;
+        }
+        videoPlayer.removeAttribute('src');
+        videoPlayer.load();
+
+        if (typeof Hls !== 'undefined' && Hls.isSupported()) {
             const hls = new Hls();
             hls.loadSource(hlsUrl);
             hls.attachMedia(videoPlayer);
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                videoPlayer.play().catch(() => {});
+            hls.on(Hls.Events.MANIFEST_PARSED, () => videoPlayer.play().catch(() => {}));
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    console.error('HLS error:', data);
+                    this.showMessage('⚠️ Video failed to load. Try refreshing.', 'error');
+                }
             });
             videoPlayer.hls = hls;
         } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
             videoPlayer.src = hlsUrl;
             videoPlayer.play().catch(() => {});
         } else {
+            console.warn('HLS.js not loaded — add <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>');
+            this.showMessage('⚠️ Video player not configured. Please contact support.', 'error');
             videoPlayer.src = hlsUrl;
-            videoPlayer.play().catch(() => {});
         }
-        
-        videoTitle.textContent = video.classTitle || video.videoDetails?.title || video.title || 'Untitled Video';
-        videoDescription.textContent = video.classDescription || video.videoDetails?.description || video.description || 'No description';
+
+        if (videoTitle) videoTitle.textContent = video.classTitle || video.videoDetails?.title || video.title || 'Untitled Video';
+        if (videoDescription) videoDescription.textContent = video.classDescription || video.videoDetails?.description || video.description || 'No description';
 
         modal.style.display = 'flex';
 
         const closeModal = () => {
             modal.style.display = 'none';
             if (videoPlayer.hls) {
-                videoPlayer.hls.destroy();
+                try { videoPlayer.hls.destroy(); } catch {}
+                videoPlayer.hls = null;
             }
             videoPlayer.pause();
             videoPlayer.currentTime = 0;
-            videoPlayer.src = '';
+            videoPlayer.removeAttribute('src');
+            videoPlayer.load();
         };
 
         const closeBtn = modal.querySelector('.close-modal');
-        if (closeBtn) {
-            closeBtn.onclick = closeModal;
-        }
-
-        modal.onclick = (e) => {
-            if (e.target === modal) closeModal();
-        };
+        if (closeBtn) closeBtn.onclick = closeModal;
+        modal.onclick = (e) => { if (e.target === modal) closeModal(); };
     }
 
     // ===== DELETE VIDEO =====
     async deleteVideo(videoId) {
-        try {
-            const btn = document.querySelector(`.delete-video-btn[data-video-id="${videoId}"]`);
-            if (btn) this.showButtonSpinner(btn, 'Deleting...');
+        const btn = document.querySelector(`.delete-video-btn[data-video-id="${videoId}"]`);
+        if (btn) this.showButtonSpinner(btn, 'Deleting...');
 
+        try {
             if (!videoId || videoId === 'undefined' || videoId === 'null') {
                 this.showMessage('❌ Invalid video ID', 'error');
                 return;
             }
-
-            if (!this.currentUser || !this.currentUser.id) {
+            if (!this.currentUser?.id) {
                 this.showMessage('❌ You must be logged in', 'error');
                 return;
             }
 
-            const url = `${this.baseUrl}/register/instructor/videos/${videoId}`;
-            const res = await fetch(url, {
+            const res = await fetch(`${this.baseUrl}/register/instructor/videos/${videoId}`, {
                 method: 'DELETE',
                 headers: this.headers(),
                 body: JSON.stringify({ id: this.currentUser.id })
             });
 
             const data = await res.json();
-
-            if (!res.ok || !data.ok) {
-                throw new Error(data.message || 'Failed to delete video');
-            }
+            if (!res.ok || !data.ok) throw new Error(data.message || 'Failed to delete video');
 
             this.showMessage('✅ Video deleted successfully!', 'success');
             await this.loadVideos();
-
         } catch (error) {
             console.error('Delete video error:', error);
             this.showMessage('❌ ' + (error.message || 'Failed to delete video'), 'error');
         } finally {
-            const btn = document.querySelector(`.delete-video-btn[data-video-id="${videoId}"]`);
             if (btn) this.hideButtonSpinner(btn, '🗑️ Delete');
         }
     }
@@ -655,21 +539,17 @@ class InstructorClassDetails {
         if (!container) return;
 
         try {
-            // Show skeleton loader
             container.innerHTML = this.getStudentsSkeleton();
 
-            const url = `${this.baseUrl}/register/instructor/classes/${this.classId}/students`;
-            const res = await fetch(url, {
+            const res = await fetch(`${this.baseUrl}/register/instructor/classes/${this.classId}/students`, {
                 headers: this.headers()
             });
-            
-            if (!res.ok) {
-                throw new Error('Failed to load students');
-            }
-            
-            const students = await res.json();
+            if (!res.ok) throw new Error(`Failed to load students (${res.status})`);
 
-            if (!students || students.length === 0) {
+            const data = await res.json();
+            const students = Array.isArray(data) ? data : (Array.isArray(data.students) ? data.students : []);
+
+            if (students.length === 0) {
                 container.innerHTML = `
                     <div class="no-content" style="text-align: center; padding: 40px;">
                         <p style="font-size: 1.2rem; color: #999;">👥 No students enrolled yet</p>
@@ -698,8 +578,8 @@ class InstructorClassDetails {
                                 <td style="padding: 16px;">${s.enrolled_at ? new Date(s.enrolled_at).toLocaleDateString() : '—'}</td>
                                 <td style="padding: 16px;">
                                     <div style="display: flex; align-items: center; gap: 10px;">
-                                        <div class="progress-bar" style="flex: 1; background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden;">
-                                            <div class="progress-fill" style="width: ${s.progress || 0}%; background: #8B5FBF; height: 100%; border-radius: 4px;"></div>
+                                        <div style="flex: 1; background: #e2e8f0; height: 8px; border-radius: 4px; overflow: hidden;">
+                                            <div style="width: ${s.progress || 0}%; background: #8B5FBF; height: 100%; border-radius: 4px;"></div>
                                         </div>
                                         <span style="font-size: 0.85rem; color: #4a5568; min-width: 40px;">${s.progress || 0}%</span>
                                     </div>
@@ -715,37 +595,36 @@ class InstructorClassDetails {
             container.innerHTML = `
                 <div class="no-content" style="text-align: center; padding: 40px;">
                     <p style="color: #EF4444;">❌ Failed to load students</p>
+                    <p style="color: #999; font-size: 0.9rem;">${this.escapeHtml(error.message)}</p>
                 </div>
             `;
         }
     }
 
-    // ===== LOAD STREAMS =====
+    // ===== LOAD STREAMS (upcoming only) =====
     async loadStreams() {
         const container = document.getElementById('streamsContainer');
         if (!container) return;
 
         try {
-            // Show skeleton loader
             container.innerHTML = this.getStreamsSkeleton();
 
-            const url = `${this.baseUrl}/register/instructor/classes/${this.classId}/streams`;
-            const res = await fetch(url, {
+            const res = await fetch(`${this.baseUrl}/register/instructor/classes/${this.classId}/streams`, {
                 headers: this.headers()
             });
-            
-            if (!res.ok) {
-                throw new Error('Failed to load streams');
-            }
-            
-            const streams = await res.json();
-            this.streams = Array.isArray(streams) ? streams : [];
+            if (!res.ok) throw new Error(`Failed to load streams (${res.status})`);
+
+            const data = await res.json();
+            this.streams = Array.isArray(data) ? data : (Array.isArray(data.streams) ? data.streams : []);
 
             if (this.streams.length === 0) {
                 container.innerHTML = `
                     <div class="no-content" style="text-align: center; padding: 40px;">
                         <p style="font-size: 1.2rem; color: #999;">📅 No scheduled streams</p>
                         <p style="color: #bbb;">Schedule your first live stream</p>
+                        <p style="color: #999; font-size: 0.85rem; margin-top: 12px;">
+                            Looking for past recordings? Check the <strong>🎥 Videos</strong> tab.
+                        </p>
                     </div>
                 `;
                 return;
@@ -776,18 +655,17 @@ class InstructorClassDetails {
 
             container.querySelectorAll('.cancel-stream-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
-                    const streamId = btn.dataset.streamId;
                     if (confirm('Are you sure you want to cancel this stream?')) {
-                        await this.cancelStream(streamId);
+                        await this.cancelStream(btn.dataset.streamId);
                     }
                 });
             });
-
         } catch (error) {
             console.error('Load streams error:', error);
             container.innerHTML = `
                 <div class="no-content" style="text-align: center; padding: 40px;">
                     <p style="color: #EF4444;">❌ Failed to load streams</p>
+                    <p style="color: #999; font-size: 0.9rem;">${this.escapeHtml(error.message)}</p>
                 </div>
             `;
         }
@@ -795,48 +673,37 @@ class InstructorClassDetails {
 
     // ===== CANCEL STREAM =====
     async cancelStream(streamId) {
-        try {
-            const btn = document.querySelector(`.cancel-stream-btn[data-stream-id="${streamId}"]`);
-            if (btn) this.showButtonSpinner(btn, 'Cancelling...');
+        const btn = document.querySelector(`.cancel-stream-btn[data-stream-id="${streamId}"]`);
+        if (btn) this.showButtonSpinner(btn, 'Cancelling...');
 
+        try {
             if (!streamId || streamId === 'undefined' || streamId === 'null') {
                 this.showMessage('❌ Invalid stream ID', 'error');
                 return;
             }
-
-            if (!this.currentUser || !this.currentUser.id) {
+            if (!this.currentUser?.id) {
                 this.showMessage('❌ You must be logged in', 'error');
                 return;
             }
 
-            const url = `${this.baseUrl}/register/instructor/streams/${streamId}`;
-            const res = await fetch(url, {
+            const res = await fetch(`${this.baseUrl}/register/instructor/streams/${streamId}`, {
                 method: 'DELETE',
                 headers: this.headers(),
                 body: JSON.stringify({ id: this.currentUser.id })
             });
 
             const data = await res.json();
-
-            if (!res.ok || !data.ok) {
-                throw new Error(data.message || 'Failed to cancel stream');
-            }
+            if (!res.ok || !data.ok) throw new Error(data.message || 'Failed to cancel stream');
 
             this.showMessage('✅ Stream cancelled successfully!', 'success');
             await this.loadStreams();
-
         } catch (error) {
             console.error('Cancel stream error:', error);
             this.showMessage('❌ ' + (error.message || 'Failed to cancel stream'), 'error');
         } finally {
-            const btn = document.querySelector(`.cancel-stream-btn[data-stream-id="${streamId}"]`);
             if (btn) this.hideButtonSpinner(btn, '🗑️ Cancel');
         }
     }
-
-    // ============================================================
-    // LESSON METHODS
-    // ============================================================
 
     // ===== LOAD LESSONS =====
     async loadLessons() {
@@ -844,18 +711,13 @@ class InstructorClassDetails {
         if (!container) return;
 
         try {
-            // Show skeleton loader
             container.innerHTML = this.getLessonsSkeleton();
 
-            const url = `${this.baseUrl}/api/lessons/class/${this.classId}`;
-            const res = await fetch(url, {
+            const res = await fetch(`${this.baseUrl}/api/lessons/class/${this.classId}`, {
                 headers: this.headers()
             });
-            
-            if (!res.ok) {
-                throw new Error('Failed to load lessons');
-            }
-            
+            if (!res.ok) throw new Error(`Failed to load lessons (${res.status})`);
+
             const data = await res.json();
             this.lessons = data.lessons || [];
 
@@ -897,29 +759,24 @@ class InstructorClassDetails {
                 </div>
             `).join('');
 
-            // Add event listeners for lesson actions
             container.querySelectorAll('.toggle-lesson-publish-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
-                    const lessonId = btn.dataset.lessonId;
-                    const currentStatus = btn.dataset.published === 'true';
-                    await this.toggleLessonPublish(lessonId, currentStatus);
+                    await this.toggleLessonPublish(btn.dataset.lessonId, btn.dataset.published === 'true');
                 });
             });
 
             container.querySelectorAll('.delete-lesson-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
-                    const lessonId = btn.dataset.lessonId;
                     if (confirm('Are you sure you want to delete this lesson? This action cannot be undone.')) {
-                        await this.deleteLesson(lessonId);
+                        await this.deleteLesson(btn.dataset.lessonId);
                     }
                 });
             });
-
         } catch (error) {
             console.error('Load lessons error:', error);
             container.innerHTML = `
                 <div class="no-lessons-instructor">
-                    <p style="color: #EF4444;">❌ Failed to load lessons: ${error.message}</p>
+                    <p style="color: #EF4444;">❌ Failed to load lessons: ${this.escapeHtml(error.message)}</p>
                 </div>
             `;
         }
@@ -928,72 +785,52 @@ class InstructorClassDetails {
     // ===== TOGGLE LESSON PUBLISH =====
     async toggleLessonPublish(lessonId, currentStatus) {
         const newStatus = !currentStatus;
-        const action = newStatus ? 'publish' : 'unpublish';
-        
-        try {
-            const btn = document.querySelector(`.toggle-lesson-publish-btn[data-lesson-id="${lessonId}"]`);
-            if (btn) this.showButtonSpinner(btn, 'Updating...');
+        const btn = document.querySelector(`.toggle-lesson-publish-btn[data-lesson-id="${lessonId}"]`);
+        if (btn) this.showButtonSpinner(btn, 'Updating...');
 
-            const url = `${this.baseUrl}/api/lessons/${lessonId}/publish`;
-            const res = await fetch(url, {
+        try {
+            const res = await fetch(`${this.baseUrl}/api/lessons/${lessonId}/publish`, {
                 method: 'PATCH',
                 headers: this.headers(),
                 body: JSON.stringify({ isPublished: newStatus })
             });
-
             if (!res.ok) throw new Error('Failed to update lesson status');
 
-            const data = await res.json();
             this.showMessage(`✅ Lesson ${newStatus ? 'published' : 'unpublished'} successfully!`, 'success');
             await this.loadLessons();
-
         } catch (error) {
             console.error('Toggle publish error:', error);
             this.showMessage('❌ ' + error.message, 'error');
         } finally {
-            const btn = document.querySelector(`.toggle-lesson-publish-btn[data-lesson-id="${lessonId}"]`);
-            if (btn) this.hideButtonSpinner(btn, btn.dataset.published === 'true' ? '📥 Unpublish' : '📤 Publish');
+            if (btn) this.hideButtonSpinner(btn, currentStatus ? '📥 Unpublish' : '📤 Publish');
         }
     }
 
     // ===== DELETE LESSON =====
     async deleteLesson(lessonId) {
-        try {
-            const btn = document.querySelector(`.delete-lesson-btn[data-lesson-id="${lessonId}"]`);
-            if (btn) this.showButtonSpinner(btn, 'Deleting...');
+        const btn = document.querySelector(`.delete-lesson-btn[data-lesson-id="${lessonId}"]`);
+        if (btn) this.showButtonSpinner(btn, 'Deleting...');
 
-            const url = `${this.baseUrl}/api/lessons/${lessonId}`;
-            const res = await fetch(url, {
+        try {
+            const res = await fetch(`${this.baseUrl}/api/lessons/${lessonId}`, {
                 method: 'DELETE',
                 headers: this.headers()
             });
-
             if (!res.ok) throw new Error('Failed to delete lesson');
 
-            const data = await res.json();
             this.showMessage('✅ Lesson deleted successfully!', 'success');
             await this.loadLessons();
-
         } catch (error) {
             console.error('Delete lesson error:', error);
             this.showMessage('❌ ' + error.message, 'error');
         } finally {
-            const btn = document.querySelector(`.delete-lesson-btn[data-lesson-id="${lessonId}"]`);
             if (btn) this.hideButtonSpinner(btn, '🗑️');
         }
     }
 
-    // ============================================================
-    // END LESSON METHODS
-    // ============================================================
-
-    // ===== OPEN EDIT MODAL =====
+    // ===== EDIT CLASS =====
     openEditModal() {
-        if (!this.classData) {
-            this.showMessage('❌ Class data not loaded', 'error');
-            return;
-        }
-
+        if (!this.classData) { this.showMessage('❌ Class data not loaded', 'error'); return; }
         document.getElementById('editClassModal').style.display = 'flex';
         document.getElementById('editClassName').value = this.classData.title || '';
         document.getElementById('editClassDescription').value = this.classData.description || '';
@@ -1002,10 +839,9 @@ class InstructorClassDetails {
         document.getElementById('editClassDuration').value = this.classData.duration || '';
     }
 
-    // ===== UPDATE CLASS =====
     async updateClass() {
-        const editBtn = document.querySelector('#editClassForm button[type="submit"]');
-        if (editBtn) this.showButtonSpinner(editBtn, 'Saving...');
+        const btn = document.querySelector('#editClassForm button[type="submit"]');
+        if (btn) this.showButtonSpinner(btn, 'Saving...');
 
         try {
             const payload = {
@@ -1013,139 +849,95 @@ class InstructorClassDetails {
                 description: document.getElementById('editClassDescription').value,
                 category: document.getElementById('editClassCategory').value,
                 level: document.getElementById('editClassLevel').value,
-                duration: document.getElementById('editClassDuration').value,
+                duration: document.getElementById('editClassDuration').value
             };
 
             if (!payload.title) {
                 this.showMessage('❌ Class title is required', 'error');
-                if (editBtn) this.hideButtonSpinner(editBtn, 'Save Changes');
                 return;
             }
 
-            const url = `${this.baseUrl}/register/instructor/classes/${this.classId}`;
-            const res = await fetch(url, {
+            const res = await fetch(`${this.baseUrl}/register/instructor/classes/${this.classId}`, {
                 method: 'PUT',
                 headers: this.headers(),
-                body: JSON.stringify({ 
-                    id: this.currentUser.id,
-                    payload: payload 
-                })
+                body: JSON.stringify({ id: this.currentUser.id, payload })
             });
 
             const data = await res.json();
-
-            if (!res.ok || !data.success) {
-                throw new Error(data.message || 'Failed to update class');
-            }
+            if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update class');
 
             this.showMessage('✅ Class updated successfully!', 'success');
             document.getElementById('editClassModal').style.display = 'none';
-            
-            // Reload class data
             await this.loadClass();
-
         } catch (error) {
             console.error('Update class error:', error);
             this.showMessage('❌ ' + (error.message || 'Failed to update class'), 'error');
         } finally {
-            if (editBtn) this.hideButtonSpinner(editBtn, 'Save Changes');
+            if (btn) this.hideButtonSpinner(btn, 'Save Changes');
         }
     }
 
     // ===== DELETE CLASS =====
     async deleteClass() {
+        const btn = document.getElementById('deleteClassBtn');
+        if (btn) this.showButtonSpinner(btn, 'Deleting...');
+
         try {
-            const deleteBtn = document.getElementById('deleteClassBtn');
-            if (deleteBtn) this.showButtonSpinner(deleteBtn, 'Deleting...');
+            if (!this.currentUser?.id) { this.showMessage('❌ You must be logged in', 'error'); return; }
 
-            if (!this.classId || this.classId === 'undefined' || this.classId === 'null') {
-                this.showMessage('❌ Invalid class ID', 'error');
-                return;
-            }
-
-            if (!this.currentUser || !this.currentUser.id) {
-                this.showMessage('❌ You must be logged in', 'error');
-                return;
-            }
-
-            const url = `${this.baseUrl}/register/instructor/classes/${this.classId}`;
-            const res = await fetch(url, {
+            const res = await fetch(`${this.baseUrl}/register/instructor/classes/${this.classId}`, {
                 method: 'DELETE',
                 headers: this.headers(),
                 body: JSON.stringify({ id: this.currentUser.id })
             });
 
             const data = await res.json();
-
-            if (!res.ok || !data.success) {
-                throw new Error(data.message || 'Failed to delete class');
-            }
+            if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete class');
 
             this.showMessage('✅ ' + (data.message || 'Class deleted successfully!'), 'success');
-            setTimeout(() => {
-                window.location.href = 'instructor-dashboard.html';
-            }, 1500);
-
+            setTimeout(() => window.location.href = 'instructor-dashboard.html', 1500);
         } catch (error) {
             console.error('Delete class error:', error);
             this.showMessage('❌ ' + (error.message || 'Failed to delete class'), 'error');
         } finally {
-            const deleteBtn = document.getElementById('deleteClassBtn');
-            if (deleteBtn) this.hideButtonSpinner(deleteBtn, 'Delete');
+            if (btn) this.hideButtonSpinner(btn, 'Delete');
         }
     }
 
     // ===== SCHEDULE STREAM =====
     async scheduleStream() {
-        const classId = document.getElementById('streamClass')?.value || this.classId;
         const title = document.getElementById('streamTitle')?.value;
         const description = document.getElementById('streamDescription')?.value;
         const scheduledTime = document.getElementById('streamDateTime')?.value;
 
-        if (!title) {
-            this.showMessage('Please enter a stream title', 'error');
-            return;
-        }
-
-        if (!scheduledTime) {
-            this.showMessage('Please select a date and time', 'error');
-            return;
-        }
+        if (!title) { this.showMessage('Please enter a stream title', 'error'); return; }
+        if (!scheduledTime) { this.showMessage('Please select a date and time', 'error'); return; }
 
         const submitBtn = document.querySelector('#scheduleStreamForm button[type="submit"]');
         if (submitBtn) this.showButtonSpinner(submitBtn, 'Scheduling...');
 
         try {
-            const payload = {
-                classId: this.classId,
-                title: title,
-                description: description || '',
-                scheduledTime: scheduledTime
-            };
-
-            const url = `${this.baseUrl}/register/instructor/schedule-stream`;
-            const res = await fetch(url, {
+            const res = await fetch(`${this.baseUrl}/register/instructor/schedule-stream`, {
                 method: 'POST',
                 headers: this.headers(),
                 body: JSON.stringify({
-                    payload: payload,
+                    payload: {
+                        classId: this.classId,
+                        title,
+                        description: description || '',
+                        scheduledTime
+                    },
                     id: this.currentUser.id
                 })
             });
 
             const data = await res.json();
-
-            if (!data.success) {
-                throw new Error(data.message || 'Failed to schedule stream');
-            }
+            if (!data.success) throw new Error(data.message || 'Failed to schedule stream');
 
             this.showMessage('✅ Stream scheduled successfully!', 'success');
-            
             document.getElementById('scheduleStreamModal').style.display = 'none';
             document.getElementById('scheduleStreamForm').reset();
-            
             await this.loadStreams();
-
         } catch (error) {
             console.error('Schedule stream error:', error);
             this.showMessage('❌ ' + (error.message || 'Failed to schedule stream'), 'error');
@@ -1158,12 +950,8 @@ class InstructorClassDetails {
     escapeHtml(s) {
         if (!s) return '';
         return String(s).replace(/[&<>"']/g, ch => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        })[ch]);
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
     }
 }
 
@@ -1171,7 +959,7 @@ class InstructorClassDetails {
 document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const classId = urlParams.get('id');
-    
+
     if (!classId || classId === 'undefined' || classId === 'null') {
         const container = document.querySelector('.container');
         if (container) {
@@ -1185,134 +973,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return;
     }
-    
+
     window.manager = new InstructorClassDetails();
 });
 
-// ===== ADD SPINNER STYLES =====
-const spinnerStyle = document.createElement('style');
-spinnerStyle.textContent = `
+// ===== ADDED STYLES =====
+const extraStyles = document.createElement('style');
+extraStyles.textContent = `
     .spinner {
-        display: inline-block;
-        width: 16px;
-        height: 16px;
-        border: 2px solid rgba(255,255,255,0.3);
-        border-radius: 50%;
-        border-top-color: #fff;
-        animation: spin 0.6s linear infinite;
-        margin-right: 8px;
-        vertical-align: middle;
+        display: inline-block; width: 16px; height: 16px;
+        border: 2px solid rgba(255,255,255,0.3); border-radius: 50%;
+        border-top-color: #fff; animation: spin 0.6s linear infinite;
+        margin-right: 8px; vertical-align: middle;
     }
-    
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-    
+    @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes slideInRight {
         from { transform: translateX(100px); opacity: 0; }
         to { transform: translateX(0); opacity: 1; }
     }
-    
-    .btn:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-    }
-    
-    .btn-danger:hover {
-        opacity: 0.8;
-        transform: translateY(-1px);
-    }
-    
-    .video-card {
-        cursor: pointer;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    
-    .video-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 8px 30px rgba(0,0,0,0.1);
-    }
-    
+    .btn:disabled { opacity: 0.7; cursor: not-allowed; }
+    .video-card { cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .video-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
     .video-thumbnail {
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        min-height: 160px;
+        position: relative; display: flex; align-items: center; justify-content: center;
+        overflow: hidden; min-height: 160px;
     }
-    
-    .video-thumbnail img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    
-    .no-content {
-        grid-column: 1 / -1;
-        text-align: center;
-        padding: 60px 20px;
-    }
-    
+    .video-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+    .no-content { grid-column: 1 / -1; text-align: center; padding: 60px 20px; }
     .modal {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.8);
-        z-index: 9999;
-        align-items: center;
-        justify-content: center;
+        display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.8); z-index: 9999;
+        align-items: center; justify-content: center;
     }
-    
-    .modal.show {
-        display: flex;
-    }
-    
+    .modal.show { display: flex; }
     .modal-content {
-        background: white;
-        padding: 30px;
-        border-radius: 16px;
-        max-width: 800px;
-        width: 90%;
-        max-height: 90vh;
-        overflow-y: auto;
+        background: white; padding: 30px; border-radius: 16px;
+        max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;
         position: relative;
     }
-    
-    .video-modal video {
-        width: 100%;
-        border-radius: 8px;
-        max-height: 70vh;
-    }
-    
+    .video-modal video { width: 100%; border-radius: 8px; max-height: 70vh; }
     .close-modal {
-        position: absolute;
-        top: 15px;
-        right: 20px;
-        font-size: 2rem;
-        cursor: pointer;
-        color: #999;
-        transition: color 0.3s ease;
-        z-index: 10;
+        position: absolute; top: 15px; right: 20px; font-size: 2rem;
+        cursor: pointer; color: #999; transition: color 0.3s ease; z-index: 10;
     }
-    
-    .close-modal:hover {
-        color: #333;
-    }
-
-    .form-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 15px;
-    }
-    
-    @media (max-width: 768px) {
-        .form-row {
-            grid-template-columns: 1fr;
-        }
-    }
+    .close-modal:hover { color: #333; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } }
 `;
-document.head.appendChild(spinnerStyle);
+document.head.appendChild(extraStyles);

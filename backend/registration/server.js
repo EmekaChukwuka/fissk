@@ -743,6 +743,49 @@ Regisrouter.post('/user-progress', async (req, res) => {
   }
 });
 
+// TEMPORARY DEBUG — remove after use
+Regisrouter.get('/debug/livestreams/:instructorId', async (req, res) => {
+  try {
+    const { instructorId } = req.params;
+    const sessions = await LiveSession.find({ instructorId }).lean();
+
+    const summary = sessions.map(s => ({
+      id: s._id,
+      title: s.title,
+      streamStatus: s.streamStatus,
+      sessionType: s.sessionType,
+      hostConnected: s.hostConnected,
+      classId: s.classId,
+      createdAt: s.createdAt
+    }));
+
+    // Group by state to see the distribution
+    const stateCounts = {};
+    sessions.forEach(s => {
+      const key = `${s.streamStatus || 'null'} / ${s.sessionType || 'null'}`;
+      stateCounts[key] = (stateCounts[key] || 0) + 1;
+    });
+
+    // What the /instructor/streams route actually returns as "past"
+    const pastQuery = await LiveSession.find({
+      instructorId,
+      $or: [
+        { streamStatus: 'ended' },
+        { sessionType: 'recorded' }
+      ]
+    }).lean();
+
+    res.json({
+      success: true,
+      totalSessions: sessions.length,
+      stateCounts,
+      matchedAsPast: pastQuery.length,
+      allSessions: summary
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 // Get user's enrolled classes
 Regisrouter.post('/get-user-classes', async (req, res) => {
   const { email } = req.body;
