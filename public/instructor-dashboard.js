@@ -783,40 +783,72 @@ class InstructorDashboard {
     }
   }
 
-  // ===== STREAMS WITH MEETING URL =====
   async loadInstructorStreams() {
     try {
-      const res = await fetch('https://fissk-iui2.onrender.com/register/instructor/streams', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: this.currentUser.id })
-      });
-      const json = await res.json();
-      
-        console.log('📹 Full streams response:', json);   // ← ADD
-        console.log('📹 Scheduled:', json?.scheduled?.length || 0, 'Past:', json?.past?.length || 0);  // ← ADD
-       
-      const scheduled = Array.isArray(json?.scheduled) ? json.scheduled : [];
-      const past = Array.isArray(json?.past) ? json.past : [];
-      
-      const scheduledWithMeetingIds = await Promise.all(scheduled.map(async (s) => {
+        // 1. Scheduled + past from LiveSession (may be empty — that's fine)
+        const res = await fetch('https://fissk-iui2.onrender.com/register/instructor/streams', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: this.currentUser.id })
+        });
+        const json = await res.json();
+
+        const scheduled = Array.isArray(json?.scheduled) ? json.scheduled : [];
+        const pastFromSessions = Array.isArray(json?.past) ? json.past : [];
+
+        // 2. Past recordings from Stream (Mux)
+        let pastFromRecordings = [];
         try {
-          const meetingRes = await fetch(`https://fissk-iui2.onrender.com/api/livekit/session/meeting/${s.id}`);
-          const meetingData = await meetingRes.json();
-          if (meetingData.success && meetingData.meetingId) {
-            return { ...s, meetingId: meetingData.meetingId };
-          }
-          return { ...s, meetingId: null };
-        } catch (err) {
-          return { ...s, meetingId: null };
+            const recRes = await fetch(
+                `https://fissk-iui2.onrender.com/register/instructor/recordings/${this.currentUser.id}`
+            );
+            const recData = await recRes.json();
+            if (recData.success && Array.isArray(recData.recordings)) {
+                pastFromRecordings = recData.recordings;
+            }
+        } catch (recErr) {
+            console.warn('Could not load recordings:', recErr);
         }
-      }));
-      
-      this.renderStreams(scheduledWithMeetingIds, past);
+
+        // 3. Merge both into a single "past" list
+        //    Real LiveSession entries first, then recordings
+        const combinedPast = [...pastFromSessions, ...pastFromRecordings];
+
+        // 4. Enrich scheduled with meeting IDs (existing logic)
+        const scheduledWithMeetingIds = await Promise.all(scheduled.map(async (s) => {
+            try {
+                const meetingRes = await fetch(
+                    `https://fissk-iui2.onrender.com/api/livekit/session/meeting/${s.id}`
+                );
+                const meetingData = await meetingRes.json();
+                if (meetingData.success && meetingData.meetingId) {
+                    return { ...s, meetingId: meetingData.meetingId };
+                }
+                return { ...s, meetingId: null };
+            } catch (err) {
+                return { ...s, meetingId: null };
+            }
+        }));
+
+        console.log('📹 Scheduled:', scheduledWithMeetingIds.length,
+                    '| Past (sessions):', pastFromSessions.length,
+                    '| Past (recordings):', pastFromRecordings.length);
+
+        this.renderStreams(scheduledWithMeetingIds, combinedPast);
     } catch (err) {
-      console.error('loadInstructorStreams error', err);
+        console.error('loadInstructorStreams error', err);
+        // Even if the LiveSession call fails, try the recordings call alone
+        try {
+            const recRes = await fetch(
+                `https://fissk-iui2.onrender.com/register/instructor/recordings/${this.currentUser.id}`
+            );
+            const recData = await recRes.json();
+            this.renderStreams([], recData.recordings || []);
+        } catch (e) {
+            console.error('Fallback recordings load failed:', e);
+        }
     }
-  }
+}
 
   renderStreams(scheduled, past) {
     if (this.el.scheduledStreams) {
@@ -873,30 +905,65 @@ class InstructorDashboard {
         }
     }
 
-    if (this.el.pastStreams) {
-        if (past && past.length > 0) {
-            this.el.pastStreams.innerHTML = past.map(s => `
+   if (this.el.pastStreams) {
+    if (past && past.length > 0) {
+        this.el.pastStreams.innerHTML = past.map(s => {
+            const isRecording = s._isRecording === true;
+
+            // Recording-specific: thumbnail
+            const thumbnailHtml = isRecording && s.thumbnailUrl
+                ? `<div class="recording-thumbnail" style="margin-bottom:10px;">
+                       <img src="${s.thumbnailUrl}" alt="${this.escapeHtml(s.title)}"
+                            style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;"
+                            onerror="this.style.display='none'">
+                   </div>`
+                : '';
+
+            // Duration / date / participants row
+            const metaBits = [
+                `📅 ${s.recorded_at || '—'}`,
+                s.duration && s.duration !== 'Unknown' ? `⏱️ ${s.duration}` : null,
+                s.participants ? `👥 ${s.participants}` : null
+            ].filter(Boolean).join(' &nbsp;•&nbsp; ');
+
+            // View button — prefer class link, fall back gracefully
+            const viewBtn = s.class_link
+                ? `<a href="${s.class_link}" class="btn btn-outline">📹 View Class</a>`
+                : (s.class_id
+                    ? `<a href="instructor-class-details.html?id=${s.class_id}" class="btn btn-outline">📹 View Class</a>`
+                    : `<span style="color:#999;font-size:0.85rem;">Class removed</span>`);
+
+            // Mux playback — direct link (optional)
+            const muxBtn = isRecording && s.muxPlaybackId
+                ? `<a href="https://stream.mux.com/${s.muxPlaybackId}.m3u8"
+                      target="_blank"
+                      rel="noopener"
+                      class="btn btn-outline"
+                      title="Open raw HLS stream">▶ Play</a>`
+                : '';
+
+            return `
                 <div class="enrolled-class-card past-stream">
                     <div class="stream-header">
-                        <h4>📹 ${this.escapeHtml(s.title)}</h4>
+                        <h4>${isRecording ? '📹' : '🎬'} ${this.escapeHtml(s.title)}</h4>
                         <span class="stream-status ended">✅ Ended</span>
                     </div>
+                    ${thumbnailHtml}
                     <p>${this.escapeHtml(s.description || 'No description')}</p>
                     <div class="stream-details">
-                        <span>📅 ${s.recorded_at || 'Unknown date'}</span>
-                        <span>👥 ${s.participants || 0} participants</span>
-                        <span>⏱️ ${s.duration || 'Unknown'}</span>
+                        <span>${metaBits}</span>
                     </div>
                     <div class="stream-actions">
-                        <a href="/class-details.html?id=${s.class_id}" class="btn btn-outline">📹 View Recording</a>
-                        ${s.id ? `<a href="newlivestream.html?streamId=${s.id}" class="btn btn-outline">🔗 Replay</a>` : ''}
+                        ${muxBtn}
+                        ${viewBtn}
                     </div>
                 </div>
-            `).join('');
-        } else {
-            this.el.pastStreams.innerHTML = `<p class="no-data">No past streams</p>`;
-        }
+            `;
+        }).join('');
+    } else {
+        this.el.pastStreams.innerHTML = `<p class="no-data">No past streams yet</p>`;
     }
+}
   }
 
   // ===== GENERATE MEETING LINK =====

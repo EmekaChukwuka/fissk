@@ -17,6 +17,7 @@ import Assignment from "../models/Assignment.js";
 import Quiz from "../models/Quiz.js";
 import QuizAttempt from "../models/QuizAttempt.js";
 import QuizService from "../services/quizService.js";
+import Stream from "../models/Stream.js";
 
 // Import Email Service
 import emailService from "../services/emailService.js";
@@ -743,74 +744,77 @@ Regisrouter.post('/user-progress', async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
-// TEMPORARY DEBUG — remove after use
-Regisrouter.get('/debug/livestreams/:instructorId', async (req, res) => {
+
+// ============================================================
+// INSTRUCTOR RECORDINGS (from Stream collection / Mux)
+// Returns past livestream recordings in LiveSession-like shape
+// ============================================================
+Regisrouter.get('/instructor/recordings/:instructorId', async (req, res) => {
   try {
     const { instructorId } = req.params;
 
-    // 1. Direct match on instructorId (as string — works because Mongoose casts)
-    const byInstructorId = await LiveSession.find({ instructorId }).lean();
+    const streams = await Stream.find({ userId: instructorId })
+      .sort({ createdAt: -1 })
+      .lean();
 
-    // 2. Search anywhere that instructorId appears as a string OR objectId
-    //    This catches type mismatches (string vs ObjectId)
-    const byAnyField = await LiveSession.find({
-      $or: [
-        { instructorId: instructorId },
-        { instructor: instructorId },
-        { userId: instructorId }
-      ]
-    }).lean();
+    // Shape them like LiveSession records so the frontend
+    // can render them with the existing renderStreams() logic.
+    const recordings = streams.map(s => {
+      const playbackId = s.muxPlaybackId || s.playbackId || null;
 
-    // 3. Is anything in the collection AT ALL?
-    const totalInDB = await LiveSession.countDocuments();
+      // Build a clickable link to the class page for this stream
+      const classLink = s.streamClass
+        ? `instructor-class-details.html?id=${s.streamClass}`
+        : null;
 
-    // 4. Sample a few sessions to see what shape they have
-    const sample = await LiveSession.find().limit(5).lean();
+      // Human-friendly duration
+      let durationStr = s.duration || '';
+      if (!durationStr && s.muxDuration) {
+        const mins = Math.floor(s.muxDuration / 60);
+        const secs = Math.floor(s.muxDuration % 60);
+        durationStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+      }
 
-    // 5. Check the Stream collection (Mux recordings)
-    const Stream = mongoose.model('Stream');
-    const streamsByUser = await Stream.find({ userId: instructorId }).lean();
-    const streamsByClass = await Stream.find().limit(5).lean();
-
-    // 6. Is the instructorId an existing user?
-    const User = mongoose.model('User');
-    const user = await User.findById(instructorId).select('firstName lastName email userType').lean();
+      return {
+        _id: s._id,
+        id: s._id,
+        title: s.classTitle || s.name || 'Untitled Recording',
+        description: s.classDescription || 'Recorded livestream',
+        recorded_at: s.createdAt
+          ? new Date(s.createdAt).toLocaleDateString('en-US', {
+              year: 'numeric', month: 'short', day: 'numeric'
+            })
+          : '—',
+        recorded_at_iso: s.createdAt,
+        duration: durationStr || 'Unknown',
+        participants: s.participants || 0,
+        class_id: s.streamClass || null,
+        class_title: s.classTitle || null,
+        muxPlaybackId: playbackId,
+        muxStatus: s.muxStatus || 'ready',
+        thumbnailUrl: playbackId
+          ? `https://image.mux.com/${playbackId}/thumbnail.jpg?time=5`
+          : null,
+        class_link: classLink,
+        _isRecording: true   // lets the frontend distinguish from real LiveSession rows
+      };
+    });
 
     res.json({
       success: true,
-      instructorId,
-      user: user || null,
-      liveSession: {
-        totalInDB,
-        matchedByInstructorId: byInstructorId.length,
-        matchedByAnyField: byAnyField.length,
-        sampleFirstFive: sample.map(s => ({
-          id: s._id,
-          title: s.title,
-          instructorId: s.instructorId,
-          streamStatus: s.streamStatus,
-          sessionType: s.sessionType,
-          classId: s.classId,
-          createdAt: s.createdAt
-        }))
-      },
-      streamCollection: {
-        totalInDB: await Stream.countDocuments(),
-        matchedByUserId: streamsByUser.length,
-        sampleFirstFive: streamsByClass.map(s => ({
-          id: s._id,
-          name: s.name,
-          userId: s.userId,
-          streamClass: s.streamClass,
-          muxPlaybackId: s.muxPlaybackId,
-          createdAt: s.createdAt
-        }))
-      }
+      count: recordings.length,
+      recordings
     });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (error) {
+    console.error('Get instructor recordings error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load recordings',
+      error: error.message
+    });
   }
 });
+
 // Get user's enrolled classes
 Regisrouter.post('/get-user-classes', async (req, res) => {
   const { email } = req.body;
