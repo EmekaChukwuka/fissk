@@ -742,45 +742,69 @@ Regisrouter.post('/user-progress', async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal server error' });
   }
 });
-
 // TEMPORARY DEBUG — remove after use
 Regisrouter.get('/debug/livestreams/:instructorId', async (req, res) => {
   try {
     const { instructorId } = req.params;
-    const sessions = await LiveSession.find({ instructorId }).lean();
 
-    const summary = sessions.map(s => ({
-      id: s._id,
-      title: s.title,
-      streamStatus: s.streamStatus,
-      sessionType: s.sessionType,
-      hostConnected: s.hostConnected,
-      classId: s.classId,
-      createdAt: s.createdAt
-    }));
+    // 1. Direct match on instructorId (as string — works because Mongoose casts)
+    const byInstructorId = await LiveSession.find({ instructorId }).lean();
 
-    // Group by state to see the distribution
-    const stateCounts = {};
-    sessions.forEach(s => {
-      const key = `${s.streamStatus || 'null'} / ${s.sessionType || 'null'}`;
-      stateCounts[key] = (stateCounts[key] || 0) + 1;
-    });
-
-    // What the /instructor/streams route actually returns as "past"
-    const pastQuery = await LiveSession.find({
-      instructorId,
+    // 2. Search anywhere that instructorId appears as a string OR objectId
+    //    This catches type mismatches (string vs ObjectId)
+    const byAnyField = await LiveSession.find({
       $or: [
-        { streamStatus: 'ended' },
-        { sessionType: 'recorded' }
+        { instructorId: instructorId },
+        { instructor: instructorId },
+        { userId: instructorId }
       ]
     }).lean();
 
+    // 3. Is anything in the collection AT ALL?
+    const totalInDB = await LiveSession.countDocuments();
+
+    // 4. Sample a few sessions to see what shape they have
+    const sample = await LiveSession.find().limit(5).lean();
+
+    // 5. Check the Stream collection (Mux recordings)
+    const Stream = mongoose.model('Stream');
+    const streamsByUser = await Stream.find({ userId: instructorId }).lean();
+    const streamsByClass = await Stream.find().limit(5).lean();
+
+    // 6. Is the instructorId an existing user?
+    const User = mongoose.model('User');
+    const user = await User.findById(instructorId).select('firstName lastName email userType').lean();
+
     res.json({
       success: true,
-      totalSessions: sessions.length,
-      stateCounts,
-      matchedAsPast: pastQuery.length,
-      allSessions: summary
+      instructorId,
+      user: user || null,
+      liveSession: {
+        totalInDB,
+        matchedByInstructorId: byInstructorId.length,
+        matchedByAnyField: byAnyField.length,
+        sampleFirstFive: sample.map(s => ({
+          id: s._id,
+          title: s.title,
+          instructorId: s.instructorId,
+          streamStatus: s.streamStatus,
+          sessionType: s.sessionType,
+          classId: s.classId,
+          createdAt: s.createdAt
+        }))
+      },
+      streamCollection: {
+        totalInDB: await Stream.countDocuments(),
+        matchedByUserId: streamsByUser.length,
+        sampleFirstFive: streamsByClass.map(s => ({
+          id: s._id,
+          name: s.name,
+          userId: s.userId,
+          streamClass: s.streamClass,
+          muxPlaybackId: s.muxPlaybackId,
+          createdAt: s.createdAt
+        }))
+      }
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
