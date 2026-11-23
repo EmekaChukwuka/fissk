@@ -1,13 +1,10 @@
 // ============================================================
 // forum.js — Community Forum (frontend)
-// Fixed: CORS preflight, silent init failures, double listeners,
-//        missing response guards, broken activity HTML.
 // ============================================================
 
 const user = JSON.parse(localStorage.getItem("user"));
 const userId = user?.id || null;
 
-// ===== USER DROPDOWN =====
 if (user) {
     const dropdown = document.getElementById('user-dropdown');
     if (dropdown) {
@@ -29,21 +26,9 @@ async function logout() {
     window.location.href = "/";
 }
 
-// ===== FORUM UI CONTROLLER =====
 const forumUI = {
-    state: {
-        category: "",
-        search: "",
-        sort: "recent"
-    },
+    state: { category: "", search: "", sort: "recent" },
 
-    /**
-     * Headers for every request.
-     * NOTE: we DO NOT send a custom `userId` header anymore — that
-     * triggered CORS preflight and broke cross-origin requests.
-     * If you ever enable auth on forum routes, the Authorization
-     * header below is already in place.
-     */
     headers(json = false) {
         const h = {};
         const token = localStorage.getItem('token');
@@ -54,136 +39,94 @@ const forumUI = {
 
     async init() {
         try {
-            // Use allSettled so one failing loader doesn't kill the others
             const results = await Promise.allSettled([
                 this.loadStats(),
                 this.loadCategories(),
                 this.loadTopics(),
                 this.loadActivity()
             ]);
-
             const failures = results.filter(r => r.status === 'rejected');
-            if (failures.length > 0) {
+            if (failures.length) {
                 console.error('Some forum loaders failed:', failures);
-                this.showInitError(failures.map(f => f.reason?.message || 'Unknown error').join(' • '));
+                this.showInitError(failures.map(f => f.reason?.message || 'Unknown').join(' • '));
             }
-
             this.setupEventListeners();
         } catch (err) {
             console.error('Forum init failed:', err);
-            this.showInitError(err.message || 'Unknown error');
+            this.showInitError(err.message);
         }
     },
 
     showInitError(detail) {
         const container = document.querySelector('.forum-main');
-        if (!container) return;
-        if (container.querySelector('.forum-init-error')) return;
+        if (!container || container.querySelector('.forum-init-error')) return;
         container.insertAdjacentHTML('afterbegin', `
             <div class="forum-init-error" style="background:#fee2e2; color:#991b1b; padding:16px; border-radius:8px; margin-bottom:16px; border:1px solid #fecaca;">
-                ⚠️ Could not fully load the forum. ${detail ? 'Details: ' + detail : 'Please refresh the page.'}
+                ⚠️ Could not fully load the forum. ${detail ? 'Details: ' + detail : 'Please refresh.'}
             </div>
         `);
     },
 
     setupEventListeners() {
-        // New topic button
         const newTopicBtn = document.getElementById('newTopicBtn');
-        if (newTopicBtn) {
-            newTopicBtn.addEventListener('click', () => this.openNewTopicModal());
-        }
+        if (newTopicBtn) newTopicBtn.addEventListener('click', () => this.openNewTopicModal());
 
-        // Search
         const searchInput = document.getElementById('forumSearch');
         const searchBtn = document.querySelector('.search-btn');
         if (searchInput && searchBtn) {
-            const performSearch = () => {
-                this.state.search = searchInput.value.trim();
-                this.loadTopics();
-            };
-            searchBtn.addEventListener('click', performSearch);
-            searchInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') performSearch();
-            });
-            // Debounced live search
-            let searchTimer = null;
-            searchInput.addEventListener('input', (e) => {
-                clearTimeout(searchTimer);
-                searchTimer = setTimeout(() => {
-                    this.state.search = e.target.value.trim();
-                    this.loadTopics();
-                }, 350);
+            const perform = () => { this.state.search = searchInput.value.trim(); this.loadTopics(); };
+            searchBtn.addEventListener('click', perform);
+            searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') perform(); });
+            let t = null;
+            searchInput.addEventListener('input', e => {
+                clearTimeout(t);
+                t = setTimeout(() => { this.state.search = e.target.value.trim(); this.loadTopics(); }, 350);
             });
         }
 
-        // Sort
         const sortSelect = document.getElementById('sortTopics');
         if (sortSelect) {
-            sortSelect.addEventListener('change', (e) => {
+            sortSelect.addEventListener('change', e => {
                 this.state.sort = e.target.value;
                 this.loadTopics();
             });
         }
 
-        // New topic form
         const newTopicForm = document.getElementById('newTopicForm');
         if (newTopicForm) {
-            newTopicForm.addEventListener('submit', async (e) => {
+            newTopicForm.addEventListener('submit', async e => {
                 e.preventDefault();
                 const title = document.getElementById('topicTitle')?.value?.trim();
                 const content = document.getElementById('topicContent')?.value?.trim();
                 const categoryId = document.getElementById('topicCategory')?.value;
                 const tags = (document.getElementById('topicTags')?.value || '')
-                    .split(',')
-                    .map(t => t.trim())
-                    .filter(Boolean);
+                    .split(',').map(t => t.trim()).filter(Boolean);
 
                 if (!title || !content || !categoryId) {
                     this.showMessage('Please fill in title, category, and content.', 'error');
                     return;
                 }
-
                 const ok = await this.createTopic({ title, content, categoryId, tags });
-                if (ok) {
-                    this.closeModal('newTopicModal');
-                }
+                if (ok) this.closeModal('newTopicModal');
             });
         }
 
-        // Editor buttons
         document.querySelectorAll('.editor-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const format = e.currentTarget.dataset.format;
-                this.formatText(format);
-            });
+            btn.addEventListener('click', e => this.formatText(e.currentTarget.dataset.format));
         });
-
-        // Close-modal buttons
         document.querySelectorAll('.close-modal').forEach(btn => {
             btn.addEventListener('click', () => this.closeModal('newTopicModal'));
         });
-
-        // Click outside modal to close
-        window.addEventListener('click', (e) => {
-            if (e.target.classList?.contains('modal')) {
-                e.target.style.display = 'none';
-            }
+        window.addEventListener('click', e => {
+            if (e.target.classList?.contains('modal')) e.target.style.display = 'none';
         });
     },
 
-    // ============================================================
-    // LOADERS
-    // ============================================================
-
     async loadStats() {
         const res = await fetch("https://fissk-iui2.onrender.com/forum-api/stats", { headers: this.headers() });
-        if (!res.ok) throw new Error(`Stats request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Stats: ${res.status}`);
         const stats = await res.json();
-
-        const set = (id, val) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = val ?? 0;
-        };
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v ?? 0; };
         set('totalTopics', stats.totalTopics);
         set('totalUsers', stats.totalUsers);
         set('totalReplies', stats.totalReplies);
@@ -192,16 +135,15 @@ const forumUI = {
 
     async loadCategories() {
         const res = await fetch("https://fissk-iui2.onrender.com/forum-api/categories", { headers: this.headers() });
-        if (!res.ok) throw new Error(`Categories request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Categories: ${res.status}`);
         const cats = await res.json();
-        if (!Array.isArray(cats)) throw new Error('Categories response was not an array');
+        if (!Array.isArray(cats)) throw new Error('Categories: not an array');
 
-        const categoriesList = document.getElementById('categoriesList');
-        if (categoriesList) {
-            if (cats.length === 0) {
-                categoriesList.innerHTML = `<div class="no-content"><p>No forum categories available yet.</p></div>`;
-            } else {
-                categoriesList.innerHTML = cats.map(c => `
+        const list = document.getElementById('categoriesList');
+        if (list) {
+            list.innerHTML = cats.length === 0
+                ? `<div class="no-content"><p>No categories yet.</p></div>`
+                : cats.map(c => `
                     <div class="category-card" onclick="forumUI.setCategory('${c.slug}')">
                         <div class="category-icon">${c.icon || '📌'}</div>
                         <div class="category-info">
@@ -209,15 +151,14 @@ const forumUI = {
                             <p>${c.description || ''}</p>
                         </div>
                     </div>
-                `).join("");
-            }
+                `).join('');
         }
 
-        const topicCategory = document.getElementById('topicCategory');
-        if (topicCategory) {
-            topicCategory.innerHTML =
+        const select = document.getElementById('topicCategory');
+        if (select) {
+            select.innerHTML =
                 `<option value="">Select category</option>` +
-                cats.map(c => `<option value="${c._id}">${c.icon || '📌'} ${c.name}</option>`).join("");
+                cats.map(c => `<option value="${c._id}">${c.icon || '📌'} ${c.name}</option>`).join('');
         }
     },
 
@@ -228,13 +169,9 @@ const forumUI = {
             const cats = await res.json();
             const select = document.getElementById('topicCategory');
             if (select && Array.isArray(cats)) {
-                select.innerHTML = cats.map(c => `
-                    <option value="${c._id}">${c.icon || '📌'} ${c.name}</option>
-                `).join('');
+                select.innerHTML = cats.map(c => `<option value="${c._id}">${c.icon || '📌'} ${c.name}</option>`).join('');
             }
-        } catch (err) {
-            console.error('Load categories for select error:', err);
-        }
+        } catch (err) { console.error('Load categories for select error:', err); }
     },
 
     setCategory(slug) {
@@ -245,65 +182,63 @@ const forumUI = {
     async loadTopics() {
         const { search, sort, category } = this.state;
         const params = new URLSearchParams({
-            search: search || "",
-            sort: sort || "recent",
-            category: category || ""
+            search: search || '',
+            sort: sort || 'recent',
+            category: category || ''
         });
 
         const res = await fetch(
             `https://fissk-iui2.onrender.com/forum-api/topics?${params.toString()}`,
             { headers: this.headers() }
         );
-        if (!res.ok) throw new Error(`Topics request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Topics: ${res.status}`);
         const topics = await res.json();
-        if (!Array.isArray(topics)) throw new Error('Topics response was not an array');
+        if (!Array.isArray(topics)) throw new Error('Topics: not an array');
 
-        const topicsList = document.getElementById('topicsList');
-        if (!topicsList) return;
+        const list = document.getElementById('topicsList');
+        if (!list) return;
 
         if (topics.length === 0) {
-            topicsList.innerHTML = `
+            list.innerHTML = `
                 <div class="no-content">
-                    <p>No topics found. Be the first to start a discussion!</p>
-                    <button class="btn btn-primary" onclick="forumUI.openNewTopicModal()">
-                        Start a Discussion
-                    </button>
+                    <p>No global discussions yet.</p>
+                    <p style="font-size:0.9rem;color:#6B7280;margin:8px 0 16px;">
+                        Looking for your class discussions? Open a class and click the <strong>Forum</strong> tab — those discussions are private to enrolled students.
+                    </p>
+                    <button class="btn btn-primary" onclick="forumUI.openNewTopicModal()">Start a Global Discussion</button>
                 </div>
             `;
             return;
         }
 
-        topicsList.innerHTML = topics.map(t => {
-            const replyCount = t.replyCount ?? t.reply_count ?? (Array.isArray(t.replies) ? t.replies.length : 0);
-            const views = t.views || 0;
-            const title = t.title || 'Untitled';
-            const categoryName = t.category_name || (t.categoryId?.name) || 'General';
+        list.innerHTML = topics.map(t => {
+            const replyCount = t.replyCount ?? (Array.isArray(t.replies) ? t.replies.length : 0);
+            const categoryName = t.category_name || 'General';
+            const author = t.author_name ? `by ${this.escapeHtml(t.author_name)}` : '';
             return `
                 <div class="topic-item">
                     <div class="topic-left">
                         <h3>
-                            ${t.isPinned || t.is_pinned ? "📌 " : ""}
-                            ${t.solved ? "✅ " : ""}
-                            ${this.escapeHtml(title)}
+                            ${t.isPinned ? '📌 ' : ''}${t.solved ? '✅ ' : ''}
+                            ${this.escapeHtml(t.title)}
                         </h3>
                         <div class="topic-meta">
                             <span>${this.escapeHtml(categoryName)}</span>
+                            ${author ? `<span>${author}</span>` : ''}
                             <span>💬 ${replyCount}</span>
-                            <span>👀 ${views}</span>
+                            <span>👀 ${t.views || 0}</span>
                         </div>
                     </div>
                     <a href="forum-post.html?id=${t._id}" class="btn btn-outline">View</a>
                 </div>
             `;
-        }).join("");
+        }).join('');
     },
 
     async loadActivity() {
+        const recentActivity = document.getElementById('recentActivity');
         if (!userId) {
-            const recentActivity = document.getElementById('recentActivity');
-            if (recentActivity) {
-                recentActivity.innerHTML = `<p style="color:#6B7280; font-size:0.9rem;">Log in to see your activity.</p>`;
-            }
+            if (recentActivity) recentActivity.innerHTML = `<p style="color:#6B7280;font-size:0.9rem;">Log in to see your activity.</p>`;
             return;
         }
 
@@ -311,61 +246,34 @@ const forumUI = {
             `https://fissk-iui2.onrender.com/forum-api/activity/${userId}`,
             { headers: this.headers() }
         );
-        if (!res.ok) throw new Error(`Activity request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Activity: ${res.status}`);
         const data = await res.json();
 
         const topicCount = Array.isArray(data.topics) ? data.topics.length : 0;
         const replyCount = Array.isArray(data.replies) ? data.replies.length : 0;
 
-        const recentActivity = document.getElementById('recentActivity');
         if (recentActivity) {
             recentActivity.innerHTML = `
-                <div class="activity-item">
-                    <strong>Your Topics</strong>
-                    <span>${topicCount}</span>
-                </div>
-                <div class="activity-item">
-                    <strong>Your Replies</strong>
-                    <span>${replyCount}</span>
-                </div>
+                <div class="activity-item"><strong>Your Topics</strong><span>${topicCount}</span></div>
+                <div class="activity-item"><strong>Your Replies</strong><span>${replyCount}</span></div>
             `;
         }
     },
 
-    // ============================================================
-    // MODALS
-    // ============================================================
-
     async openNewTopicModal() {
-        if (!userId) {
-            this.showMessage('Please log in to start a discussion.', 'error');
-            return;
-        }
+        if (!userId) { this.showMessage('Please log in to start a discussion.', 'error'); return; }
         await this.loadCategoriesForSelect();
-        const modal = document.getElementById('newTopicModal');
-        if (modal) modal.style.display = 'flex';
+        const m = document.getElementById('newTopicModal');
+        if (m) m.style.display = 'flex';
     },
 
-    closeModal(modalId) {
-        const modal = document.getElementById(modalId);
-        if (modal) modal.style.display = 'none';
+    closeModal(id) {
+        const m = document.getElementById(id);
+        if (m) m.style.display = 'none';
     },
-
-    toggleModal(id, show) {
-        const modal = document.getElementById(id);
-        if (modal) modal.style.display = show ? "flex" : "none";
-    },
-
-    // ============================================================
-    // CREATE TOPIC
-    // ============================================================
 
     async createTopic(payload) {
-        if (!userId) {
-            this.showMessage('Please log in to post.', 'error');
-            return false;
-        }
-
+        if (!userId) { this.showMessage('Please log in to post.', 'error'); return false; }
         try {
             const res = await fetch("https://fissk-iui2.onrender.com/forum-api/topics", {
                 method: "POST",
@@ -378,20 +286,13 @@ const forumUI = {
                     userId
                 })
             });
-
             const data = await res.json().catch(() => ({}));
-
             if (!res.ok) {
                 this.showMessage(data.message || 'Failed to create topic.', 'error');
                 return false;
             }
-
-            this.showMessage('Successfully created discussion', 'success');
-            await Promise.allSettled([
-                this.loadTopics(),
-                this.loadStats(),
-                this.loadActivity()
-            ]);
+            this.showMessage('Discussion created!', 'success');
+            await Promise.allSettled([this.loadTopics(), this.loadStats(), this.loadActivity()]);
             return true;
         } catch (err) {
             console.error('createTopic error:', err);
@@ -400,35 +301,18 @@ const forumUI = {
         }
     },
 
-    // ============================================================
-    // UTILITIES
-    // ============================================================
-
     formatText(format) {
-        const textarea = document.getElementById('topicContent');
-        if (!textarea) return;
-
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const selectedText = textarea.value.substring(start, end);
-
-        let formattedText = '';
-        switch (format) {
-            case 'bold':   formattedText = `**${selectedText}**`; break;
-            case 'italic': formattedText = `*${selectedText}*`; break;
-            case 'code':   formattedText = `\`${selectedText}\``; break;
-            case 'link':   formattedText = `[${selectedText}](url)`; break;
-            default: return;
-        }
-
-        textarea.value =
-            textarea.value.substring(0, start) +
-            formattedText +
-            textarea.value.substring(end);
-
-        textarea.focus();
-        const newCursor = start + formattedText.length;
-        textarea.setSelectionRange(newCursor, newCursor);
+        const ta = document.getElementById('topicContent');
+        if (!ta) return;
+        const start = ta.selectionStart, end = ta.selectionEnd;
+        const sel = ta.value.substring(start, end);
+        const map = { bold: `**${sel}**`, italic: `*${sel}*`, code: `\`${sel}\``, link: `[${sel}](url)` };
+        const formatted = map[format];
+        if (!formatted) return;
+        ta.value = ta.value.substring(0, start) + formatted + ta.value.substring(end);
+        ta.focus();
+        const pos = start + formatted.length;
+        ta.setSelectionRange(pos, pos);
     },
 
     showMessage(message, type = 'success') {
@@ -436,24 +320,11 @@ const forumUI = {
         el.className = `forum-message forum-message-${type}`;
         el.textContent = message;
         el.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 20px;
-            border-radius: 10px;
-            color: white;
-            background: ${type === 'success' ? '#48BB78' : '#F56565'};
-            z-index: 10000;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            max-width: 400px;
-        `;
+            position:fixed;top:20px;right:20px;padding:15px 20px;border-radius:10px;
+            color:white;background:${type === 'success' ? '#48BB78' : '#F56565'};
+            z-index:10000;box-shadow:0 5px 15px rgba(0,0,0,0.2);max-width:400px;`;
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 3000);
-    },
-
-    truncateText(text, maxLength) {
-        if (!text) return '';
-        return text.length <= maxLength ? text : text.substring(0, maxLength) + '...';
     },
 
     escapeHtml(s) {
@@ -464,13 +335,10 @@ const forumUI = {
     }
 };
 
-// ===== BOOT =====
 document.addEventListener("DOMContentLoaded", () => forumUI.init());
 
-// ===== MOBILE NAVIGATION =====
 const hamburger = document.querySelector('.hamburger');
 const navMenu = document.querySelector('.nav-menu');
-
 if (hamburger && navMenu) {
     hamburger.addEventListener('click', () => {
         hamburger.classList.toggle('active');
@@ -484,7 +352,6 @@ if (hamburger && navMenu) {
         }
     });
 }
-
 document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', () => {
         if (hamburger) hamburger.classList.remove('active');
