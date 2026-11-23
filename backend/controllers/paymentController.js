@@ -4,13 +4,23 @@ import Class from '../models/Class.js';
 import User from '../models/User.js';
 import paymentService from '../services/paymentService.js';
 import emailService from '../services/emailService.js';
-// backend/controllers/paymentController.js
 
 // ===== GENERATE UNIQUE REFERENCE (FISSK format) =====
 function generateReference() {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 8).toUpperCase();
   return `FISSK-${timestamp}-${random}`;
+}
+
+// ===== HELPER: Ensure reference is not already used in our DB =====
+async function generateUniqueReference(maxAttempts = 5) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const ref = generateReference();
+    const exists = await Payment.findOne({ reference: ref }).select('_id').lean();
+    if (!exists) return ref;
+  }
+  // Extremely unlikely, but fall back to a definitely-unique value
+  return `FISSK-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
 }
 
 export const initializePayment = async (req, res) => {
@@ -29,7 +39,7 @@ export const initializePayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'This class is free' });
     }
 
-    // Check if already paid
+    // Already paid? Short-circuit.
     const existingPaid = await Enrollment.findOne({
       userId, classId, paymentStatus: 'paid'
     });
@@ -38,20 +48,21 @@ export const initializePayment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'You already have access' });
     }
 
-    // Check for existing pending payment
+    // A prior attempt may exist (pending or failed). Reuse the RECORD but
+    // ALWAYS mint a fresh reference — Paystack rejects duplicates.
     const existingPayment = await Payment.findOne({
-      user: userId, class: classId, status: 'pending'
-    });
+      user: userId, class: classId, status: { $in: ['pending', 'failed'] }
+    }).sort({ createdAt: -1 });
 
-    // ===== GENERATE YOUR CUSTOM REFERENCE =====
-    const myReference = generateReference(); // FISSK-XXXXX-XXXXX
+    // ===== ALWAYS GENERATE A FRESH REFERENCE =====
+    const finalReference = await generateUniqueReference();
 
-    console.log('🔑 Generated custom reference:', myReference);
+    console.log('🔑 Generated fresh reference:', finalReference);
+    if (existingPayment) {
+      console.log('   Replacing stale reference on existing payment:', existingPayment.reference);
+    }
 
-    // If there's an existing pending payment, reuse its reference
-    const referenceToUse = existingPayment?.reference || myReference;
-
-    // Initialize with Paystack — passing YOUR reference
+    // Initialize with Paystack using the fresh reference
     const result = await paymentService.initializePayment(
       user.email,
       classData.price,
@@ -60,11 +71,39 @@ export const initializePayment = async (req, res) => {
         userId: userId,
         instructorId: classData.instructorId,
         className: classData.title,
-        reference: referenceToUse // ← Pass YOUR custom reference
+        reference: finalReference
       }
     );
 
     if (!result.success) {
+      // Paystack still complained about duplicate? Retry once with a new ref.
+      if (result.code === 'duplicate_reference' || /duplicate/i.test(result.message || '')) {
+        console.warn('⚠️ Duplicate reference from Paystack. Retrying with a new one...');
+        const retryRef = await generateUniqueReference();
+        const retry = await paymentService.initializePayment(
+          user.email,
+          classData.price,
+          {
+            classId,
+            userId,
+            instructorId: classData.instructorId,
+            className: classData.title,
+            reference: retryRef
+          }
+        );
+        if (retry.success) {
+          return await finalizePaymentRecord({
+            res, existingPayment, retry,
+            userId, classId, classData, user, usedReference: retryRef
+          });
+        }
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to initialize payment after retry',
+          error: retry.error
+        });
+      }
+
       return res.status(500).json({
         success: false,
         message: 'Failed to initialize payment',
@@ -72,76 +111,10 @@ export const initializePayment = async (req, res) => {
       });
     }
 
-    // ===== CRITICAL: Use whatever reference Paystack returned =====
-    // If Paystack accepted your reference, it will be FISSK-XXXXX
-    // If Paystack rejected it (duplicate), it will generate T-XXXXX
-    const finalReference = result.data.reference;
-    
-    console.log('✅ Paystack accepted reference:', finalReference);
-    console.log('   Is it FISSK format?', finalReference.startsWith('FISSK-'));
-
-    // Create or update payment record
-    let payment;
-    
-    if (existingPayment) {
-      // Update existing payment
-      existingPayment.reference = finalReference;
-      existingPayment.amount = classData.price;
-      existingPayment.platformFee = classData.price * 0.3;
-      existingPayment.instructorEarning = classData.price * 0.7;
-      existingPayment.metadata = {
-        ...existingPayment.metadata,
-        myReference: referenceToUse,
-        className: classData.title
-      };
-      payment = await existingPayment.save();
-    } else {
-      // Create new payment
-      payment = new Payment({
-        user: userId,
-        class: classId,
-        instructor: classData.instructorId,
-        amount: classData.price,
-        reference: finalReference, // ← Use Paystack's reference
-        status: 'pending',
-        platformFee: classData.price * 0.3,
-        instructorEarning: classData.price * 0.7,
-        metadata: {
-          myReference: referenceToUse, // Store your original reference for backup
-          className: classData.title,
-          studentEmail: user.email,
-          studentName: `${user.firstName} ${user.lastName}`
-        }
-      });
-      await payment.save();
-    }
-
-    // Upsert enrollment with the final reference
-    await Enrollment.findOneAndUpdate(
-      { userId, classId },
-      {
-        $set: {
-          paymentReference: finalReference,
-          paymentStatus: 'pending',
-          amountPaid: classData.price,
-          accessType: 'paid'
-        },
-        $setOnInsert: {
-          userId,
-          classId,
-          enrolledAt: new Date(),
-          progress: 0
-        }
-      },
-      { upsert: true, new: true }
-    );
-
-    res.json({
-      success: true,
-      data: {
-        authorizationUrl: result.authorizationUrl,
-        reference: finalReference
-      }
+    // Success path — persist the record and enrollment
+    return await finalizePaymentRecord({
+      res, existingPayment, retry: result,
+      userId, classId, classData, user, usedReference: finalReference
     });
 
   } catch (error) {
@@ -154,6 +127,76 @@ export const initializePayment = async (req, res) => {
   }
 };
 
+// ===== HELPER: Persist payment + enrollment after a successful init =====
+async function finalizePaymentRecord({
+  res, existingPayment, retry, userId, classId, classData, user, usedReference
+}) {
+  const finalReference = retry.data.reference || usedReference;
+
+  console.log('✅ Paystack accepted reference:', finalReference);
+
+  let payment;
+
+  if (existingPayment) {
+    existingPayment.reference = finalReference;
+    existingPayment.amount = classData.price;
+    existingPayment.platformFee = classData.price * 0.3;
+    existingPayment.instructorEarning = classData.price * 0.7;
+    existingPayment.status = 'pending';
+    existingPayment.metadata = {
+      ...(existingPayment.metadata || {}),
+      myReference: usedReference,
+      className: classData.title
+    };
+    payment = await existingPayment.save();
+  } else {
+    payment = new Payment({
+      user: userId,
+      class: classId,
+      instructor: classData.instructorId,
+      amount: classData.price,
+      reference: finalReference,
+      status: 'pending',
+      platformFee: classData.price * 0.3,
+      instructorEarning: classData.price * 0.7,
+      metadata: {
+        myReference: usedReference,
+        className: classData.title,
+        studentEmail: user.email,
+        studentName: `${user.firstName} ${user.lastName}`
+      }
+    });
+    await payment.save();
+  }
+
+  await Enrollment.findOneAndUpdate(
+    { userId, classId },
+    {
+      $set: {
+        paymentReference: finalReference,
+        paymentStatus: 'pending',
+        amountPaid: classData.price,
+        accessType: 'paid'
+      },
+      $setOnInsert: {
+        userId,
+        classId,
+        enrolledAt: new Date(),
+        progress: 0
+      }
+    },
+    { upsert: true, new: true }
+  );
+
+  return res.json({
+    success: true,
+    data: {
+      authorizationUrl: retry.authorizationUrl,
+      reference: finalReference
+    }
+  });
+}
+
 export const verifyPayment = async (req, res) => {
   try {
     const { reference } = req.body;
@@ -164,13 +207,11 @@ export const verifyPayment = async (req, res) => {
 
     console.log('🔍 Verifying reference:', reference);
 
-    // Find payment — try both the main reference and metadata.myReference
     let payment = await Payment.findOne({ reference })
       .populate('user')
       .populate('class')
       .populate('instructor');
 
-    // Fallback: try metadata.myReference
     if (!payment) {
       console.log('⚠️ Not found by main reference, trying metadata...');
       payment = await Payment.findOne({ 'metadata.myReference': reference })
@@ -183,7 +224,6 @@ export const verifyPayment = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Payment not found' });
     }
 
-    // Already processed?
     if (payment.status === 'success') {
       const enrollment = await Enrollment.findOne({
         userId: payment.user._id,
@@ -197,7 +237,6 @@ export const verifyPayment = async (req, res) => {
       });
     }
 
-    // Verify with Paystack — use the reference stored in the payment record
     const result = await paymentService.verifyPayment(payment.reference);
 
     if (!result.success) {
@@ -211,7 +250,7 @@ export const verifyPayment = async (req, res) => {
     if (result.status !== 'success') {
       payment.status = 'failed';
       await payment.save();
-      
+
       await Enrollment.findOneAndUpdate(
         { paymentReference: payment.reference },
         { paymentStatus: 'failed' }
@@ -223,7 +262,6 @@ export const verifyPayment = async (req, res) => {
       });
     }
 
-    // ===== SUCCESS — CREDIT EVERYONE =====
     payment.status = 'success';
     payment.paystackData = result.data;
     payment.paidAt = new Date();
@@ -255,8 +293,6 @@ export const verifyPayment = async (req, res) => {
     console.log('   Reference:', payment.reference);
     console.log('   Instructor earning:', payment.instructorEarning);
     console.log('   New balance:', instructorUpdate?.earnings);
-
-    // Send emails...
 
     res.json({
       success: true,
@@ -333,13 +369,11 @@ export const handleWebhook = async (req, res) => {
     if (event === 'charge.success') {
       const paystackRef = data.reference;
 
-      // ===== Try multiple lookups =====
       let payment = await Payment.findOne({ reference: paystackRef })
         .populate('user')
         .populate('class')
         .populate('instructor');
 
-      // Fallback 1: metadata.myReference
       if (!payment && data.metadata?.reference) {
         console.log('🔍 Trying metadata.reference...');
         payment = await Payment.findOne({ reference: data.metadata.reference })
@@ -348,7 +382,6 @@ export const handleWebhook = async (req, res) => {
           .populate('instructor');
       }
 
-      // Fallback 2: metadata.custom_fields
       if (!payment && data.metadata?.custom_fields) {
         const refField = data.metadata.custom_fields.find(f => f.variable_name === 'reference');
         if (refField?.value) {
@@ -360,7 +393,6 @@ export const handleWebhook = async (req, res) => {
         }
       }
 
-      // Fallback 3: customer email + amount
       if (!payment && data.customer?.email) {
         console.log('🔍 Trying email + amount lookup...');
         const user = await User.findOne({ email: data.customer.email });
@@ -377,7 +409,6 @@ export const handleWebhook = async (req, res) => {
 
           if (payment) {
             console.log('✅ Found via email + amount');
-            // Update the reference to match Paystack's
             payment.reference = paystackRef;
             await payment.save();
           }
@@ -393,7 +424,6 @@ export const handleWebhook = async (req, res) => {
         return res.status(200).json({ success: true });
       }
 
-      // Credit everyone
       payment.status = 'success';
       payment.paystackData = data;
       payment.paidAt = new Date();

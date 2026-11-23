@@ -87,7 +87,7 @@ class EmailService {
                         </div>
 
                         <p style="text-align:center; margin: 25px 0;">
-                            <a href="${process.env.FRONTEND_URL || 'https://fissk-online-academy.onrender.com'}/classes.html" class="button">
+                            <a href="${process.env.FRONTEND_URL || 'https://fisskonlineacademy.com.ng'}/classes.html" class="button">
                                 🚀 Browse Courses
                             </a>
                         </p>
@@ -156,7 +156,7 @@ class EmailService {
                         </div>
 
                         <p style="text-align:center; margin: 25px 0;">
-                            <a href="${process.env.FRONTEND_URL || 'https://fissk-online-academy.onrender.com'}/instructor-dashboard.html" class="button">
+                            <a href="${process.env.FRONTEND_URL || 'https://fisskonlineacademy.com.ng'}/instructor-dashboard.html" class="button">
                                 📊 Go to Dashboard
                             </a>
                         </p>
