@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import session from "express-session";
 import dotenv from "dotenv";
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { generateToken } from '../middleware/auth.js';
 
 // Import Mongoose models
