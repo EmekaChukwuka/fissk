@@ -30,11 +30,11 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 
-// ===== MIDDLEWARE =====
+// ===== MIDDLEWARE ===== //
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'userId']
 }));
 app.use(bodyParser.json());
 app.use('/uploads', express.static('uploads'));
