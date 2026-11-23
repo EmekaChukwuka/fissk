@@ -698,7 +698,7 @@ showLessonDetail(lesson) {
                 case 'embed':
                     itemContent = `
                         <div class="item-embed-wrapper">
-                            ${item.embedCode ? item.embedCode : ''}
+                            ${this.sanitizeEmbedCode(item.embedCode)}
                             ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
                         </div>
                     `;
@@ -810,6 +810,26 @@ showLessonDetail(lesson) {
         });
     });
 }
+
+    sanitizeEmbedCode(raw) {
+        if (!raw || typeof raw !== 'string') return '';
+        const trimmed = raw.trim();
+        const m = trimmed.match(/<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>\s*<\/iframe>/i);
+        if (!m) return this.escapeHtml(trimmed);
+        const src = m[1];
+        const allowedHosts = [
+            'www.youtube.com', 'youtube.com', 'youtu.be',
+            'player.vimeo.com', 'vimeo.com',
+            'stream.mux.com', 'iframe.mediadelivery.net',
+            'player.twitch.tv', 'open.spotify.com'
+        ];
+        let host = '';
+        try { host = new URL(src).hostname.toLowerCase(); } catch { return this.escapeHtml(trimmed); }
+        const ok = allowedHosts.some(h => host === h || host.endsWith('.' + h));
+        if (!ok) return this.escapeHtml(trimmed);
+        const safeSrc = this.escapeHtml(src);
+        return `<iframe src="${safeSrc}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width:100%;aspect-ratio:16/9;border:0;border-radius:8px;"></iframe>`;
+    }
 
     // ============================================================
     // LESSON METHODS
@@ -1092,14 +1112,24 @@ showLessonDetail(lesson) {
             
             if (levelEl) levelEl.textContent = `🟢 ${this.classData.level || 'Beginner'}`;
             if (durationEl) durationEl.textContent = `🕒 ${this.classData.duration || 'Self-paced'}`;
-            if (studentsEl) studentsEl.textContent = `👥 ${this.classData.maxStudents || 0} Students`;
+            if (studentsEl) {
+                const enrolled = this.classData.enrolledStudents || 0;
+                const capacity = this.classData.maxStudents || 0;
+                studentsEl.textContent = capacity > 0
+                    ? `👥 ${enrolled} / ${capacity} Students`
+                    : `👥 ${enrolled} Students`;
+            }
 
             const enrollBtn = document.getElementById('enrollBtn');
             if (enrollBtn) {
-                if (this.isEnrolled) {
+              if (this.isEnrolled) {
                     enrollBtn.textContent = '✅ Already Enrolled';
                     enrollBtn.disabled = true;
                     enrollBtn.classList.add('enrolled');
+                } else if (this.classData.isFull) {
+                    enrollBtn.textContent = '🔒 Class Full';
+                    enrollBtn.disabled = true;
+                    enrollBtn.classList.remove('enrolled');
                 } else {
                     enrollBtn.textContent = '📝 Enroll Now';
                     enrollBtn.disabled = false;
@@ -1107,42 +1137,37 @@ showLessonDetail(lesson) {
                 }
             }
 
-            if (this.classData.instructorId) {
-                try {
-                    const instructorNameEl = document.getElementById('instructorName');
-                    const instructorBioEl = document.getElementById('instructorBio');
-                    
-                    if (this.classData.instructorId) {
-                        if (typeof this.classData.instructorId === 'object' && this.classData.instructorId.firstName) {
-                            const name = `${this.classData.instructorId.firstName || ''} ${this.classData.instructorId.lastName || ''}`.trim();
-                            if (instructorNameEl) instructorNameEl.textContent = name || 'Staff';
-                        } else {
-                            const response = await fetch('https://fissk-iui2.onrender.com/register/classes/instructor', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ instructor_id: this.classData.instructorId })
-                            });
-                            const dataA = await response.json();
-                            if (instructorNameEl && dataA.instructorData) {
-                                const name = `${dataA.instructorData.firstName || ''} ${dataA.instructorData.lastName || ''}`.trim();
-                                instructorNameEl.textContent = name || 'Staff';
-                            }
-                        }
-                    }
-                    
-                    if (instructorBioEl) {
-                        instructorBioEl.textContent = `Certified ${this.classData.title} Instructor`;
-                    }
-                } catch (err) {
-                    console.error('Error loading instructor:', err);
-                    const instructorNameEl = document.getElementById('instructorName');
-                    if (instructorNameEl) instructorNameEl.textContent = 'Staff';
-                }
-            }
+            this.renderInstructorDetails();
 
             this.renderClassDetails();
         } catch(err) {
             console.error('Error rendering class data:', err);
+        }
+    }
+
+        renderInstructorDetails() {
+        const instructorNameEl = document.getElementById('instructorName');
+        const instructorBioEl = document.getElementById('instructorBio');
+
+        const instructor = this.classData?.instructor;
+        if (instructor && typeof instructor === 'object' && instructor.name) {
+            if (instructorNameEl) instructorNameEl.textContent = instructor.name;
+
+            if (instructorBioEl) {
+                const parts = [];
+                if (instructor.bio) parts.push(instructor.bio);
+                if (instructor.qualifications) parts.push(`Qualifications: ${instructor.qualifications}`);
+                if (instructor.experienceYears) parts.push(`${instructor.experienceYears} years of experience`);
+                instructorBioEl.textContent = parts.length > 0
+                    ? parts.join(' • ')
+                    : `Certified ${this.classData?.title || 'course'} Instructor`;
+            }
+            return;
+        }
+
+        if (instructorNameEl) instructorNameEl.textContent = 'Staff';
+        if (instructorBioEl) {
+            instructorBioEl.textContent = `Certified ${this.classData?.title || 'course'} Instructor`;
         }
     }
 
@@ -2835,250 +2860,6 @@ async viewLesson(lessonId) {
     }
 }
 
-/**
- * Show lesson detail in a modal
- */
-showLessonDetail(lesson) {
-    console.log('Showing lesson detail:', lesson);
-    console.log('Content items:', lesson.contentItems);
-
-    let modal = document.getElementById('lessonDetailModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'lessonDetailModal';
-        modal.className = 'modal';
-        modal.style.display = 'none';
-        document.body.appendChild(modal);
-    }
-
-    // Build content items HTML
-    let itemsHTML = '';
-    const totalItems = lesson.contentItems?.length || 0;
-
-    const getQuizId = (item) => {
-        return item.contentId || item.quizId?._id || item.quizId || null;
-    };
-
-    if (lesson.contentItems && lesson.contentItems.length > 0) {
-        itemsHTML = lesson.contentItems.map((item, index) => {
-            let itemContent = '';
-            
-            console.log('Rendering item:', item.type, item);
-
-            switch (item.type) {
-                case 'text':
-                    itemContent = `
-                        <div class="item-text-content" style="color: rgba(255,255,255,0.9); white-space: pre-wrap;">${this.escapeHtml(item.content || '')}</div>
-                    `;
-                    break;
-               case 'video':
-    // Get video URL from multiple sources
-    const videoUrl = item.videoDetails?.playbackUrl || 
-                    (item.muxPlaybackId ? `https://stream.mux.com/${item.muxPlaybackId}.m3u8` : null) ||
-                    (item.videoDetails?.muxPlaybackId ? `https://stream.mux.com/${item.videoDetails.muxPlaybackId}.m3u8` : null);
-    
-    const isReady = item.muxStatus === 'ready' || 
-                   item.videoDetails?.muxStatus === 'ready';
-    
-    const thumbnailUrl = item.thumbnailUrl || item.videoDetails?.thumbnailUrl;
-    
-    console.log('Video URL:', videoUrl);
-    console.log('Is ready:', isReady);
-    console.log('Mux status:', item.muxStatus, item.videoDetails?.muxStatus);
-    
-    if (videoUrl) {
-        itemContent = `
-            <div class="item-video-wrapper">
-                <video controls style="max-width: 100%; border-radius: 8px; width: 100%;" poster="${thumbnailUrl || ''}">
-                    <source src="${videoUrl}" type="application/x-mpegURL">
-                    Your browser does not support the video tag.
-                </video>
-                ${!isReady ? '<p style="color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-top: 4px;">⏳ Video is still processing, but you can try playing it.</p>' : ''}
-            </div>
-            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-        `;
-    } else {
-        // No video URL - show placeholder
-        itemContent = `
-            <div class="item-video-wrapper">
-                <div style="background: rgba(255,255,255,0.05); padding: 30px; border-radius: 8px; text-align: center; color: rgba(255,255,255,0.5);">
-                    <span style="font-size: 2rem; display: block; margin-bottom: 8px;">🎬</span>
-                    <p>Video not available</p>
-                    ${item.title ? `<p style="font-size: 0.85rem; margin-top: 4px;">${this.escapeHtml(item.title)}</p>` : ''}
-                </div>
-            </div>
-            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-        `;
-    }
-    break;
-                case 'quiz':
-                    const quizId = getQuizId(item);
-                    const quizDetails = item.quizDetails || {};
-                    
-                    console.log('Quiz item:', item);
-                    console.log('Quiz ID:', quizId);
-                    console.log('Quiz Details:', quizDetails);
-                    
-                    itemContent = `
-                        <div class="item-quiz-wrapper">
-                            ${quizId ? `
-                                <a href="quiz/take.html?quizId=${quizId}" 
-                                   class="btn btn-primary" 
-                                   style="margin-right: 8px; background: #8B5FBF; color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block;">
-                                    📝 Take Quiz
-                                </a>
-                                <span style="color: rgba(255,255,255,0.4); font-size: 0.85rem; margin-left: 8px;">
-                                    ${quizDetails.questionCount || 0} questions
-                                </span>
-                            ` : `
-                                <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 8px; text-align: center; color: rgba(255,255,255,0.4);">
-                                    <span style="font-size: 1.5rem; display: block; margin-bottom: 4px;">📝</span>
-                                    <p>Quiz not available</p>
-                                </div>
-                            `}
-                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                        </div>
-                    `;
-                    break;
-                case 'material':
-                    itemContent = `
-                        <div class="item-material-wrapper">
-                            ${item.fileUrl ? `
-                                <a href="${item.fileUrl}" class="btn btn-outline" download style="margin-right: 8px; color: #8B5FBF; border: 1px solid #8B5FBF; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-block;">
-                                    📥 Download ${item.fileName || 'File'}
-                                </a>
-                            ` : '<p style="color: rgba(255,255,255,0.5);">Material not available</p>'}
-                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                        </div>
-                    `;
-                    break;
-                case 'link':
-                    itemContent = `
-                        <div class="item-link-wrapper">
-                            <a href="${item.linkUrl}" target="${item.linkTarget || '_blank'}" class="btn btn-outline" style="color: #8B5FBF; border: 1px solid #8B5FBF; padding: 8px 16px; border-radius: 8px; text-decoration: none; display: inline-block;">
-                                🔗 ${this.escapeHtml(item.title || 'Open Link')}
-                            </a>
-                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                        </div>
-                    `;
-                    break;
-                case 'embed':
-                    itemContent = `
-                        <div class="item-embed-wrapper">
-                            ${item.embedCode ? item.embedCode : ''}
-                            ${item.content ? `<p style="margin-top: 8px; color: rgba(255,255,255,0.7);">${this.escapeHtml(item.content)}</p>` : ''}
-                        </div>
-                    `;
-                    break;
-                default:
-                    itemContent = `<p style="color: rgba(255,255,255,0.5);">Content type not supported</p>`;
-            }
-
-            const typeLabels = {
-                'text': 'Text',
-                'video': 'Video',
-                'quiz': 'Quiz',
-                'material': 'Material',
-                'link': 'Link',
-                'embed': 'Embed'
-            };
-
-            const typeColors = {
-                'text': '#3B82F6',
-                'video': '#EF4444',
-                'quiz': '#F59E0B',
-                'material': '#10B981',
-                'link': '#8B5FBF',
-                'embed': '#6B7280'
-            };
-
-            return `
-                <div class="lesson-content-item" data-item-index="${index}" style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; border-left: 4px solid ${typeColors[item.type] || '#8B5FBF'}; margin-bottom: 16px;">
-                    <div class="item-header" style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                        <span class="item-type-badge ${item.type}" style="display: inline-block; padding: 2px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; background: ${typeColors[item.type] || '#6B7280'}; color: white;">
-                            ${typeLabels[item.type] || item.type}
-                        </span>
-                        ${item.isRequired ? '<span style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">Required</span>' : '<span style="font-size: 0.7rem; color: rgba(255,255,255,0.3);">Optional</span>'}
-                    </div>
-                    ${item.title ? `<div class="item-title" style="font-size: 1rem; font-weight: 600; color: white;">${this.escapeHtml(item.title)}</div>` : ''}
-                    ${itemContent}
-                    <div class="item-footer" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                        ${item.duration ? `<span class="item-duration" style="font-size: 0.8rem; color: rgba(255,255,255,0.5);">⏱️ ${item.duration} min</span>` : ''}
-                        <button class="item-complete-btn incomplete" data-item-index="${index}" style="padding: 4px 16px; border-radius: 20px; font-size: 0.8rem; border: none; cursor: pointer; background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.2);">
-                            Mark as Read
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    } else {
-        itemsHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center; padding: 20px;">No content items in this lesson.</p>';
-    }
-
-    const progress = lesson.progressPercentage || 0;
-    const isCompleted = lesson.completed || false;
-
-    modal.innerHTML = `
-        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto; background: #1A1A2E; border-radius: 16px; padding: 32px; border: 1px solid rgba(255,255,255,0.1); position: relative;">
-            <span class="close-modal" onclick="document.getElementById('lessonDetailModal').style.display='none'" style="position: absolute; top: 15px; right: 20px; font-size: 2rem; cursor: pointer; color: rgba(255,255,255,0.6); transition: color 0.3s ease; z-index: 10;">&times;</span>
-            
-            <div style="margin-bottom: 16px;">
-                <h2 style="color: white; margin: 0;">${this.escapeHtml(lesson.title)}</h2>
-                ${lesson.description ? `<p style="color: rgba(255,255,255,0.6); margin-top: 4px;">${this.escapeHtml(lesson.description)}</p>` : ''}
-            </div>
-
-            <div class="lesson-progress-container" style="background: rgba(255,255,255,0.08); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;">
-                <div class="progress-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                    <h4 style="color: white; font-size: 1rem; margin: 0;">📊 Lesson Progress</h4>
-                    <span style="color: rgba(255,255,255,0.7); font-size: 0.9rem;">${progress}% complete</span>
-                </div>
-                <div class="progress-bar" style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; margin-top: 8px;">
-                    <div class="progress-fill" style="width: ${progress}%; height: 100%; background: linear-gradient(90deg, #8B5FBF, #6C3CE1); border-radius: 4px; transition: width 0.5s ease;"></div>
-                </div>
-            </div>
-
-            <div class="lesson-content-items" style="display: flex; flex-direction: column; gap: 16px;">
-                ${itemsHTML}
-            </div>
-
-            <button class="mark-lesson-complete-btn ${isCompleted ? 'completed' : 'available'}" 
-                    id="markLessonCompleteBtn"
-                    ${isCompleted ? 'disabled' : ''}
-                    style="padding: 12px 32px; border-radius: 10px; font-size: 1rem; font-weight: 600; border: none; cursor: pointer; transition: all 0.3s ease; width: 100%; margin-top: 20px; ${isCompleted ? 'background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); cursor: default;' : 'background: #10B981; color: white;'}">
-                ${isCompleted ? '✅ Lesson Completed' : '✅ Mark Lesson as Complete'}
-            </button>
-        </div>
-    `;
-
-    modal.style.display = 'flex';
-
-    // Add event listener for mark complete button with loading state
-    const completeBtn = document.getElementById('markLessonCompleteBtn');
-    if (completeBtn && !isCompleted) {
-        completeBtn.addEventListener('click', () => {
-            // Show loading on button
-            const originalText = completeBtn.textContent;
-            completeBtn.disabled = true;
-            completeBtn.innerHTML = `
-                <span class="spinner" style="display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: middle;"></span>
-                Saving...
-            `;
-            completeBtn.style.opacity = '0.7';
-            
-            // Call mark complete
-            this.markLessonComplete(lesson._id, completeBtn, originalText);
-        });
-    }
-
-    // Add event listeners for item complete buttons
-    modal.querySelectorAll('.item-complete-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const itemIndex = parseInt(btn.dataset.itemIndex);
-            this.toggleItemComplete(lesson._id, itemIndex, btn);
-        });
-    });
-}
 
 /**
  * Mark a lesson as complete
