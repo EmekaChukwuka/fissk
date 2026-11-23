@@ -748,7 +748,6 @@ Regisrouter.post('/get-user-classes', async (req, res) => {
   const { email } = req.body;
   
   try {
-    // Find user by email
     const user = await User.findOne({ email });
     
     if (!user) {
@@ -762,8 +761,10 @@ Regisrouter.post('/get-user-classes', async (req, res) => {
       .populate('classId')
       .lean();
     
-    // Format the response
-    const classes = enrollments.map(enrollment => ({
+    // ===== FIX: Filter out enrollments whose class was deleted =====
+    const validEnrollments = enrollments.filter(e => e.classId && e.classId._id);
+    
+    const classes = validEnrollments.map(enrollment => ({
       class_id: enrollment.classId._id,
       progress: enrollment.progress,
       completed: enrollment.completed,

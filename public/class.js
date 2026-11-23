@@ -184,39 +184,43 @@ class ClassManager {
             throw error;
         }
     }
-
-    async checkEnrollment() {
-        if (!this.user || !this.user.email) {
-            this.isEnrolled = false;
-            return;
-        }
-        
-        try {
-            const response = await fetch('https://fissk-iui2.onrender.com/register/get-user-classes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: this.user.email })
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to check enrollment');
+    
+            async checkEnrollment() {
+            if (!this.user || !this.user.email) {
+                this.isEnrolled = false;
+                return;
             }
             
-            const data = await response.json();
-            
-            if (data.classes && data.classes.length) {
-                this.isEnrolled = data.classes.some(c => 
-                    (c.class_id?.toString() === this.classId) || (c._id?.toString() === this.classId)
-                );
+            try {
+                const response = await fetch('https://fissk-iui2.onrender.com/register/get-user-classes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: this.user.email })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Enrollment check failed: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.classes && data.classes.length) {
+                    this.isEnrolled = data.classes.some(c => 
+                        (c.class_id?.toString() === this.classId) || (c._id?.toString() === this.classId)
+                    );
+                } else {
+                    this.isEnrolled = false;
+                }
+                
+                console.log('Enrollment status:', this.isEnrolled);
+            } catch (error) {
+                console.error('Error checking enrollment:', error);
+                // Do NOT silently flip to false — warn the user instead.
+                if (window.showToast) {
+                    window.showToast('Could not verify enrollment. Please refresh if this looks wrong.', true);
+                }
             }
-            
-            console.log('Enrollment status:', this.isEnrolled);
-        } catch (error) {
-            console.error('Error checking enrollment:', error);
-            this.isEnrolled = false;
         }
-    }
-
     async loadClassVideos() {
         try {
             const userId = this.userId || '';
