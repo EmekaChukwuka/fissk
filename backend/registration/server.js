@@ -627,7 +627,7 @@ Regisrouter.get('/classes-on-homepage', async (req, res) => {
   }
 });
 
-// Get class by ID (with payment info)
+// Get class by ID (with payment info + real enrollment count)
 Regisrouter.get('/class/:classId', async (req, res) => {
   const classId = req.params.classId;
   
@@ -641,7 +641,34 @@ Regisrouter.get('/class/:classId', async (req, res) => {
         message: 'Class not found' 
       });
     }
-    
+
+    // ===== REAL ENROLLMENT COUNTS =====
+    // Count only enrollments that actually have access (paid or free).
+    // Pending/failed payment rows are counted separately so the UI can
+    // decide whether to show "12 enrolled" or "12 enrolled · 2 pending".
+    let totalEnrollments = 0;
+    let paidOrFreeCount = 0;
+    let pendingCount = 0;
+    let failedCount = 0;
+
+    try {
+      [totalEnrollments, paidOrFreeCount, pendingCount, failedCount] = await Promise.all([
+        Enrollment.countDocuments({ classId }),
+        Enrollment.countDocuments({
+          classId,
+          paymentStatus: { $in: ['paid', 'free'] }
+        }),
+        Enrollment.countDocuments({ classId, paymentStatus: 'pending' }),
+        Enrollment.countDocuments({ classId, paymentStatus: 'failed' })
+      ]);
+    } catch (countErr) {
+      // A count failure should never break the class page.
+      console.error('Enrollment count error for class', classId, ':', countErr);
+    }
+
+    const maxStudents = classData.maxStudents || 0;
+    const isFull = maxStudents > 0 && paidOrFreeCount >= maxStudents;
+
     // Format with payment info
     const formattedClass = {
       _id: classData._id,
@@ -664,7 +691,18 @@ Regisrouter.get('/class/:classId', async (req, res) => {
       currency: classData.currency || 'NGN',
       totalRevenue: classData.totalRevenue || 0,
       totalSales: classData.totalSales || 0,
-      enrolledStudents: classData.enrolledStudents || 0,
+
+      // ===== ENROLLMENT (now real) =====
+      enrolledStudents: paidOrFreeCount,     // the number to show as "X enrolled"
+      isFull,                                 // true when paidOrFreeCount >= maxStudents
+      enrollmentStats: {                      // optional breakdown for detailed views
+        total: totalEnrollments,
+        active: paidOrFreeCount,
+        pending: pendingCount,
+        failed: failedCount,
+        maxStudents
+      },
+
       rating: classData.rating || 0,
       totalRatings: classData.totalRatings || 0,
       requirements: classData.requirements,
@@ -672,7 +710,7 @@ Regisrouter.get('/class/:classId', async (req, res) => {
       syllabus: classData.syllabus,
       thumbnailUrl: classData.thumbnailUrl,
       isActive: classData.isActive,
-      maxStudents: classData.maxStudents,
+      maxStudents,
       quizCount: classData.quizCount || 0,
       createdAt: classData.createdAt,
       updatedAt: classData.updatedAt
